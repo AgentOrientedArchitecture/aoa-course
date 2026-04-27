@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/")
 TRACES_DIR = Path(os.environ.get("PLANNER_TRACES_DIR", "/data/traces"))
 PORT = int(os.environ.get("PLANNER_PORT", "7200"))
-INVOKE_TIMEOUT = float(os.environ.get("PLANNER_INVOKE_TIMEOUT", "120"))
+INVOKE_TIMEOUT = float(os.environ.get("PLANNER_INVOKE_TIMEOUT", "300"))
 
 
 # ----------------------------------------------------------------------
@@ -292,6 +292,19 @@ async def _run_workflow(
                 "signals": response.get("signals", {}),
                 "latency_seconds": elapsed,
             })
+            if _response_failed(response):
+                final_outputs = {
+                    "error": response.get("outputs", {}).get("error", "capability failed"),
+                    "failed_capability": step.capability,
+                    "signals": response.get("signals", {}),
+                }
+                await _record({
+                    "trace_id": trace_id,
+                    "step": "finish",
+                    "workflow": workflow.name,
+                    "outputs": final_outputs,
+                })
+                return trace_id, final_outputs
             step_outputs[step.capability] = {
                 "outputs": response.get("outputs", {}),
                 "signals": response.get("signals", {}),
@@ -305,6 +318,14 @@ async def _run_workflow(
         "outputs": final.get("outputs", {}),
     })
     return trace_id, final.get("outputs", {})
+
+
+def _response_failed(response: dict[str, Any]) -> bool:
+    outputs = response.get("outputs", {})
+    signals = response.get("signals", {})
+    has_output_error = isinstance(outputs, dict) and bool(outputs.get("error"))
+    has_exception_signal = isinstance(signals, dict) and bool(signals.get("exception"))
+    return has_output_error or has_exception_signal
 
 
 # ----------------------------------------------------------------------

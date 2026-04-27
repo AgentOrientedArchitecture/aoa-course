@@ -37,7 +37,7 @@ class Model:
         self,
         provider: str | None = None,
         model: str | None = None,
-        timeout_seconds: float = 60.0,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.provider = (provider or os.environ.get("PROVIDER", "openai")).lower()
         self.model = model or os.environ.get("MODEL", "")
@@ -45,7 +45,11 @@ class Model:
             raise RuntimeError(
                 "MODEL env var is not set. See system/.env.example for guidance."
             )
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = (
+            float(os.environ.get("MODEL_TIMEOUT_SECONDS", "180"))
+            if timeout_seconds is None
+            else timeout_seconds
+        )
         self._client: Any = None
 
     # ------------------------------------------------------------------

@@ -39,6 +39,7 @@ services:
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_TRACES_DIR: /data/traces
+      PLANNER_INVOKE_TIMEOUT: ${PLANNER_INVOKE_TIMEOUT:-300}
     depends_on:
       registry:
         condition: service_healthy
@@ -56,6 +57,7 @@ services:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
       INBOX_DIR: /data/inbox
+      PLANNER_REQUEST_TIMEOUT: ${PLANNER_REQUEST_TIMEOUT:-420}
     depends_on:
       registry:
         condition: service_healthy
@@ -127,6 +129,7 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
     depends_on:
       registry:
         condition: service_healthy
@@ -154,6 +157,7 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
     depends_on:
       registry:
         condition: service_healthy
@@ -180,6 +184,7 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
     depends_on:
       registry:
         condition: service_healthy

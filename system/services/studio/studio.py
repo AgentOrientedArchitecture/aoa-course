@@ -30,6 +30,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/")
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
+PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
 
 # The inbox is a shared volume the studio writes to and the filesystem tool
 # reads from. Both containers see it at the same path so the agents can be
@@ -289,7 +290,7 @@ async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] 
 
 
 async def _post_planner_intent(planner_body: dict[str, Any]) -> dict[str, Any] | JSONResponse:
-    async with httpx.AsyncClient(timeout=180.0) as client:
+    async with httpx.AsyncClient(timeout=PLANNER_REQUEST_TIMEOUT) as client:
         try:
             r = await client.post(f"{PLANNER_URL}/intent", json=planner_body)
             r.raise_for_status()
