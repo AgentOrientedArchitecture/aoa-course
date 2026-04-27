@@ -8,8 +8,9 @@ The studio has two roles in this system:
 
 - **Registry.** Every registered capability — id, version, kind, current `skills_hash`. Updates as capabilities register, deregister, or change.
 - **Trace.** The currently-running flow as a vertical timeline. Each row shows
-  a planner step: task breakdown, discovery, selection, plan, lookup,
-  invocation, response. Rows expand for full payloads.
+  a planner step: capability context, planner proposal, validation/fallback,
+  discovery, selection, plan, lookup, invocation, response. Rows expand for
+  full payloads.
 - **Capability card.** Click a registry row to read its card.
 
 **Intent** — two ways to drive the system:

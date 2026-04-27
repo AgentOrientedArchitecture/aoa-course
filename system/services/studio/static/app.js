@@ -135,7 +135,18 @@ function appendTraceRow(record) {
 }
 
 function pickPayload(record) {
+  if (record.step === "capability-context") {
+    return { capabilities: record.capabilities };
+  }
   if (record.step === "breakdown") return { tasks: record.tasks };
+  if (record.step === "plan-proposal") {
+    return {
+      source: record.source,
+      proposal: record.proposal,
+      validation: record.validation,
+      fallback_reason: record.fallback_reason,
+    };
+  }
   if (record.step === "discover") {
     return { task: record.task, query: record.query, candidates: record.candidates };
   }

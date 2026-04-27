@@ -90,10 +90,11 @@ There is no restart. The studio's registry pane updates the `skills_hash` for th
 
 ## Invocation
 
-The planner breaks intent into task specs and asks the registry to discover
-candidate capabilities for each task. Once a task is bound to an AU capability,
-the selected card includes `a2a_endpoint`, so the planner sends an A2A JSON-RPC
-request:
+The planner gives the planner model compact registry context and asks for a
+task plan. The runtime validates that plan against capability cards before
+executing it, falling back to the deterministic course plan if needed. Once a
+task is bound to an AU capability, the selected card includes `a2a_endpoint`,
+so the planner sends an A2A JSON-RPC request:
 
 ```json
 POST http://evaluator:8888/a2a

@@ -2,6 +2,9 @@
 
 The planner turns an intent into a task breakdown, discovers matching
 capabilities, assembles a plan, and then orchestrates capability invocations.
+By default it uses a hybrid strategy: a small-registry planner model sees the
+available AU capability cards and proposes the plan, then deterministic
+validation either accepts that plan or falls back to the built-in course plan.
 
 For Session 2 there is one workflow:
 
@@ -18,13 +21,15 @@ knowledge-query:  parse-note → evaluate-question → write-grounded-answer
 
 Receiving an intent, the planner:
 
-1. Decides which task breakdown applies.
-2. Emits task specs with required inputs, required outputs, and discovery text.
-3. Calls registry `/discover` for each task.
-4. Selects the top-ranked capability and records the resolved plan.
-5. Starts AU capabilities over A2A `message/send`; tool bridges remain direct.
-6. Threads outputs into the next task's inputs.
-7. Writes every visible step to `traces/<event-id>.jsonl`.
+1. Loads the current capability cards from the registry.
+2. Gives the planner model the intent, compact AU card summaries, and few-shot
+   examples.
+3. Validates the proposed JSON plan against registry contracts.
+4. Falls back to the deterministic course plan if validation fails.
+5. Records task breakdown, selected capabilities, and the resolved plan.
+6. Starts AU capabilities over A2A `message/send`; tool bridges remain direct.
+7. Threads outputs into the next task's inputs.
+8. Writes every visible step to `traces/<event-id>.jsonl`.
 
 The studio subscribes to `/events` and renders the running trace live.
 
@@ -43,7 +48,9 @@ The studio subscribes to `/events` and renders the running trace live.
 Each trace is a JSON-lines file. One record per planner-visible step:
 
 ```json
+{"ts": "...", "trace_id": "...", "step": "capability-context", "capabilities": [...]}
 {"ts": "...", "trace_id": "...", "step": "breakdown", "tasks": [...]}
+{"ts": "...", "trace_id": "...", "step": "plan-proposal", "source": "llm", "validation": {...}}
 {"ts": "...", "trace_id": "...", "step": "discover", "task": "parse-cv", "candidates": [...]}
 {"ts": "...", "trace_id": "...", "step": "select", "task": "parse-cv", "capability": "parser-cv"}
 {"ts": "...", "trace_id": "...", "step": "plan", "plan": [...]}
@@ -59,3 +66,9 @@ any editor.
 ## Running locally
 
 The planner runs on port 7200. It expects `REGISTRY_URL=http://registry:7100`.
+
+`PLANNER_STRATEGY` controls planning:
+
+- `hybrid` — default. Ask the model for a plan, validate, fall back if needed.
+- `deterministic` — skip the model and use the built-in course task plan.
+- `llm` — require a valid model-generated plan; fail if validation fails.

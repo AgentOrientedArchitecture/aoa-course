@@ -44,7 +44,7 @@ Each is something you can see on screen as you build:
 3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
-6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → task breakdown → discovery → plan → A2A orchestration → tool.
+6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
 
 ## The agent set
 
@@ -79,7 +79,7 @@ When a single codebase backs more than one capability, the capability-specific f
 | Service | Job |
 |---|---|
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
-| **planner** | Receives intents from the studio. Builds task specs, asks the registry to discover candidates, selects capabilities, sequences AU invocations with A2A `message/send`, and calls registered tool bridges for deterministic MCP-backed tools. Records each step to `traces/<event-id>.jsonl`. |
+| **planner** | Receives intents from the studio. Gives the planner model compact registry context, validates the proposed plan, falls back if needed, sequences AU invocations with A2A `message/send`, and calls registered tool bridges for deterministic MCP-backed tools. Records each step to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
 
 ## Container topology
@@ -121,11 +121,13 @@ at `http://parser:8888/a2a`. The card includes standard A2A fields such as
 the full capability-card contracts are also advertised through an A2A
 `capabilities.extensions` entry.
 
-The planner still uses the AOA registry to choose concrete capabilities. It
-first records task specs, asks `/discover` for ranked candidate cards, selects
-one capability per task, and records the resolved plan. When a registered card
-includes `a2a_endpoint`, the planner sends a JSON-RPC 2.0 request to that
-endpoint:
+The planner still uses the AOA registry to ground concrete capabilities. In
+this small course registry it sends compact AU capability summaries to the
+planner model and asks for a JSON task plan. The runtime validates that the
+plan uses registered capabilities, maps required inputs, references only
+available prior outputs, and ends in a markdown-producing result. If validation
+fails, the deterministic course plan is used. When a registered card includes
+`a2a_endpoint`, the planner sends a JSON-RPC 2.0 request to that endpoint:
 
 ```json
 {
@@ -205,7 +207,7 @@ A browser surface at `localhost:8080` with two roles:
 **Observation:**
 
 - **Registry pane.** Live listing of every registered capability — id, version, kind (`au` or `tool`), backing agent, current `skills_hash`. Updates as capabilities register, deregister, or change.
-- **Trace pane.** The currently-running flow as a vertical timeline. Each row shows task breakdown, registry discovery, capability selection, plan assembly, invocation, and response. Rows are collapsible for full payloads. Finished flows persist until the next intent runs.
+- **Trace pane.** The currently-running flow as a vertical timeline. Each row shows capability context, planner proposal, validation/fallback, discovery, capability selection, plan assembly, invocation, and response. Rows are collapsible for full payloads. Finished flows persist until the next intent runs.
 - **Capability card pane.** Click any registry entry to see its card formatted.
 
 **Intent:**
