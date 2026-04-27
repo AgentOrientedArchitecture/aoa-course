@@ -121,11 +121,16 @@ class Model:
             "max_tokens": max_tokens,
         }
         reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low").strip()
+        extra_body: dict[str, Any] = {}
         if reasoning_effort:
-            kwargs["reasoning_effort"] = reasoning_effort
+            # OpenAI-compatible providers often add fields before the OpenAI
+            # Python SDK exposes them as first-class keyword arguments.
+            extra_body["reasoning_effort"] = reasoning_effort
         response_format = os.environ.get("OPENAI_RESPONSE_FORMAT", "json_object").strip()
         if response_format:
             kwargs["response_format"] = {"type": response_format}
+        if extra_body:
+            kwargs["extra_body"] = extra_body
         return kwargs
 
     def _openai_text(self, raw: dict[str, Any]) -> str:
