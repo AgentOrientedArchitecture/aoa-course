@@ -1,0 +1,27 @@
+id: parser-cv
+version: 0.1.0
+kind: au
+purpose: |
+  Read a CV from the filesystem and return a structured representation:
+  contact details, a one-line summary, a list of skills, work experience,
+  and education.
+inputs:
+  - name: cv_path
+    type: string
+    required: true
+outputs:
+  - name: parsed
+    type: structured-cv
+constraints:
+  - The output is a single JSON object.
+  - The object includes the keys name, email, summary, skills, experience, education.
+  - skills is an array of strings.
+  - experience is an array of {company, role, start, end, highlights}.
+  - education is an array of {institution, qualification, year}.
+evaluation_signals:
+  - valid_output_shape
+  - has_name
+  - has_skills
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}
