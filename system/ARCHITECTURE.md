@@ -207,7 +207,7 @@ A browser surface at `localhost:8080` with two roles:
 **Observation:**
 
 - **Registry pane.** Live listing of every registered capability — id, version, kind (`au` or `tool`), backing agent, current `skills_hash`. Updates as capabilities register, deregister, or change.
-- **Trace pane.** The currently-running flow as a vertical timeline. Each row shows capability context, planner proposal, validation/fallback, discovery, capability selection, plan assembly, invocation, and response. Rows are collapsible for full payloads. Finished flows persist until the next intent runs.
+- **Intent Studio pane.** The currently-running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, task plan, work status, and rendered result. Raw event payloads are still available in an expandable details section.
 - **Capability card pane.** Click any registry entry to see its card formatted.
 
 **Intent:**

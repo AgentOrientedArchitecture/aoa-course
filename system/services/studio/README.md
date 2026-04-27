@@ -7,10 +7,9 @@ The studio has two roles in this system:
 **Observation** — three live panes:
 
 - **Registry.** Every registered capability — id, version, kind, current `skills_hash`. Updates as capabilities register, deregister, or change.
-- **Trace.** The currently-running flow as a vertical timeline. Each row shows
-  a planner step: capability context, planner proposal, validation/fallback,
-  discovery, selection, plan, lookup, invocation, response. Rows expand for
-  full payloads.
+- **Intent Studio.** The centre pane shows the selected intent, supplied
+  inputs, planner summary, task cards, lifecycle rail, and final result. Raw
+  event payloads remain available behind an expandable details section.
 - **Capability card.** Click a registry row to read its card.
 
 **Intent** — two ways to drive the system:

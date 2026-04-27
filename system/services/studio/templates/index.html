@@ -18,7 +18,7 @@
     </section>
 
     <section id="trace-pane" class="pane">
-      <h2>Trace</h2>
+      <h2>Intent Studio</h2>
       <div id="intent-form" class="intent">
         <div class="mode-tabs" role="tablist" aria-label="Workflow">
           <button id="mode-cv" class="active" type="button" data-mode="cv-fit">CV fit</button>
@@ -78,7 +78,46 @@
           <span id="intent-status"></span>
         </div>
       </div>
-      <ol id="trace-list" class="list trace"></ol>
+      <div id="lifecycle" class="lifecycle">
+        <section class="lifecycle-summary">
+          <div>
+            <span class="section-label">Intent</span>
+            <h3 id="intent-title">No run yet</h3>
+          </div>
+          <span id="run-state" class="run-state idle">idle</span>
+        </section>
+
+        <ol id="lifecycle-rail" class="lifecycle-rail"></ol>
+
+        <section class="lifecycle-section">
+          <div class="section-head">
+            <span class="section-label">Planner</span>
+            <span id="planner-source" class="section-meta">waiting</span>
+          </div>
+          <div id="planner-body" class="planner-body muted-block">No plan yet.</div>
+        </section>
+
+        <section class="lifecycle-section">
+          <div class="section-head">
+            <span class="section-label">Tasks</span>
+            <span id="task-count" class="section-meta">0</span>
+          </div>
+          <ol id="task-list" class="task-list"></ol>
+        </section>
+
+        <section class="lifecycle-section result-section">
+          <div class="section-head">
+            <span class="section-label">Result</span>
+            <span id="result-state" class="section-meta">waiting</span>
+          </div>
+          <div id="result-body" class="result-body muted-block">No result yet.</div>
+        </section>
+      </div>
+
+      <details class="event-details">
+        <summary>Event details</summary>
+        <ol id="trace-list" class="list trace"></ol>
+      </details>
     </section>
 
     <section id="card-pane" class="pane">
