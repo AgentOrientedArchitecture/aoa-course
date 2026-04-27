@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AOA Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>AOA Studio</h1>
+    <span id="status" class="status disconnected">connecting…</span>
+  </header>
+
+  <main>
+    <section id="registry-pane" class="pane">
+      <h2>Registry</h2>
+      <ul id="registry-list" class="list"></ul>
+    </section>
+
+    <section id="trace-pane" class="pane">
+      <h2>Trace</h2>
+      <div id="intent-form" class="intent">
+        <textarea
+          id="intent-cv"
+          placeholder="Paste a CV here, or drop a .txt / .md file anywhere on the page."
+          rows="6"></textarea>
+        <textarea
+          id="intent-jd"
+          placeholder="Paste the job description here."
+          rows="4"></textarea>
+        <div class="intent-actions">
+          <button id="intent-submit" type="button">Run cv-fit</button>
+          <span id="intent-status"></span>
+        </div>
+      </div>
+      <ol id="trace-list" class="list trace"></ol>
+    </section>
+
+    <section id="card-pane" class="pane">
+      <h2>Capability card</h2>
+      <pre id="card-body" class="card-body">Click a capability on the left.</pre>
+    </section>
+  </main>
+
+  <div id="file-drop-overlay" class="drop-overlay">Drop a CV file</div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
