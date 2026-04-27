@@ -3,8 +3,8 @@
 A small, container-shaped, readable AOA system. Two workflows, three agent
 codebases, six AU capabilities, two deterministic tools, and three plumbing
 services. AU-to-AU orchestration uses A2A Agent Cards and JSON-RPC
-`message/send`; deterministic tools remain registered capabilities called over
-their simpler tool endpoints.
+`message/send`; deterministic tools expose MCP tools behind small registered
+AOA bridges.
 
 ## What the system does
 
@@ -40,7 +40,7 @@ general.
 Each is something you can see on screen as you build:
 
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
-2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool over a direct endpoint is a property of the entry, not of the registry.
+2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
 3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
@@ -61,7 +61,7 @@ Plus, in `tools/`:
 | Tool | Registered as | Type |
 |---|---|---|
 | filesystem MCP server | `tool-filesystem` | non-AU registered capability |
-| document text extractor | `tool-document-text` | non-AU registered capability |
+| document text MCP server | `tool-document-text` | non-AU registered capability |
 
 ## The four parts of an AU
 
@@ -79,7 +79,7 @@ When a single codebase backs more than one capability, the capability-specific f
 | Service | Job |
 |---|---|
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes `find_capability(intent)` and `list_capabilities()` over HTTP. |
-| **planner** | Receives intents from the studio. Queries the registry. Sequences AU invocations with A2A `message/send` and falls back to direct endpoints for tools. Records each step to `traces/<event-id>.jsonl`. |
+| **planner** | Receives intents from the studio. Queries the registry. Sequences AU invocations with A2A `message/send` and calls registered tool bridges for deterministic MCP-backed tools. Records each step to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
 
 ## Container topology
@@ -96,7 +96,7 @@ docker-compose.yml services:
   evaluator            FastAPI    8888 (host: 7302)
   reporter             FastAPI    8888 (host: 7303)
   tool-filesystem      MCP        7401
-  tool-document-text   FastAPI    7402
+  tool-document-text   MCP+bridge 7402
   ollama               profile: local, optional
 ```
 
@@ -153,8 +153,8 @@ request to that endpoint:
 The agent replies with an A2A message. The structured AOA envelope lives in a
 `DataPart` so the planner can keep the same trace and workflow code. Reporter
 agents may also include a text part containing markdown for inline rendering.
-`/invoke` remains available as a compatibility endpoint and as the simple
-surface used by deterministic tools.
+`/invoke` remains available as a compatibility endpoint and as the AOA bridge
+surface used by deterministic MCP-backed tools.
 
 ## Capability card schema
 

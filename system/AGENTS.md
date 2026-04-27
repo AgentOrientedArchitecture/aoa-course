@@ -23,9 +23,10 @@ agents/<name>/
 It's mounted read-only and **hot-reloaded**: a watcher inside the container re-reads `skills.md` when it changes. Editing `skills.md` on disk changes the capability's behaviour without a restart.
 
 **3. `tools.yaml`** — capability ids this agent calls. In this course system
-the examples use pure tools here, called through registered tool endpoints.
-The planner is responsible for AU-to-AU A2A orchestration. May be empty for AUs
-that don't need anything beyond their model — the reporter is the example.
+the examples use pure tools here, exposed as MCP tools behind registered AOA
+bridges. The planner is responsible for AU-to-AU A2A orchestration. May be
+empty for AUs that don't need anything beyond their model — the reporter is the
+example.
 
 ```yaml
 needs:
@@ -158,9 +159,9 @@ with the AOA result envelope in a `DataPart`:
 Both the request and response are written to the planner's trace file for that flow. The studio renders them.
 
 `/invoke?capability=<id>` remains available as a simple compatibility endpoint
-and is the shape deterministic tools use. The course point is visible in the
-registry card: AUs advertise `endpoint`, `agent_card_url`, and `a2a_endpoint`;
-tools advertise only `endpoint`.
+and is the AOA bridge shape deterministic MCP-backed tools use. The course
+point is visible in the registry card: AUs advertise `endpoint`,
+`agent_card_url`, and `a2a_endpoint`; tools advertise only `endpoint`.
 
 The Docker-internal Agent Card URLs use service names, for example
 `http://parser:8888/.well-known/agent-card.json`. Host ports are mapped only so
@@ -202,6 +203,6 @@ Tools live under `tools/<name>/` rather than `agents/<name>/`. Same shape, with 
 
 Tools register the same way agents do and are looked up the same way. The planner doesn't distinguish between calling an agent and calling a tool — both come back from `find_capability(id)` with an `endpoint`.
 
-The MCP filesystem server and document text extractor are the examples. See
+The filesystem and document text extractors are MCP-backed examples. See
 [`tools/filesystem/`](tools/filesystem/) and
 [`tools/document-text/`](tools/document-text/).

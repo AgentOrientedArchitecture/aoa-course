@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
-COPY tool.py capability-card.yaml /app/
+COPY mcp_server.py bridge.py capability-card.yaml /app/
 
 EXPOSE 7402
-CMD ["python", "-u", "/app/tool.py"]
+CMD ["python", "-u", "/app/bridge.py"]
