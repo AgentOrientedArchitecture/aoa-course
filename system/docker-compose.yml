@@ -1,0 +1,182 @@
+# Session 2 system. Bring everything up with `make up` from the repo root,
+# or `docker compose -f system/docker-compose.yml up --build` directly.
+#
+# Build order matters once: the `agent-base` service builds the shared base
+# image that every agent extends. Compose handles this through the
+# `depends_on` graph. Concrete agents reference it by image name.
+
+services:
+
+  # ------------------------------------------------------------------
+  # Services
+  # ------------------------------------------------------------------
+  registry:
+    build:
+      context: ./services/registry
+    image: aoa-course/registry:latest
+    container_name: aoa-registry
+    ports:
+      - "7100:7100"
+    volumes:
+      - registry-data:/data
+    environment:
+      REGISTRY_DATA_DIR: /data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7100/healthz', timeout=2).status == 200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  planner:
+    build:
+      context: ./services/planner
+    image: aoa-course/planner:latest
+    container_name: aoa-planner
+    ports:
+      - "7200:7200"
+    volumes:
+      - planner-traces:/data/traces
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_TRACES_DIR: /data/traces
+    depends_on:
+      registry:
+        condition: service_healthy
+
+  studio:
+    build:
+      context: ./services/studio
+    image: aoa-course/studio:latest
+    container_name: aoa-studio
+    ports:
+      - "8080:8080"
+    volumes:
+      - inbox:/data/inbox
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      INBOX_DIR: /data/inbox
+    depends_on:
+      registry:
+        condition: service_healthy
+      planner:
+        condition: service_started
+
+  # ------------------------------------------------------------------
+  # Tools
+  # ------------------------------------------------------------------
+  tool-filesystem:
+    build:
+      context: ./tools/filesystem
+    image: aoa-course/tool-filesystem:latest
+    container_name: aoa-tool-filesystem
+    ports:
+      - "7401:7401"
+    volumes:
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      TOOL_HOST: tool-filesystem
+      TOOL_PORT: 7401
+      FS_ROOT: /data
+    depends_on:
+      registry:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------
+  # Agents
+  # ------------------------------------------------------------------
+  parser:
+    build:
+      context: ./agents/parser
+    image: aoa-course/parser:latest
+    container_name: aoa-parser
+    ports:
+      - "7301:7301"
+    volumes:
+      # capabilities/ is mounted (not COPYed) so editing skills.md on the
+      # host triggers the in-container hot reload.
+      - ./agents/parser/capabilities:/app/capabilities:ro
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      AGENT_NAME: parser
+      AGENT_HOST: parser
+      AGENT_PORT: 7301
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-filesystem:
+        condition: service_started
+
+  evaluator:
+    build:
+      context: ./agents/evaluator
+    image: aoa-course/evaluator:latest
+    container_name: aoa-evaluator
+    ports:
+      - "7302:7302"
+    volumes:
+      - ./agents/evaluator/capabilities:/app/capabilities:ro
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      AGENT_NAME: evaluator
+      AGENT_HOST: evaluator
+      AGENT_PORT: 7302
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-filesystem:
+        condition: service_started
+
+  reporter:
+    build:
+      context: ./agents/reporter
+    image: aoa-course/reporter:latest
+    container_name: aoa-reporter
+    ports:
+      - "7303:7303"
+    volumes:
+      - ./agents/reporter/capabilities:/app/capabilities:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      AGENT_NAME: reporter
+      AGENT_HOST: reporter
+      AGENT_PORT: 7303
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+    depends_on:
+      registry:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------
+  # Optional: local model server (only started under `local` profile)
+  # ------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aoa-ollama
+    profiles: ["local"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+
+volumes:
+  registry-data:
+  planner-traces:
+  inbox:
+  ollama-models:

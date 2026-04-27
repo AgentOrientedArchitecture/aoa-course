@@ -1,0 +1,21 @@
+# Local environment — never check this in.
+.env
+
+# Python build artefacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Runtime data left behind by `docker compose down -v` not running
+# (kept out of git so a stray local run never clutters PRs).
+system/services/registry/data/cards.json
+system/services/planner/traces/*.jsonl

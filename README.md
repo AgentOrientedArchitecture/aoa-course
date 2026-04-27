@@ -23,13 +23,13 @@ You'll need [Docker](https://docs.docker.com/get-docker/) and either an API key 
 
 ```bash
 git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
-cd aoa-course/system
+cd aoa-course
 cp .env.example .env
 # edit .env — set PROVIDER and MODEL
-docker compose up
+make up
 ```
 
-Then open `http://localhost:8080` for the studio.
+Then open [http://localhost:8080](http://localhost:8080) for the studio. `make help` lists the rest (`down`, `logs`, `rebuild`, `clean`, `local-up` for Ollama).
 
 ## Repo layout
 
@@ -47,7 +47,8 @@ system/
   seed-wiki/
   inbox/  raw/  wiki/
   docker-compose.yml
-  Makefile
+.env.example
+Makefile
 ```
 
 For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.md). For how the agents work, see [`system/AGENTS.md`](system/AGENTS.md).
