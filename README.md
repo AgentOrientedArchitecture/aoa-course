@@ -1,39 +1,37 @@
 # aoa-course
 
-Materials and runnable system for the **Agent-Oriented Architecture** live course on O'Reilly, **14 May 2026**.
+Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
 
-This repo carries two things at once:
+This repo holds two things:
 
-- **`course/`** — session narratives, slides, handouts, and the data the live build runs against.
-- **`system/`** — a small, runnable, container-shaped AOA system that the audience builds across the course.
-
-It is _not_ the same thing as [`aoa-knowledge`](https://github.com/AgentOrientedArchitecture/aoa-knowledge). That repo is the working knowledge base for the AOA project. This repo is the teaching artefact.
+- **`course/`** — session narratives, slides, handouts, and example data.
+- **`system/`** — a small, container-shaped AOA system you build across the course.
 
 ## What you'll build
 
-In **Session 2** the audience builds a small AOA system that evaluates a CV against a job description. By the end of S2, three agents (parser, evaluator, reporter) work together through a tiny browser-based studio to produce a structured fit verdict.
+Across two hands-on sessions you'll build an AOA system, starting from a single model call and ending with a multi-agent platform.
 
-In **Session 4** the audience opens the same repo and discovers the three-agent chain they built is general — it's also a query pipeline. They add new `skills.md` files against the same agent codebases and two more agents to make it a knowledge-management system: ingest research notes, promote them to a wiki, query the wiki with grounded answers.
+In **Session 2** you build a system that evaluates a CV against a job description. By the end of the session you have three agents — parser, evaluator, reporter — co-operating through a small browser studio to produce a structured fit verdict.
 
-The architectural payoff is that the same physical agents back different registered capabilities depending on which `skills.md` is mounted. Almost nothing about the agent _code_ changes between the CV evaluator (S2) and the wiki query system (S4) — what changes is which capabilities are registered.
+In **Session 4** you open the same repo and discover the three-agent chain you built is general. By adding new `skills.md` files to the same agents (and adding two new ones), you turn it into a knowledge-management system that ingests research notes, promotes them into a wiki, and answers questions grounded in those notes.
 
-## Five-minute clone-to-run
+The point of the course is in that move: the same agents back different capabilities depending on which `skills.md` is mounted. The architecture changes shape without you rewriting the agents.
 
-You'll need [Docker](https://docs.docker.com/get-docker/) and either an API key for OpenAI/Anthropic or a local [Ollama](https://ollama.com) install.
+## Run it
+
+You'll need [Docker](https://docs.docker.com/get-docker/) and either an API key (OpenAI or Anthropic) or a local [Ollama](https://ollama.com) install.
 
 ```bash
 git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
-cd aoa-course
-cp system/.env.example system/.env
-# edit system/.env — set PROVIDER and MODEL
-cd system && docker compose up
+cd aoa-course/system
+cp .env.example .env
+# edit .env — set PROVIDER and MODEL
+docker compose up
 ```
 
-Open `http://localhost:8080` for the studio.
+Then open `http://localhost:8080` for the studio.
 
 ## Repo layout
-
-See [`system/ARCHITECTURE.md`](system/ARCHITECTURE.md) for the architectural story and [`system/AGENTS.md`](system/AGENTS.md) for how agents in this repo work.
 
 ```
 course/
@@ -43,25 +41,21 @@ course/
   handouts/
   data/
 system/
-  agents/        # five agent codebases, eight capabilities by S4 end
-  services/      # registry, planner, studio, watcher
-  tools/         # registered capabilities that aren't AUs
+  agents/
+  services/
+  tools/
   seed-wiki/
   inbox/  raw/  wiki/
   docker-compose.yml
   Makefile
 ```
 
+For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.md). For how the agents work, see [`system/AGENTS.md`](system/AGENTS.md).
+
 ## Sessions
 
 - **Session 2 — Anatomy of AOA** — [`course/sessions/02-anatomy-of-aoa/`](course/sessions/02-anatomy-of-aoa/)
 - **Session 4 — Let's build** — [`course/sessions/04-lets-build/`](course/sessions/04-lets-build/)
-
-Sessions 1 and 3 don't have folders here — they're talk-and-demo sessions and live in [`aoa-knowledge`](https://github.com/AgentOrientedArchitecture/aoa-knowledge) under `course/2026-05-14-oreilly/`.
-
-## Status
-
-This repo is being built ahead of the May 14 course. Expect breaking changes until the course-day SHA is pinned (target: 11 May 2026).
 
 ## License
 

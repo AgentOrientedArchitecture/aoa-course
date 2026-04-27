@@ -1,54 +1,45 @@
 # Architecture
 
-This document describes the AOA system inside `system/`. It exists before the code so the architectural story is in prose first; the code is the implementation of this document, not the other way round.
+A small, container-shaped, readable AOA system. Three workflows, five agents, eight registered capabilities, one MCP tool, four services. Around 2,200 lines of Python including tests.
 
-## What this system is
+## What the system does
 
-A small, container-shaped, deliberately readable AOA system. Three workflows, five agent codebases, eight registered capabilities, one MCP tool, four plumbing services. Roughly 2,200 lines of Python all-in by Session 4 end.
+Three workflows run through one registry:
 
-The audience builds this system across two course sessions:
-
-- **Session 2** ends at three agents (parser, evaluator, reporter) producing a CV-vs-JD fit verdict — three registered capabilities, one workflow.
-- **Session 4** ends at five agents and eight registered capabilities, threading three workflows: ingest, promote, query.
-
-The S2 system is a literal subset of the S4 system. Nothing built in S2 is deleted or rewritten.
-
-## The architectural claims this system demonstrates
-
-Six claims, each tied to a moment the audience sees on screen:
-
-1. **An AU is `model + capability + skills.md + maybe tools`.** Some AUs have no tools. The reporter is the example. Read any agent folder to see all four parts.
-2. **Tools can be registered capabilities without being AUs.** The MCP filesystem server in `tools/` registers in the same registry as the agents. The registry is a _capability_ registry, not an agent registry.
-3. **Registered capability ≠ physical agent.** The evaluator codebase backs three registered capabilities by S4 end (`evaluator-cv`, `evaluator-ingest`, `evaluator-query`). The studio shows them as three rows.
-4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md` makes a different capability. Made loud when we live-edit `evaluator-query/skills.md` and the studio's registry pane shows that one entry's `skills_hash` change while everything else holds.
-5. **The architecture is indifferent to where reasoning happens.** Live-swap the model from API to Ollama; nothing else changes.
-6. **Intent is a first-class surface.** The studio is how humans hand intents into the system. AOA isn't only agents-talking-to-agents; it's a layered handover from intent through plan through capability through tool.
-
-## The three workflows
-
-**S2 ships one workflow:**
+**CV evaluation** (Session 2):
 
 ```
 parser-cv → evaluator-cv → reporter-cv-fit
 ```
 
-The audience submits a CV and a JD through the studio. The planner queries the registry for `parser-cv`, gets a handle, calls it. The parser returns structured CV data. The planner queries for `evaluator-cv`, calls it with the parsed CV and the JD. The evaluator returns scores and a verdict. The planner queries for `reporter-cv-fit`, calls it with the evaluation. The reporter returns a structured fit-verdict report. The studio shows every step in the trace pane.
+You submit a CV and a job description through the studio. The planner queries the registry for `parser-cv` and calls it; the parser returns structured CV data. The planner then calls `evaluator-cv` with the parsed CV and the job description; the evaluator returns scores and a verdict. Finally the planner calls `reporter-cv-fit`, which produces a structured fit-verdict report. Every step is visible in the studio's trace pane.
 
-**S4 adds two more workflows, and reuses the S2 chain in a third form:**
+**Knowledge management** (Session 4) adds two more workflows on the same agents:
 
 ```
-ingest:  parser-notes → evaluator-ingest → (gate)         → raw/
-promote: promoter                                          → wiki/
-query:   searcher → evaluator-query → reporter-answer      → answer
+ingest:   parser-notes → evaluator-ingest → (gate)         → raw/
+promote:  promoter                                          → wiki/
+query:    searcher → evaluator-query → reporter-answer      → answer
 ```
 
-The query workflow is structurally identical to the S2 workflow. Three agents in a chain, the middle one is the evaluator. The audience already built this chain in S2; in S4 they discover it's general.
+Notice that the query workflow has the same shape as the CV workflow: three agents in a chain, the middle one is the evaluator. The chain you build in Session 2 turns out to be general.
+
+## Six things this system demonstrates
+
+Each is something you can see on screen as you build:
+
+1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
+2. **A registered capability isn't always an AU.** The MCP filesystem server in `tools/` registers in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU or by a deterministic tool is a property of the entry, not of the registry.
+3. **One agent can back many capabilities.** The evaluator codebase backs three registered capabilities by the end of Session 4 (`evaluator-cv`, `evaluator-ingest`, `evaluator-query`). The studio shows them as three rows.
+4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
+5. **The architecture is indifferent to where reasoning happens.** Switch the model from a hosted API to local Ollama through `.env`; nothing else changes.
+6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → plan → capability → tool.
 
 ## The agent set
 
-Five codebases. Eight registered capabilities. One tool.
+Five agent codebases:
 
-| Codebase | S2 capabilities | S4 capabilities |
+| Codebase | Session 2 capabilities | Session 4 capabilities |
 |---|---|---|
 | `parser` | `parser-cv` | `parser-cv`, `parser-notes` |
 | `evaluator` | `evaluator-cv` | `evaluator-cv`, `evaluator-ingest`, `evaluator-query` |
@@ -60,53 +51,51 @@ Plus, in `tools/`:
 
 | Tool | Registered as | Type |
 |---|---|---|
-| filesystem MCP server | `tool-filesystem` | Pure tool, not an AU |
+| filesystem MCP server | `tool-filesystem` | non-AU registered capability |
 
-S2 ends at 3 agents, 3 capabilities, 1 tool, 1 workflow. S4 ends at 5 agents, 8 capabilities, 1 tool, 3 workflows.
+## The four parts of an AU
 
-## The four-part AU anatomy
+Every AU has four addressable parts:
 
-Every AU in this repo has four addressable parts:
+1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only and exposed at `/cards/<id>`.
+2. **`skills.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
+3. **`tools.yaml`** — the capability ids this agent will call. May reference other AUs or pure tools. May be empty.
+4. **`agent.py`** — the wiring. Built on the shared FastAPI scaffold in `agents/_base/`.
 
-1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only in the container, exposed at `/cards/<id>`.
-2. **`skills.md`** — the unit's practical know-how for its job. Prompt structure, rubric, judgement criteria, examples. Mounted read-only and **hot-reloaded**: editing `skills.md` on the host changes capability behaviour without a container restart.
-3. **`tools.yaml`** — capability ids the agent will call. Read at boot. May be empty.
-4. **`agent.py`** — wiring between the three above and a model. Framework-agnostic. Built on a ~50-line shared FastAPI scaffold in `agents/_base/`.
-
-When a single codebase backs more than one capability, capability-specific files live in a `capabilities/<name>/` subfolder; the code lives at the agent root. Every agent uses this pattern even when it currently has only one capability — it sets the expectation that any agent might gain a second.
+When a single codebase backs more than one capability, the capability-specific files live in `capabilities/<name>/` subfolders; the code lives at the agent root. Every agent uses this pattern even when it has only one capability.
 
 ## Plumbing services
 
-| Service | Job | Lines budget |
-|---|---|---|
-| **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes `find_capability(intent)` and `list_capabilities()` over HTTP. | ~150 |
-| **planner** | Receives intents from the studio. Queries the registry. Sequences agent invocations. Records each step to `traces/<event-id>.jsonl`. | ~200 |
-| **studio** | Browser surface at `localhost:8080`. Three observation panes (registry, trace, capability card) plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. | ~250 |
-| **watcher** _(S4 only)_ | Watches `inbox/` for new files. Posts ingest events to the planner. | ~50 |
+| Service | Job |
+|---|---|
+| **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes `find_capability(intent)` and `list_capabilities()` over HTTP. |
+| **planner** | Receives intents from the studio. Queries the registry. Sequences agent invocations. Records each step to `traces/<event-id>.jsonl`. |
+| **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
+| **watcher** | Watches `inbox/` for new files. Posts ingest events to the planner. (Session 4 only.) |
 
 ## Container topology
 
-Each agent and each service in its own container. Compose orchestrates.
+Each agent and each service runs in its own container. Compose orchestrates.
 
 ```
 docker-compose.yml services:
 
   registry             FastAPI    7100
   planner              FastAPI    7200
-  studio               FastAPI    8080  (the page lives here)
-  watcher              S4 only,   no port
+  studio               FastAPI    8080
+  watcher              (S4)       no port
   parser               FastAPI    7301
   evaluator            FastAPI    7302
   reporter             FastAPI    7303
-  promoter             S4 only    7304
-  searcher             S4 only    7305
+  promoter             (S4)       7304
+  searcher             (S4)       7305
   tool-filesystem      MCP        7401
   ollama               profile: local, optional
 ```
 
-Eleven containers at S4 end (eight at S2 end).
+Eight containers at the end of Session 2; eleven at the end of Session 4.
 
-Each agent container has the same shape: FastAPI app, mounts its `capabilities/` folder as a volume, registers itself with the registry on boot, exposes `/invoke`, exposes `/cards/<id>`, watches mounted `skills.md` files for hot reload. The audience reads one agent and has read them all.
+Every agent container has the same shape: a FastAPI app that mounts its `capabilities/` folder as a volume, registers itself with the registry on boot, exposes `/invoke` and `/cards/<id>`, and watches mounted `skills.md` files for hot reload. Read one agent and you've read them all.
 
 ## Capability card schema
 
@@ -141,58 +130,34 @@ provenance:
 endpoint: http://evaluator:7302/invoke
 ```
 
-The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`, `constraints`, `evaluation_signals`, `skills.md`, and `endpoint` (path differs per capability). They share `agent.py` and `model`. That's the architectural payoff made concrete in YAML.
-
-Pure tools have `kind: tool` and `provenance.model: none`. The registry uses `kind` for studio display only — the planner doesn't branch on it.
+The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`, `constraints`, `evaluation_signals`, `skills.md`, and the `endpoint` path. They share `agent.py` and `model`. Pure tools have `kind: tool` and `provenance.model: none`; the planner doesn't branch on `kind`.
 
 ## The studio
 
-A browser-based surface at `localhost:8080`. Two roles:
+A browser surface at `localhost:8080` with two roles:
 
 **Observation:**
 
-- **Registry pane.** Live listing of every registered capability with id, version, kind (`au` or `tool`), backing agent codebase, and current `skills_hash`. Updates when capabilities register, deregister, or change.
-- **Trace pane.** Currently-running flow as a vertical timeline. Each step is a row showing planner → registry lookup, agent invocation, response. Rows collapsible for full payloads. Finished flows persist until the next intent runs.
-- **Capability card pane.** Click any registry entry, see its card formatted.
+- **Registry pane.** Live listing of every registered capability — id, version, kind (`au` or `tool`), backing agent, current `skills_hash`. Updates as capabilities register, deregister, or change.
+- **Trace pane.** The currently-running flow as a vertical timeline. Each row shows planner → registry lookup, agent invocation, response. Rows are collapsible for full payloads. Finished flows persist until the next intent runs.
+- **Capability card pane.** Click any registry entry to see its card formatted.
 
 **Intent:**
 
-- **Submit an intent.** Free-form text box. Sent to the planner; planner routes to the right capability; trace pane fills in real time.
-- **Drop a file.** Drag a CV onto the page in S2, or a research note in S4.
+- **Submit an intent.** Free-form text, sent to the planner.
+- **Drop a file.** Drag a CV (Session 2) or a research note (Session 4) onto the page.
 
-The studio does not browse the wiki. The wiki has its own viewers (Obsidian primary). A future v0.2 portal app may serve as a wiki front end; that's deliberately out of scope for the May 14 build.
+The studio is for observing and driving the system. It doesn't browse the wiki — point Obsidian or any markdown viewer at `system/wiki/` for that.
 
-The studio's visual vocabulary echoes [`aoa-a2a-intent-studio`](https://github.com/AgentOrientedArchitecture/aoa-a2a-intent-studio) — the production AOA studio — but no code is shared. This is a course-shaped equivalent built fresh in ~250 lines.
+## Running locally
 
-## What this repo is not
+`docker compose up` brings everything alive. Open `http://localhost:8080` and you'll see the registry pane populate as agents come up.
 
-- Not a framework. No abstractions beyond what the workflows need.
-- Not production-grade. The registry is a JSON file. The planner is procedural. There's no auth, no retries beyond a basic one, no rate limiting.
-- Not a content product. The seeded wiki is a starting point.
-- Not a wiki viewer. The studio observes and initiates; reading wiki content is a job for Obsidian, mkdocs, or a separate v0.2 app.
-- Not the same thing as `aoa-knowledge`.
+Configure the model via `.env`:
 
-## Reuse from sibling repos
+```
+PROVIDER=openai|anthropic|ollama
+MODEL=…
+```
 
-We use almost nothing from existing repos as code. Reuse here means **reuse of agents across workflows** within this repo.
-
-| Source | What we take | What we re-do |
-|---|---|---|
-| `aoa-a2a-core` | Capability card schema (kept aligned, not imported). A2A request/response shape (mimicked). | Registry, planner, A2A boundary — reimplemented small. |
-| `aoa-a2a-agents` | The four-part AU anatomy. | The agents themselves; workflows differ. |
-| `aoa-a2a-cv-fit-for-job` | Prompt scaffolding for `evaluator-cv` and `parser-cv`. CVs and JDs are synthetic, authored fresh for the course. | Agent code; reshaped to fit the AU anatomy used here. |
-| `aoa-a2a-intent-studio` | Visual vocabulary for the studio. | Code; built fresh. |
-| `aoa-knowledge/wiki/` | Six concept pages, vendored into `system/seed-wiki/`. | Course wiki _grows_ from those six during S4. |
-
-## Build order
-
-1. ~~Repo created, this document and `AGENTS.md` written.~~
-2. `agents/_base/base.py` — the shared FastAPI scaffold. Boot-time registration. `skills.md` hot reload.
-3. `services/registry/` — capability card loading, `cards.json` watching, lookup endpoint.
-4. `services/planner/` — registry lookup, agent invocation, trace recording.
-5. `services/studio/` — registry pane, trace pane, capability card pane, intent submission. Get it lighting up while the agents are still stubbed.
-6. `tools/filesystem/` — the MCP filesystem server, registered as `tool-filesystem`.
-7. `agents/parser/`, `agents/evaluator/`, `agents/reporter/` with their S2 capabilities. End of S2 buildable subset.
-8. `services/watcher/` and S4 capability additions.
-9. `agents/promoter/`, `agents/searcher/` — the new S4 codebases.
-10. End-to-end verify, pin SHA by 11 May 2026.
+Switching from a hosted API to Ollama is a `.env` change and a `docker compose up` away. The registry, the agents, the capability cards, and the planner all stay still.
