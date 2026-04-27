@@ -293,7 +293,7 @@ def build_app(handle: Handler) -> FastAPI:
     capabilities = discover_capabilities()
     by_id = {c.id: c for c in capabilities}
     registry = RegistryClient()
-    model = Model()
+    model: Model | None = None
     tool_cards: dict[str, dict[str, Any]] = {}
     tool_client: httpx.AsyncClient | None = None
 
@@ -337,6 +337,10 @@ def build_app(handle: Handler) -> FastAPI:
         body = await request.json()
         trace_id = body.get("trace_id", "")
         inputs = body.get("inputs", {})
+
+        nonlocal model
+        if model is None:
+            model = Model()
 
         # Bind a fresh ToolHandle set per request so trace_id propagates.
         assert tool_client is not None
