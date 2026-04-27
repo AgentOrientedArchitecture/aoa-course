@@ -61,13 +61,13 @@ WORKFLOWS: dict[str, Workflow] = {
     "cv-fit": Workflow(
         name="cv-fit",
         steps=[
-            # The parser reads the CV file via tool-filesystem itself; the
+            # The parser extracts the CV text via tool-document-text itself; the
             # planner only threads the path through.
             Step(
                 capability="parser-cv",
                 input_map={"cv_path": "inputs.cv_path"},
             ),
-            # The evaluator reads the JD file via tool-filesystem too; this is
+            # The evaluator extracts the JD text via tool-document-text too; this is
             # how Session 2 shows that tools.yaml is honest about what each
             # agent actually reaches for.
             Step(

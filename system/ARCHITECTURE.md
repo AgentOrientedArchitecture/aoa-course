@@ -1,7 +1,8 @@
 # Architecture
 
 A small, container-shaped, readable AOA system. Two workflows, three agent
-codebases, six AU capabilities, one MCP tool, and three plumbing services.
+codebases, six AU capabilities, two deterministic tools, and three plumbing
+services.
 
 ## What the system does
 
@@ -32,7 +33,7 @@ general.
 Each is something you can see on screen as you build:
 
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
-2. **A registered capability isn't always an AU.** The MCP filesystem server in `tools/` registers in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU or by a deterministic tool is a property of the entry, not of the registry.
+2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU or by a deterministic tool is a property of the entry, not of the registry.
 3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
@@ -53,6 +54,7 @@ Plus, in `tools/`:
 | Tool | Registered as | Type |
 |---|---|---|
 | filesystem MCP server | `tool-filesystem` | non-AU registered capability |
+| document text extractor | `tool-document-text` | non-AU registered capability |
 
 ## The four parts of an AU
 
@@ -87,10 +89,11 @@ docker-compose.yml services:
   evaluator            FastAPI    7302
   reporter             FastAPI    7303
   tool-filesystem      MCP        7401
+  tool-document-text   FastAPI    7402
   ollama               profile: local, optional
 ```
 
-Seven containers run for both sessions, plus optional Ollama under the local
+Eight containers run for both sessions, plus optional Ollama under the local
 profile.
 
 Every agent container has the same shape: a FastAPI app that mounts its `capabilities/` folder as a volume, registers itself with the registry on boot, exposes `/invoke` and `/cards/<id>`, and watches mounted `skills.md` files for hot reload. Read one agent and you've read them all.

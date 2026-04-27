@@ -67,7 +67,7 @@ class ToolHandle:
     the wrapper hides three pieces of plumbing so agent code reads as the
     teaching wants it to read::
 
-        passages = await ctx.tools["tool-filesystem"]({"op": "read", "path": p})
+        passages = await ctx.tools["tool-document-text"]({"path": p})
 
     Specifically the wrapper:
 

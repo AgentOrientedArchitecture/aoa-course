@@ -38,12 +38,12 @@ async def _parse_cv(inputs: dict, ctx: Context) -> dict:
     if not cv_path:
         return error_envelope("cv_path is required")
 
-    # Read the CV through tool-filesystem so the trace shows the call.
-    fs = ctx.tools.get("tool-filesystem")
-    if fs is None:
-        return error_envelope("tool-filesystem is not available")
-    fs_outputs = await fs({"op": "read_file", "path": cv_path})
-    cv_text = fs_outputs.get("text", "")
+    # Extract the CV through a registered tool so the trace shows the boundary.
+    doc_text = ctx.tools.get("tool-document-text")
+    if doc_text is None:
+        return error_envelope("tool-document-text is not available")
+    doc_outputs = await doc_text({"path": cv_path})
+    cv_text = doc_outputs.get("text", "")
     if not cv_text.strip():
         return error_envelope(f"CV at {cv_path} was empty")
 
@@ -69,11 +69,11 @@ async def _parse_notes(inputs: dict, ctx: Context) -> dict:
     if not note_path:
         return error_envelope("note_path is required")
 
-    fs = ctx.tools.get("tool-filesystem")
-    if fs is None:
-        return error_envelope("tool-filesystem is not available")
-    fs_outputs = await fs({"op": "read_file", "path": note_path})
-    note_text = fs_outputs.get("text", "")
+    doc_text = ctx.tools.get("tool-document-text")
+    if doc_text is None:
+        return error_envelope("tool-document-text is not available")
+    doc_outputs = await doc_text({"path": note_path})
+    note_text = doc_outputs.get("text", "")
     if not note_text.strip():
         return error_envelope(f"note at {note_path} was empty")
 

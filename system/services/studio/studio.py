@@ -203,7 +203,11 @@ async def submit_intent(request: Request) -> JSONResponse:
                 "note_name",
             )
         }
-        files = {key: form[key] for key in ("cv_file", "jd_file", "note_file") if key in form}
+        files = {
+            key: form[key]
+            for key in ("cv_file", "jd_file", "note_file")
+            if key in form and hasattr(form[key], "read")
+        }
     else:
         body = await request.json()
         kind = body.get("kind", "cv-fit")

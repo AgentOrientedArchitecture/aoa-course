@@ -1,0 +1,25 @@
+id: tool-document-text
+version: 0.1.0
+kind: tool
+purpose: |
+  Extract plain text from uploaded course documents under the configured
+  filesystem root. Supports UTF-8 text/markdown files and PDFs.
+inputs:
+  - name: path
+    type: string
+    required: true
+outputs:
+  - name: text
+    type: string
+  - name: media_type
+    type: string
+constraints:
+  - All operations are restricted to the configured filesystem root.
+  - PDF extraction returns embedded text only; scanned image PDFs are reported
+    as unsupported unless another OCR tool is added.
+evaluation_signals:
+  - path_within_root
+  - extracted_text_present
+  - latency_p95_under(3s)
+provenance:
+  model: none

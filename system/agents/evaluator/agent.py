@@ -6,7 +6,7 @@ The same Python process serves both through capability-id dispatch in
 
 For ``evaluator-cv`` we receive a parsed CV (the parser's output) and a path
 to a job description on the shared inbox volume. We read the JD through
-``tool-filesystem`` so the call shows up in the trace, hand both to the
+``tool-document-text`` so the call shows up in the trace, hand both to the
 model with the rubric in ``skills.md``, and return a JSON evaluation.
 """
 from __future__ import annotations
@@ -46,11 +46,11 @@ async def _evaluate_cv(inputs: dict, ctx: Context) -> dict:
     if not jd_path:
         return error_envelope("jd_path is required")
 
-    fs = ctx.tools.get("tool-filesystem")
-    if fs is None:
-        return error_envelope("tool-filesystem is not available")
-    fs_outputs = await fs({"op": "read_file", "path": jd_path})
-    jd_text = fs_outputs.get("text", "")
+    doc_text = ctx.tools.get("tool-document-text")
+    if doc_text is None:
+        return error_envelope("tool-document-text is not available")
+    doc_outputs = await doc_text({"path": jd_path})
+    jd_text = doc_outputs.get("text", "")
     if not jd_text.strip():
         return error_envelope(f"JD at {jd_path} was empty")
 

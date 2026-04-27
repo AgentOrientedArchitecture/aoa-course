@@ -70,26 +70,11 @@ def _tool_read_file(args: dict[str, Any]) -> dict[str, Any]:
         raise FsError(f"no such file: {path}")
     if not path.is_file():
         raise FsError(f"not a file: {path}")
-    if path.suffix.lower() == ".pdf":
-        return {"content": [{"type": "text", "text": _read_pdf_text(path)}]}
     try:
         text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as e:
         raise FsError(f"file is not utf-8: {path} ({e})")
     return {"content": [{"type": "text", "text": text}]}
-
-
-def _read_pdf_text(path: Path) -> str:
-    try:
-        from pypdf import PdfReader
-
-        reader = PdfReader(str(path))
-        text = "\n\n".join((page.extract_text() or "").strip() for page in reader.pages)
-    except Exception as e:  # noqa: BLE001
-        raise FsError(f"could not extract text from PDF: {path} ({e})")
-    if not text.strip():
-        raise FsError(f"PDF contained no extractable text: {path}")
-    return text
 
 
 def _tool_list_directory(args: dict[str, Any]) -> dict[str, Any]:
@@ -117,7 +102,7 @@ def _tool_list_directory(args: dict[str, Any]) -> dict[str, Any]:
 TOOLS: dict[str, dict[str, Any]] = {
     "read_file": {
         "name": "read_file",
-        "description": "Read a UTF-8 text file or extract text from a PDF under the configured root.",
+        "description": "Read a UTF-8 text file under the configured root.",
         "inputSchema": {
             "type": "object",
             "properties": {"path": {"type": "string"}},

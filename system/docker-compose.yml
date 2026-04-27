@@ -83,6 +83,24 @@ services:
       registry:
         condition: service_healthy
 
+  tool-document-text:
+    build:
+      context: ./tools/document-text
+    image: aoa-course/tool-document-text:latest
+    container_name: aoa-tool-document-text
+    ports:
+      - "7402:7402"
+    volumes:
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      TOOL_HOST: tool-document-text
+      TOOL_PORT: 7402
+      FS_ROOT: /data
+    depends_on:
+      registry:
+        condition: service_healthy
+
   # ------------------------------------------------------------------
   # Agents
   # ------------------------------------------------------------------
@@ -112,7 +130,7 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-      tool-filesystem:
+      tool-document-text:
         condition: service_started
 
   evaluator:
@@ -139,7 +157,7 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-      tool-filesystem:
+      tool-document-text:
         condition: service_started
 
   reporter:

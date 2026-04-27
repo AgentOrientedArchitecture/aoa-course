@@ -26,7 +26,7 @@ It's mounted read-only and **hot-reloaded**: a watcher inside the container re-r
 
 ```yaml
 needs:
-  - tool-filesystem
+  - tool-document-text
   - parser-cv
 ```
 
@@ -134,7 +134,7 @@ The shared scaffold in `_base/base.py` keeps a new `agent.py` typically under 10
 
 ## Conventions
 
-- **Capability ids are kebab-case**, namespaced by purpose: `evaluator-cv`, `parser-notes`, `tool-filesystem`.
+- **Capability ids are kebab-case**, namespaced by purpose: `evaluator-cv`, `parser-notes`, `tool-document-text`.
 - **Agent codebase names are singular nouns**: `evaluator`, not `evaluators`.
 - **`skills.md` is markdown, not YAML.** Prose and examples — capabilities are taught, not configured.
 - **`evaluation_signals` are booleans or numeric thresholds**, never free-form. They have to be machine-checkable.
@@ -150,4 +150,6 @@ Tools live under `tools/<name>/` rather than `agents/<name>/`. Same shape, with 
 
 Tools register the same way agents do and are looked up the same way. The planner doesn't distinguish between calling an agent and calling a tool — both come back from `find_capability(id)` with an `endpoint`.
 
-The MCP filesystem server is the example. See [`tools/filesystem/`](tools/filesystem/).
+The MCP filesystem server and document text extractor are the examples. See
+[`tools/filesystem/`](tools/filesystem/) and
+[`tools/document-text/`](tools/document-text/).
