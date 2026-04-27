@@ -11,6 +11,8 @@ import asyncio
 import json
 import logging
 import os
+import re
+import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -29,8 +31,34 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 
+# The inbox is a shared volume the studio writes to and the filesystem tool
+# reads from. Both containers see it at the same path so the agents can be
+# handed cv_path / jd_path strings that resolve identically in either place.
+INBOX_DIR = Path(os.environ.get("INBOX_DIR", "/data/inbox"))
+
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+_SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize_name(name: str) -> str:
+    name = name.strip().lstrip(".") or "file"
+    return _SAFE_NAME_RE.sub("-", name)[:80] or "file"
+
+
+def _write_inbox(content: str, suggested_name: str) -> Path:
+    """Persist an intent payload to the shared inbox and return its path."""
+    INBOX_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    safe = _sanitize_name(suggested_name)
+    path = INBOX_DIR / f"{stamp}-{safe}"
+    counter = 1
+    while path.exists():
+        path = INBOX_DIR / f"{stamp}-{counter}-{safe}"
+        counter += 1
+    path.write_text(content)
+    return path
 
 
 # ----------------------------------------------------------------------
@@ -92,9 +120,13 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 @app.on_event("startup")
 async def _startup() -> None:
+    INBOX_DIR.mkdir(parents=True, exist_ok=True)
     asyncio.create_task(_follow_upstream(f"{REGISTRY_URL}/stream", "registry"))
     asyncio.create_task(_follow_upstream(f"{PLANNER_URL}/events", "planner"))
-    logger.info("studio up on :%d (registry=%s planner=%s)", PORT, REGISTRY_URL, PLANNER_URL)
+    logger.info(
+        "studio up on :%d (registry=%s planner=%s inbox=%s)",
+        PORT, REGISTRY_URL, PLANNER_URL, INBOX_DIR,
+    )
 
 
 @app.get("/healthz")
@@ -134,12 +166,39 @@ async def get_capability(capability_id: str) -> JSONResponse:
 
 @app.post("/api/intent")
 async def submit_intent(request: Request) -> JSONResponse:
+    """Persist the CV and JD payloads to the inbox and submit paths to the planner.
+
+    The browser sends raw text (typed or read from a dropped file). The studio
+    writes the bytes to ``inbox/`` so the filesystem tool can later read them,
+    then submits ``{cv_path, jd_path}`` to the planner. Agents only ever see
+    paths — never bytes — from the studio.
+    """
     body = await request.json()
+    inputs = body.get("inputs", {}) or {}
+    cv_text = inputs.get("cv_text") or ""
+    jd_text = inputs.get("jd_text") or ""
+    cv_name = inputs.get("cv_name") or "cv.txt"
+    jd_name = inputs.get("jd_name") or "jd.txt"
+    if not cv_text.strip() or not jd_text.strip():
+        return JSONResponse(
+            {"error": "both cv_text and jd_text are required"}, status_code=400
+        )
+
+    cv_path = _write_inbox(cv_text, cv_name)
+    jd_path = _write_inbox(jd_text, jd_name)
+
+    planner_body = {
+        "kind": body.get("kind", "cv-fit"),
+        "inputs": {"cv_path": str(cv_path), "jd_path": str(jd_path)},
+    }
     async with httpx.AsyncClient(timeout=180.0) as client:
         try:
-            r = await client.post(f"{PLANNER_URL}/intent", json=body)
+            r = await client.post(f"{PLANNER_URL}/intent", json=planner_body)
             r.raise_for_status()
-            return JSONResponse(r.json())
+            result = r.json()
+            result["cv_path"] = str(cv_path)
+            result["jd_path"] = str(jd_path)
+            return JSONResponse(result)
         except httpx.HTTPStatusError as e:
             return JSONResponse(
                 {"error": e.response.text}, status_code=e.response.status_code

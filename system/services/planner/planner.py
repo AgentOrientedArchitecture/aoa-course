@@ -60,15 +60,20 @@ WORKFLOWS: dict[str, Workflow] = {
     "cv-fit": Workflow(
         name="cv-fit",
         steps=[
+            # The parser reads the CV file via tool-filesystem itself; the
+            # planner only threads the path through.
             Step(
                 capability="parser-cv",
-                input_map={"cv_text": "inputs.cv_text"},
+                input_map={"cv_path": "inputs.cv_path"},
             ),
+            # The evaluator reads the JD file via tool-filesystem too; this is
+            # how Session 2 shows that tools.yaml is honest about what each
+            # agent actually reaches for.
             Step(
                 capability="evaluator-cv",
                 input_map={
                     "cv": "parser-cv.outputs.parsed",
-                    "jd_text": "inputs.jd_text",
+                    "jd_path": "inputs.jd_path",
                 },
             ),
             Step(
@@ -76,7 +81,6 @@ WORKFLOWS: dict[str, Workflow] = {
                 input_map={
                     "cv": "parser-cv.outputs.parsed",
                     "evaluation": "evaluator-cv.outputs",
-                    "jd_text": "inputs.jd_text",
                 },
             ),
         ],
@@ -94,7 +98,7 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
     kind = intent.get("kind")
     if kind in WORKFLOWS:
         return WORKFLOWS[kind]
-    if kind is None and {"cv_text", "jd_text"} <= set(intent.get("inputs", {})):
+    if kind is None and {"cv_path", "jd_path"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["cv-fit"]
     raise HTTPException(status_code=400, detail=f"no workflow for intent kind={kind!r}")
 

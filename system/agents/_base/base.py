@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
+import httpx
 import uvicorn
 import yaml
 from fastapi import FastAPI, HTTPException, Request
@@ -59,20 +60,69 @@ class Capability:
     tools_needs: list[str] = field(default_factory=list)
 
 
+class ToolHandle:
+    """Awaitable handle for a capability listed in ``tools.yaml``.
+
+    Calling a handle is just an HTTP POST to the capability's endpoint, but
+    the wrapper hides three pieces of plumbing so agent code reads as the
+    teaching wants it to read::
+
+        passages = await ctx.tools["tool-filesystem"]({"op": "read", "path": p})
+
+    Specifically the wrapper:
+
+    1. Threads ``ctx.trace_id`` into the request body so the planner can stitch
+       the call into the running trace.
+    2. Posts to the registered ``endpoint`` with ``?capability=<id>`` set.
+    3. Returns ``response["outputs"]`` directly — agents almost always want
+       just the outputs, not the full envelope. Use ``.invoke_raw()`` if you
+       want signals too.
+    """
+
+    def __init__(
+        self,
+        capability_id: str,
+        card: dict[str, Any],
+        client: httpx.AsyncClient,
+        trace_id_provider: Callable[[], str],
+        timeout_seconds: float = 60.0,
+    ) -> None:
+        self.capability_id = capability_id
+        self.card = card
+        self._client = client
+        self._trace_id_provider = trace_id_provider
+        self._timeout = timeout_seconds
+
+    async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        envelope = await self.invoke_raw(inputs)
+        return envelope.get("outputs", {})
+
+    async def invoke_raw(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        payload = {"trace_id": self._trace_id_provider(), "inputs": inputs}
+        r = await self._client.post(
+            self.card["endpoint"],
+            params={"capability": self.capability_id},
+            json=payload,
+            timeout=self._timeout,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 @dataclass
 class Context:
     """Per-invocation context passed to ``handle``.
 
     Concrete agents read ``capability``, ``model``, and ``skills`` to build a
-    prompt; ``trace_id`` is forwarded into any tool calls so the planner can
-    stitch the trace together.
+    prompt. ``tools`` holds awaitable handles for every capability the agent
+    declared in ``tools.yaml`` — call them like functions.
     """
 
     capability: Capability
     model: Model
     skills: str
     trace_id: str
-    tools: dict[str, dict[str, Any]] = field(default_factory=dict)
+    tools: dict[str, ToolHandle] = field(default_factory=dict)
 
 
 Handler = Callable[[str, dict[str, Any], Context], dict[str, Any] | Awaitable[dict[str, Any]]]
@@ -212,15 +262,14 @@ async def _watch_skills(
 # FastAPI app
 # ----------------------------------------------------------------------
 
-def _resolve_tool_handles(
+def _resolve_tool_cards(
     capabilities: list[Capability],
     registry: RegistryClient,
 ) -> dict[str, dict[str, Any]]:
     """Resolve every tools.yaml `needs` entry into a registered card.
 
-    Per AGENTS.md, agents call other capabilities through the registry. The
-    handles are just the cards (which contain the endpoint); the agent does
-    the HTTP call itself when invoking a tool.
+    Returns a dict of ``capability_id -> card``. The cards are wrapped into
+    ``ToolHandle`` instances per request, since each handle binds a trace id.
     """
     needed: set[str] = set()
     for cap in capabilities:
@@ -228,13 +277,13 @@ def _resolve_tool_handles(
     if not needed:
         return {}
     registry.wait_for_capabilities(sorted(needed))
-    handles: dict[str, dict[str, Any]] = {}
+    cards: dict[str, dict[str, Any]] = {}
     for cap_id in sorted(needed):
         card = registry.find(cap_id)
         if card is None:
             raise RuntimeError(f"required capability {cap_id} disappeared from registry")
-        handles[cap_id] = card
-    return handles
+        cards[cap_id] = card
+    return cards
 
 
 def build_app(handle: Handler) -> FastAPI:
@@ -245,18 +294,25 @@ def build_app(handle: Handler) -> FastAPI:
     by_id = {c.id: c for c in capabilities}
     registry = RegistryClient()
     model = Model()
-    tool_handles: dict[str, dict[str, Any]] = {}
+    tool_cards: dict[str, dict[str, Any]] = {}
+    tool_client: httpx.AsyncClient | None = None
 
     @app.on_event("startup")
     async def _startup() -> None:
-        nonlocal tool_handles
+        nonlocal tool_cards, tool_client
         registry.wait_until_ready()
-        tool_handles = _resolve_tool_handles(capabilities, registry)
+        tool_cards = _resolve_tool_cards(capabilities, registry)
+        tool_client = httpx.AsyncClient()
         for cap in capabilities:
             registry.register(cap.card)
             logger.info("registered %s", cap.id)
         # Start hot-reload watcher in the background.
         asyncio.create_task(_watch_skills(capabilities, registry))
+
+    @app.on_event("shutdown")
+    async def _shutdown() -> None:
+        if tool_client is not None:
+            await tool_client.aclose()
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:
@@ -282,12 +338,18 @@ def build_app(handle: Handler) -> FastAPI:
         trace_id = body.get("trace_id", "")
         inputs = body.get("inputs", {})
 
+        # Bind a fresh ToolHandle set per request so trace_id propagates.
+        assert tool_client is not None
+        handles: dict[str, ToolHandle] = {
+            cid: ToolHandle(cid, card, tool_client, lambda tid=trace_id: tid)
+            for cid, card in tool_cards.items()
+        }
         ctx = Context(
             capability=cap,
             model=model,
             skills=cap.skills_text,
             trace_id=trace_id,
-            tools=tool_handles,
+            tools=handles,
         )
 
         result = handle(capability_id, inputs, ctx)

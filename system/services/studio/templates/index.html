@@ -20,14 +20,28 @@
     <section id="trace-pane" class="pane">
       <h2>Trace</h2>
       <div id="intent-form" class="intent">
-        <textarea
-          id="intent-cv"
-          placeholder="Paste a CV here, or drop a .txt / .md file anywhere on the page."
-          rows="6"></textarea>
-        <textarea
-          id="intent-jd"
-          placeholder="Paste the job description here."
-          rows="4"></textarea>
+        <label class="drop-field">
+          <span class="drop-label">
+            <strong>CV</strong>
+            <em id="intent-cv-name">paste below or drop a file</em>
+          </span>
+          <textarea
+            id="intent-cv"
+            data-name-target="intent-cv-name"
+            placeholder="Paste the CV here."
+            rows="6"></textarea>
+        </label>
+        <label class="drop-field">
+          <span class="drop-label">
+            <strong>Job description</strong>
+            <em id="intent-jd-name">paste below or drop a file</em>
+          </span>
+          <textarea
+            id="intent-jd"
+            data-name-target="intent-jd-name"
+            placeholder="Paste the job description here."
+            rows="4"></textarea>
+        </label>
         <div class="intent-actions">
           <button id="intent-submit" type="button">Run cv-fit</button>
           <span id="intent-status"></span>
@@ -42,7 +56,7 @@
     </section>
   </main>
 
-  <div id="file-drop-overlay" class="drop-overlay">Drop a CV file</div>
+
 
   <script type="module" src="/static/app.js"></script>
 </body>

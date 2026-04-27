@@ -10,6 +10,8 @@ const state = {
   capabilities: new Map(),     // id -> card
   selectedCapability: null,
   currentTraceId: null,
+  cvName: "",                  // last filename loaded into the CV box
+  jdName: "",                  // last filename loaded into the JD box
 };
 
 // ---------------------------------------------------------------------------
@@ -182,7 +184,15 @@ async function submitIntent() {
     const resp = await fetch("/api/intent", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "cv-fit", inputs: { cv_text: cv, jd_text: jd } }),
+      body: JSON.stringify({
+        kind: "cv-fit",
+        inputs: {
+          cv_text: cv,
+          jd_text: jd,
+          cv_name: state.cvName || "cv.txt",
+          jd_name: state.jdName || "jd.txt",
+        },
+      }),
     });
     const body = await resp.json();
     if (!resp.ok) {
@@ -198,33 +208,32 @@ async function submitIntent() {
 }
 
 // ---------------------------------------------------------------------------
-// File drop
+// File drop (per-textarea: drop on the CV box or the JD box)
 // ---------------------------------------------------------------------------
 
 function setupFileDrop() {
-  const overlay = $("file-drop-overlay");
-  let depth = 0;
+  for (const id of ["intent-cv", "intent-jd"]) {
+    const ta = $(id);
+    if (!ta) continue;
 
-  document.addEventListener("dragenter", (e) => {
-    e.preventDefault();
-    depth += 1;
-    overlay.classList.add("visible");
-  });
-  document.addEventListener("dragover", (e) => e.preventDefault());
-  document.addEventListener("dragleave", () => {
-    depth = Math.max(0, depth - 1);
-    if (depth === 0) overlay.classList.remove("visible");
-  });
-  document.addEventListener("drop", async (e) => {
-    e.preventDefault();
-    depth = 0;
-    overlay.classList.remove("visible");
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    const text = await files[0].text();
-    $("intent-cv").value = text;
-    $("intent-status").textContent = `loaded ${files[0].name} into CV box`;
-  });
+    ta.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      ta.classList.add("dragover");
+    });
+    ta.addEventListener("dragleave", () => ta.classList.remove("dragover"));
+    ta.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      ta.classList.remove("dragover");
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      const f = files[0];
+      ta.value = await f.text();
+      const labelId = ta.dataset.nameTarget;
+      if (labelId && $(labelId)) $(labelId).textContent = f.name;
+      if (id === "intent-cv") state.cvName = f.name;
+      else state.jdName = f.name;
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
