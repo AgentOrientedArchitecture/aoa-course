@@ -9,11 +9,11 @@ This repo holds two things:
 
 ## What you'll build
 
-Across two hands-on sessions you'll build an AOA system, starting from a single model call and ending with a multi-agent platform.
+Across two hands-on sessions you'll build an AOA system, starting from a single model call and ending with a small multi-capability platform.
 
 In **Session 2** you build a system that evaluates a CV against a job description. By the end of the session you have three agents — parser, evaluator, reporter — co-operating through a small browser studio to produce a structured fit verdict.
 
-In **Session 4** you open the same repo and discover the three-agent chain you built is general. By adding new `skills.md` files to the same agents (and adding two new ones), you turn it into a knowledge-management system that ingests research notes, promotes them into a wiki, and answers questions grounded in those notes.
+In **Session 4** you open the same repo and discover the three-agent chain you built is general. By adding new `skills.md` files to the same agents, you turn it into a cut-down knowledge-management system that parses research notes, ranks passages against a question, and writes a grounded answer.
 
 The point of the course is in that move: the same agents back different capabilities depending on which `skills.md` is mounted. The architecture changes shape without you rewriting the agents.
 
@@ -44,8 +44,7 @@ system/
   agents/
   services/
   tools/
-  seed-wiki/
-  inbox/  raw/  wiki/
+  inbox/
   docker-compose.yml
 .env.example
 Makefile

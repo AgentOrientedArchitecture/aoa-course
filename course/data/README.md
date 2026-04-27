@@ -1,9 +1,8 @@
 # Example data
 
-Synthetic CVs and JDs used in the Session 2 walkthrough. None of the people
-or companies here are real. Add your own files alongside these — the system
-doesn't care which inputs it receives, as long as they look roughly like CVs
-and job descriptions in plain text.
+Synthetic CVs, job descriptions, and research notes used in the course
+walkthroughs. None of the people or companies here are real. Add your own
+files alongside these — the system reads plain text.
 
 ## Pairings
 
@@ -38,3 +37,30 @@ curl -s http://localhost:7200/intent \
 ```
 
 (With files of those names placed in the `inbox` volume by hand.)
+
+## Session 4 knowledge query
+
+Use the Knowledge tab in the studio. Paste or drop a source note, then ask a
+question the note should answer.
+
+Example:
+
+| Note | Question |
+| --- | --- |
+| `seed-notes/agent-registry-lessons.txt` | Why is observed behaviour more important than self-reported metadata? |
+
+Direct planner invocation:
+
+```bash
+curl -s http://localhost:7200/intent \
+  -H 'content-type: application/json' \
+  -d '{
+    "kind": "knowledge-query",
+    "inputs": {
+      "note_path": "/data/inbox/agent-registry-lessons.txt",
+      "question": "Why is observed behaviour more important than self-reported metadata?"
+    }
+  }'
+```
+
+(With a note of that name placed in the `inbox` volume by hand.)

@@ -1,0 +1,39 @@
+id: reporter-answer
+version: 0.1.0
+kind: au
+purpose: |
+  Produce a grounded answer to a user question from a parsed note and an
+  evaluator-ranked passage set, with explicit citations back to passage ids.
+inputs:
+  - name: question
+    type: string
+    required: true
+  - name: parsed_note
+    type: structured-note
+    required: true
+  - name: evaluation
+    type: object
+    required: true
+outputs:
+  - name: answer
+    type: string
+  - name: citations
+    type: array
+  - name: gaps
+    type: array
+  - name: follow_ups
+    type: array
+  - name: confidence
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - answer is one or two paragraphs.
+  - citations is an array of passage ids used in the answer.
+  - confidence is one of "high", "medium", "low".
+evaluation_signals:
+  - valid_output_shape
+  - has_answer
+  - has_citations
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

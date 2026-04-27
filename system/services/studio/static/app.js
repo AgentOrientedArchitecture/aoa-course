@@ -10,8 +10,10 @@ const state = {
   capabilities: new Map(),     // id -> card
   selectedCapability: null,
   currentTraceId: null,
+  mode: "cv-fit",
   cvName: "",                  // last filename loaded into the CV box
   jdName: "",                  // last filename loaded into the JD box
+  noteName: "",                // last filename loaded into the note box
 };
 
 // ---------------------------------------------------------------------------
@@ -170,29 +172,18 @@ function setStatus(connected) {
 // ---------------------------------------------------------------------------
 
 async function submitIntent() {
-  const cv = $("intent-cv").value.trim();
-  const jd = $("intent-jd").value.trim();
   const status = $("intent-status");
   const btn = $("intent-submit");
-  if (!cv || !jd) {
-    status.textContent = "need both a CV and a job description";
-    return;
-  }
+  const payload = buildIntentPayload(status);
+  if (!payload) return;
+
   btn.disabled = true;
   status.textContent = "running…";
   try {
     const resp = await fetch("/api/intent", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "cv-fit",
-        inputs: {
-          cv_text: cv,
-          jd_text: jd,
-          cv_name: state.cvName || "cv.txt",
-          jd_name: state.jdName || "jd.txt",
-        },
-      }),
+      body: JSON.stringify(payload),
     });
     const body = await resp.json();
     if (!resp.ok) {
@@ -207,12 +198,47 @@ async function submitIntent() {
   }
 }
 
+function buildIntentPayload(status) {
+  if (state.mode === "cv-fit") {
+    const cv = $("intent-cv").value.trim();
+    const jd = $("intent-jd").value.trim();
+    if (!cv || !jd) {
+      status.textContent = "need both a CV and a job description";
+      return null;
+    }
+    return {
+      kind: "cv-fit",
+      inputs: {
+        cv_text: cv,
+        jd_text: jd,
+        cv_name: state.cvName || "cv.txt",
+        jd_name: state.jdName || "jd.txt",
+      },
+    };
+  }
+
+  const note = $("intent-note").value.trim();
+  const question = $("intent-question").value.trim();
+  if (!note || !question) {
+    status.textContent = "need both a source note and a question";
+    return null;
+  }
+  return {
+    kind: "knowledge-query",
+    inputs: {
+      note_text: note,
+      note_name: state.noteName || "source-note.txt",
+      question,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // File drop (per-textarea: drop on the CV box or the JD box)
 // ---------------------------------------------------------------------------
 
 function setupFileDrop() {
-  for (const id of ["intent-cv", "intent-jd"]) {
+  for (const id of ["intent-cv", "intent-jd", "intent-note"]) {
     const ta = $(id);
     if (!ta) continue;
 
@@ -231,9 +257,28 @@ function setupFileDrop() {
       const labelId = ta.dataset.nameTarget;
       if (labelId && $(labelId)) $(labelId).textContent = f.name;
       if (id === "intent-cv") state.cvName = f.name;
-      else state.jdName = f.name;
+      else if (id === "intent-jd") state.jdName = f.name;
+      else state.noteName = f.name;
     });
   }
+}
+
+function setupModeTabs() {
+  for (const btn of document.querySelectorAll("[data-mode]")) {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
+  }
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  for (const btn of document.querySelectorAll("[data-mode]")) {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  }
+  for (const panel of document.querySelectorAll("[data-mode-panel]")) {
+    panel.classList.toggle("hidden", panel.dataset.modePanel !== mode);
+  }
+  $("intent-submit").textContent = mode === "cv-fit" ? "Run cv-fit" : "Run knowledge-query";
+  $("intent-status").textContent = "";
 }
 
 // ---------------------------------------------------------------------------
@@ -258,6 +303,7 @@ function escapeHtml(s) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  setupModeTabs();
   $("intent-submit").addEventListener("click", submitIntent);
   setupFileDrop();
   loadInitialRegistry();

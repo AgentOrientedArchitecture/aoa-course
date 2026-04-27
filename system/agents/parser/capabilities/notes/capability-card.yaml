@@ -1,0 +1,26 @@
+id: parser-notes
+version: 0.1.0
+kind: au
+purpose: |
+  Read a research note from the filesystem and return a structured
+  representation: title, summary, key points, entities, candidate concepts,
+  and citeable passages.
+inputs:
+  - name: note_path
+    type: string
+    required: true
+outputs:
+  - name: parsed_note
+    type: structured-note
+constraints:
+  - The output is a single JSON object.
+  - The object includes the keys title, summary, key_points, entities, candidate_concepts, passages.
+  - key_points, entities, candidate_concepts, and passages are arrays.
+  - Each passage includes passage_id, quote, and why_it_matters.
+evaluation_signals:
+  - valid_output_shape
+  - has_summary
+  - has_passages
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

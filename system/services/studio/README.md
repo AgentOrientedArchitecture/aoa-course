@@ -12,11 +12,12 @@ The studio has two roles in this system:
 
 **Intent** — two ways to drive the system:
 
-- A free-form text box that POSTs to the planner.
-- A file drop that forwards file contents as the intent's input.
+- A workflow switch for `cv-fit` and `knowledge-query`.
+- Text boxes and file drops that forward course inputs to the planner.
 
-The studio doesn't browse the wiki — point Obsidian or any markdown viewer at
-`system/wiki/` for that.
+The studio drives the demo workflows and shows the trace. For the cut-down
+knowledge-management workflow, the grounded answer appears as the final trace
+output.
 
 ## Internals
 

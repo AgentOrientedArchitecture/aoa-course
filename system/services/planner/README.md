@@ -8,7 +8,12 @@ For Session 2 there is one workflow:
 cv-fit:  parser-cv → evaluator-cv → reporter-cv-fit
 ```
 
-Session 4 adds two more (ingest, query) on the same registry.
+Session 4 adds a second workflow on the same registry and the same three
+agent codebases:
+
+```
+knowledge-query:  parser-notes → evaluator-query → reporter-answer
+```
 
 Receiving an intent, the planner:
 

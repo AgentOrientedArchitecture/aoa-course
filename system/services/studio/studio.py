@@ -166,15 +166,26 @@ async def get_capability(capability_id: str) -> JSONResponse:
 
 @app.post("/api/intent")
 async def submit_intent(request: Request) -> JSONResponse:
-    """Persist the CV and JD payloads to the inbox and submit paths to the planner.
+    """Persist browser payloads to the inbox and submit paths to the planner.
 
     The browser sends raw text (typed or read from a dropped file). The studio
-    writes the bytes to ``inbox/`` so the filesystem tool can later read them,
-    then submits ``{cv_path, jd_path}`` to the planner. Agents only ever see
-    paths — never bytes — from the studio.
+    writes bytes to ``inbox/`` so the filesystem tool can later read them.
+    Agents only ever see paths — never bytes — from the studio.
     """
     body = await request.json()
+    kind = body.get("kind", "cv-fit")
     inputs = body.get("inputs", {}) or {}
+
+    if kind == "knowledge-query":
+        return await _submit_knowledge_query(inputs)
+
+    if kind != "cv-fit":
+        return JSONResponse({"error": f"unknown intent kind: {kind}"}, status_code=400)
+
+    return await _submit_cv_fit(inputs)
+
+
+async def _submit_cv_fit(inputs: dict[str, Any]) -> JSONResponse:
     cv_text = inputs.get("cv_text") or ""
     jd_text = inputs.get("jd_text") or ""
     cv_name = inputs.get("cv_name") or "cv.txt"
@@ -188,17 +199,44 @@ async def submit_intent(request: Request) -> JSONResponse:
     jd_path = _write_inbox(jd_text, jd_name)
 
     planner_body = {
-        "kind": body.get("kind", "cv-fit"),
+        "kind": "cv-fit",
         "inputs": {"cv_path": str(cv_path), "jd_path": str(jd_path)},
     }
+    result = await _post_planner_intent(planner_body)
+    if isinstance(result, JSONResponse):
+        return result
+    result["cv_path"] = str(cv_path)
+    result["jd_path"] = str(jd_path)
+    return JSONResponse(result)
+
+
+async def _submit_knowledge_query(inputs: dict[str, Any]) -> JSONResponse:
+    note_text = inputs.get("note_text") or ""
+    question = inputs.get("question") or ""
+    note_name = inputs.get("note_name") or "source-note.txt"
+    if not note_text.strip() or not question.strip():
+        return JSONResponse(
+            {"error": "both note_text and question are required"}, status_code=400
+        )
+
+    note_path = _write_inbox(note_text, note_name)
+    planner_body = {
+        "kind": "knowledge-query",
+        "inputs": {"note_path": str(note_path), "question": question},
+    }
+    result = await _post_planner_intent(planner_body)
+    if isinstance(result, JSONResponse):
+        return result
+    result["note_path"] = str(note_path)
+    return JSONResponse(result)
+
+
+async def _post_planner_intent(planner_body: dict[str, Any]) -> dict[str, Any] | JSONResponse:
     async with httpx.AsyncClient(timeout=180.0) as client:
         try:
             r = await client.post(f"{PLANNER_URL}/intent", json=planner_body)
             r.raise_for_status()
-            result = r.json()
-            result["cv_path"] = str(cv_path)
-            result["jd_path"] = str(jd_path)
-            return JSONResponse(result)
+            return r.json()
         except httpx.HTTPStatusError as e:
             return JSONResponse(
                 {"error": e.response.text}, status_code=e.response.status_code

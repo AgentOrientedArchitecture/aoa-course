@@ -1,0 +1,26 @@
+Agent registry lessons for the course demo
+
+Every generation of distributed systems has rebuilt three ideas: a contract,
+a registry, and an orchestrator. Service-oriented architecture had WSDL for
+contracts, UDDI for discovery, and BPEL or ESBs for orchestration. The useful
+principles survived, but much of the ceremony did not.
+
+UDDI is the cautionary example. It asked publishers to create heavyweight
+metadata for a discovery pattern many organisations did not actually need.
+The records were static, publication was high-friction, and the registry had
+no meaningful concept of liveness or observed quality.
+
+An agent registry has to avoid repeating that failure. A useful registry
+should make publication cheap, keep capability records live, and rank
+candidates using observed behaviour where possible. Self-reported metadata is
+still useful for bootstrapping, but it should not be the final source of truth
+once traffic is flowing.
+
+This matters more for agentic systems because an Agentic Unit is probabilistic.
+The contract needs to describe more than input and output types. It also needs
+constraints, provenance, evaluation signals, and enough runtime observation to
+let the platform decide which candidate should be selected next.
+
+The practical lesson is simple: a registry is not just a catalogue. If the
+planner uses it to select capabilities, and observations flow back into future
+selection, the registry becomes part of the control loop.

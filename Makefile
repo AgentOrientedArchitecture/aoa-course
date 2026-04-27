@@ -1,4 +1,4 @@
-# Friendly entry points for the Session 2 system.
+# Friendly entry points for the course system.
 #
 # The system lives under `system/`; this Makefile wraps the few docker
 # commands you actually need so the course doesn't lean on memorising

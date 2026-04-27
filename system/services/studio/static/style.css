@@ -130,6 +130,39 @@ main {
   padding-bottom: 14px;
   border-bottom: 1px dashed var(--border);
 }
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fafaf8;
+}
+.mode-tabs button {
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mode-tabs button:last-child {
+  border-right: 0;
+}
+.mode-tabs button.active {
+  background: var(--accent);
+  color: white;
+}
+.workflow-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hidden {
+  display: none !important;
+}
 .intent textarea {
   width: 100%;
   resize: vertical;
@@ -170,7 +203,7 @@ main {
   align-items: center;
   gap: 12px;
 }
-.intent button {
+.intent-actions button {
   padding: 6px 14px;
   border: 1px solid var(--accent);
   background: var(--accent);
@@ -179,7 +212,7 @@ main {
   cursor: pointer;
   font-weight: 500;
 }
-.intent button:disabled {
+.intent-actions button:disabled {
   opacity: 0.6;
   cursor: progress;
 }
@@ -249,5 +282,4 @@ main {
   flex: 1;
   overflow: auto;
 }
-
 

@@ -20,28 +20,59 @@
     <section id="trace-pane" class="pane">
       <h2>Trace</h2>
       <div id="intent-form" class="intent">
-        <label class="drop-field">
-          <span class="drop-label">
-            <strong>CV</strong>
-            <em id="intent-cv-name">paste below or drop a file</em>
-          </span>
-          <textarea
-            id="intent-cv"
-            data-name-target="intent-cv-name"
-            placeholder="Paste the CV here."
-            rows="6"></textarea>
-        </label>
-        <label class="drop-field">
-          <span class="drop-label">
-            <strong>Job description</strong>
-            <em id="intent-jd-name">paste below or drop a file</em>
-          </span>
-          <textarea
-            id="intent-jd"
-            data-name-target="intent-jd-name"
-            placeholder="Paste the job description here."
-            rows="4"></textarea>
-        </label>
+        <div class="mode-tabs" role="tablist" aria-label="Workflow">
+          <button id="mode-cv" class="active" type="button" data-mode="cv-fit">CV fit</button>
+          <button id="mode-knowledge" type="button" data-mode="knowledge-query">Knowledge</button>
+        </div>
+
+        <div class="workflow-fields" data-mode-panel="cv-fit">
+          <label class="drop-field">
+            <span class="drop-label">
+              <strong>CV</strong>
+              <em id="intent-cv-name">paste below or drop a file</em>
+            </span>
+            <textarea
+              id="intent-cv"
+              data-name-target="intent-cv-name"
+              placeholder="Paste the CV here."
+              rows="6"></textarea>
+          </label>
+          <label class="drop-field">
+            <span class="drop-label">
+              <strong>Job description</strong>
+              <em id="intent-jd-name">paste below or drop a file</em>
+            </span>
+            <textarea
+              id="intent-jd"
+              data-name-target="intent-jd-name"
+              placeholder="Paste the job description here."
+              rows="4"></textarea>
+          </label>
+        </div>
+
+        <div class="workflow-fields hidden" data-mode-panel="knowledge-query">
+          <label class="drop-field">
+            <span class="drop-label">
+              <strong>Source note</strong>
+              <em id="intent-note-name">paste below or drop a file</em>
+            </span>
+            <textarea
+              id="intent-note"
+              data-name-target="intent-note-name"
+              placeholder="Paste a research note, meeting note, or article excerpt here."
+              rows="7"></textarea>
+          </label>
+          <label class="drop-field">
+            <span class="drop-label">
+              <strong>Question</strong>
+            </span>
+            <textarea
+              id="intent-question"
+              placeholder="Ask a question the note should answer."
+              rows="3"></textarea>
+          </label>
+        </div>
+
         <div class="intent-actions">
           <button id="intent-submit" type="button">Run cv-fit</button>
           <span id="intent-status"></span>

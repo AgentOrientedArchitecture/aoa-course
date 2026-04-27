@@ -48,17 +48,13 @@ agents/evaluator/
       capability-card.yaml      # id: evaluator-cv
       skills.md                 # rubric for CV-vs-JD fit
       tools.yaml
-    ingest/
-      capability-card.yaml      # id: evaluator-ingest
-      skills.md                 # rubric for raw note quality
-      tools.yaml
     query/
       capability-card.yaml      # id: evaluator-query
       skills.md                 # rubric for passage relevance
       tools.yaml
 ```
 
-The container registers three capabilities at boot. The registry lists three rows. The studio shows three cards. One Python process serves all three.
+The container registers two capabilities at boot. The registry lists two rows. The studio shows two cards. One Python process serves both.
 
 Every agent uses the `capabilities/<name>/` pattern even when there's only one capability — it makes adding a second capability a structural copy rather than a refactor.
 
@@ -95,7 +91,10 @@ Content-Type: application/json
 
 {
   "trace_id": "…",
-  "inputs": { … }
+  "inputs": {
+    "question": "Why does observed behaviour matter?",
+    "parsed_note": { "passages": [] }
+  }
 }
 ```
 

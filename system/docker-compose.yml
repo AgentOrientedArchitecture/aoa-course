@@ -1,4 +1,4 @@
-# Session 2 system. Bring everything up with `make up` from the repo root,
+# Course system. Bring everything up with `make up` from the repo root,
 # or `docker compose -f system/docker-compose.yml up --build` directly.
 #
 # Build order matters once: the `agent-base` service builds the shared base

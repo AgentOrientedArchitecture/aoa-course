@@ -2,8 +2,9 @@
 
 The planner receives intents from the studio, asks the registry for the
 capabilities it needs, sequences the agent invocations, and records the trace.
-For Session 2 there is one workflow (`cv-fit`); Session 4 adds two more on the
-same machinery.
+Session 2 starts with one workflow (`cv-fit`). Session 4 reuses the same
+parser/evaluator/reporter shape for a cut-down knowledge-management workflow
+(`knowledge-query`).
 """
 from __future__ import annotations
 
@@ -85,6 +86,30 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "knowledge-query": Workflow(
+        name="knowledge-query",
+        steps=[
+            Step(
+                capability="parser-notes",
+                input_map={"note_path": "inputs.note_path"},
+            ),
+            Step(
+                capability="evaluator-query",
+                input_map={
+                    "question": "inputs.question",
+                    "parsed_note": "parser-notes.outputs.parsed_note",
+                },
+            ),
+            Step(
+                capability="reporter-answer",
+                input_map={
+                    "question": "inputs.question",
+                    "parsed_note": "parser-notes.outputs.parsed_note",
+                    "evaluation": "evaluator-query.outputs",
+                },
+            ),
+        ],
+    ),
 }
 
 
@@ -100,6 +125,8 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
         return WORKFLOWS[kind]
     if kind is None and {"cv_path", "jd_path"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["cv-fit"]
+    if kind is None and {"note_path", "question"} <= set(intent.get("inputs", {})):
+        return WORKFLOWS["knowledge-query"]
     raise HTTPException(status_code=400, detail=f"no workflow for intent kind={kind!r}")
 
 
