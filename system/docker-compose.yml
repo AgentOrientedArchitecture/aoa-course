@@ -103,8 +103,8 @@ services:
       AGENT_NAME: parser
       AGENT_HOST: parser
       AGENT_PORT: 7301
-      PROVIDER: ${PROVIDER:-openai}
-      MODEL: ${MODEL}
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -130,8 +130,8 @@ services:
       AGENT_NAME: evaluator
       AGENT_HOST: evaluator
       AGENT_PORT: 7302
-      PROVIDER: ${PROVIDER:-openai}
-      MODEL: ${MODEL}
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -156,8 +156,8 @@ services:
       AGENT_NAME: reporter
       AGENT_HOST: reporter
       AGENT_PORT: 7303
-      PROVIDER: ${PROVIDER:-openai}
-      MODEL: ${MODEL}
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

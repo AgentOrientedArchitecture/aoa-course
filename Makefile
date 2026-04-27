@@ -17,7 +17,8 @@
 #   PROVIDER=ollama MODEL=gpt-oss:120b make local-up
 #   PROVIDER=openai MODEL=qwen3-32b OPENAI_BASE_URL=https://provider.example/v1 make up
 
-COMPOSE       := docker compose -f system/docker-compose.yml
+ENV_FILE      := $(wildcard .env)
+COMPOSE       := docker compose $(if $(ENV_FILE),--env-file .env,) -f system/docker-compose.yml
 BASE_IMAGE    := aoa-course/agent-base:latest
 BASE_CONTEXT  := system/agents/_base
 
