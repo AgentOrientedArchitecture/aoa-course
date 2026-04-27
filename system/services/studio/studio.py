@@ -47,8 +47,8 @@ def _sanitize_name(name: str) -> str:
     return _SAFE_NAME_RE.sub("-", name)[:80] or "file"
 
 
-def _write_inbox(content: str, suggested_name: str) -> Path:
-    """Persist an intent payload to the shared inbox and return its path."""
+def _inbox_path(suggested_name: str) -> Path:
+    """Return a fresh path inside the shared inbox."""
     INBOX_DIR.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     safe = _sanitize_name(suggested_name)
@@ -57,7 +57,21 @@ def _write_inbox(content: str, suggested_name: str) -> Path:
     while path.exists():
         path = INBOX_DIR / f"{stamp}-{counter}-{safe}"
         counter += 1
+    return path
+
+
+def _write_inbox(content: str, suggested_name: str) -> Path:
+    """Persist a text intent payload to the shared inbox and return its path."""
+    path = _inbox_path(suggested_name)
     path.write_text(content)
+    return path
+
+
+async def _write_upload(upload: Any, suggested_name: str) -> Path:
+    """Persist an uploaded file to the shared inbox and return its path."""
+    path = _inbox_path(suggested_name)
+    content = await upload.read()
+    path.write_bytes(content)
     return path
 
 
@@ -168,35 +182,66 @@ async def get_capability(capability_id: str) -> JSONResponse:
 async def submit_intent(request: Request) -> JSONResponse:
     """Persist browser payloads to the inbox and submit paths to the planner.
 
-    The browser sends raw text (typed or read from a dropped file). The studio
-    writes bytes to ``inbox/`` so the filesystem tool can later read them.
-    Agents only ever see paths — never bytes — from the studio.
+    The browser sends pasted text or uploaded files. The studio writes payloads
+    to ``inbox/`` so the filesystem tool can later read or extract them. Agents
+    only ever see paths — never bytes — from the studio.
     """
-    body = await request.json()
-    kind = body.get("kind", "cv-fit")
-    inputs = body.get("inputs", {}) or {}
+    content_type = request.headers.get("content-type", "")
+    files: dict[str, Any] = {}
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        kind = str(form.get("kind") or "cv-fit")
+        inputs = {
+            key: str(form.get(key) or "")
+            for key in (
+                "cv_text",
+                "jd_text",
+                "note_text",
+                "question",
+                "cv_name",
+                "jd_name",
+                "note_name",
+            )
+        }
+        files = {key: form[key] for key in ("cv_file", "jd_file", "note_file") if key in form}
+    else:
+        body = await request.json()
+        kind = body.get("kind", "cv-fit")
+        inputs = body.get("inputs", {}) or {}
 
     if kind == "knowledge-query":
-        return await _submit_knowledge_query(inputs)
+        return await _submit_knowledge_query(inputs, files)
 
     if kind != "cv-fit":
         return JSONResponse({"error": f"unknown intent kind: {kind}"}, status_code=400)
 
-    return await _submit_cv_fit(inputs)
+    return await _submit_cv_fit(inputs, files)
 
 
-async def _submit_cv_fit(inputs: dict[str, Any]) -> JSONResponse:
+async def _submit_cv_fit(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
+    files = files or {}
     cv_text = inputs.get("cv_text") or ""
     jd_text = inputs.get("jd_text") or ""
     cv_name = inputs.get("cv_name") or "cv.txt"
     jd_name = inputs.get("jd_name") or "jd.txt"
-    if not cv_text.strip() or not jd_text.strip():
+    has_cv = bool(files.get("cv_file")) or bool(cv_text.strip())
+    has_jd = bool(files.get("jd_file")) or bool(jd_text.strip())
+    if not has_cv or not has_jd:
         return JSONResponse(
-            {"error": "both cv_text and jd_text are required"}, status_code=400
+            {"error": "both CV and job description are required"}, status_code=400
         )
 
-    cv_path = _write_inbox(cv_text, cv_name)
-    jd_path = _write_inbox(jd_text, jd_name)
+    if files.get("cv_file"):
+        cv_upload = files["cv_file"]
+        cv_path = await _write_upload(cv_upload, getattr(cv_upload, "filename", None) or cv_name)
+    else:
+        cv_path = _write_inbox(cv_text, cv_name)
+
+    if files.get("jd_file"):
+        jd_upload = files["jd_file"]
+        jd_path = await _write_upload(jd_upload, getattr(jd_upload, "filename", None) or jd_name)
+    else:
+        jd_path = _write_inbox(jd_text, jd_name)
 
     planner_body = {
         "kind": "cv-fit",
@@ -210,16 +255,24 @@ async def _submit_cv_fit(inputs: dict[str, Any]) -> JSONResponse:
     return JSONResponse(result)
 
 
-async def _submit_knowledge_query(inputs: dict[str, Any]) -> JSONResponse:
+async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
+    files = files or {}
     note_text = inputs.get("note_text") or ""
     question = inputs.get("question") or ""
     note_name = inputs.get("note_name") or "source-note.txt"
-    if not note_text.strip() or not question.strip():
+    has_note = bool(files.get("note_file")) or bool(note_text.strip())
+    if not has_note or not question.strip():
         return JSONResponse(
-            {"error": "both note_text and question are required"}, status_code=400
+            {"error": "both source note and question are required"}, status_code=400
         )
 
-    note_path = _write_inbox(note_text, note_name)
+    if files.get("note_file"):
+        note_upload = files["note_file"]
+        note_path = await _write_upload(
+            note_upload, getattr(note_upload, "filename", None) or note_name
+        )
+    else:
+        note_path = _write_inbox(note_text, note_name)
     planner_body = {
         "kind": "knowledge-query",
         "inputs": {"note_path": str(note_path), "question": question},

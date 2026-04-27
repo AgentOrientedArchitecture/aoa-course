@@ -14,6 +14,9 @@ const state = {
   cvName: "",                  // last filename loaded into the CV box
   jdName: "",                  // last filename loaded into the JD box
   noteName: "",                // last filename loaded into the note box
+  cvFile: null,
+  jdFile: null,
+  noteFile: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -176,14 +179,14 @@ async function submitIntent() {
   const btn = $("intent-submit");
   const payload = buildIntentPayload(status);
   if (!payload) return;
+  const formBody = intentFormData(payload);
 
   btn.disabled = true;
   status.textContent = "running…";
   try {
     const resp = await fetch("/api/intent", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      body: formBody,
     });
     const body = await resp.json();
     if (!resp.ok) {
@@ -202,35 +205,45 @@ function buildIntentPayload(status) {
   if (state.mode === "cv-fit") {
     const cv = $("intent-cv").value.trim();
     const jd = $("intent-jd").value.trim();
-    if (!cv || !jd) {
+    if ((!cv && !state.cvFile) || (!jd && !state.jdFile)) {
       status.textContent = "need both a CV and a job description";
       return null;
     }
     return {
       kind: "cv-fit",
-      inputs: {
-        cv_text: cv,
-        jd_text: jd,
-        cv_name: state.cvName || "cv.txt",
-        jd_name: state.jdName || "jd.txt",
-      },
+      cv_text: cv,
+      jd_text: jd,
+      cv_name: state.cvName || "cv.txt",
+      jd_name: state.jdName || "jd.txt",
+      cv_file: state.cvFile,
+      jd_file: state.jdFile,
     };
   }
 
   const note = $("intent-note").value.trim();
   const question = $("intent-question").value.trim();
-  if (!note || !question) {
+  if ((!note && !state.noteFile) || !question) {
     status.textContent = "need both a source note and a question";
     return null;
   }
   return {
     kind: "knowledge-query",
-    inputs: {
-      note_text: note,
-      note_name: state.noteName || "source-note.txt",
-      question,
-    },
+    note_text: note,
+    note_name: state.noteName || "source-note.txt",
+    note_file: state.noteFile,
+    question,
   };
+}
+
+function intentFormData(payload) {
+  const form = new FormData();
+  form.append("kind", payload.kind);
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === "kind" || value == null) continue;
+    if (value instanceof File) form.append(key, value, value.name);
+    else form.append(key, value);
+  }
+  return form;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,20 +260,45 @@ function setupFileDrop() {
       ta.classList.add("dragover");
     });
     ta.addEventListener("dragleave", () => ta.classList.remove("dragover"));
+    ta.addEventListener("input", () => clearDroppedFile(id));
     ta.addEventListener("drop", async (e) => {
       e.preventDefault();
       ta.classList.remove("dragover");
       const files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
       const f = files[0];
-      ta.value = await f.text();
+      ta.value = "";
+      ta.placeholder = `Selected file: ${f.name}`;
       const labelId = ta.dataset.nameTarget;
       if (labelId && $(labelId)) $(labelId).textContent = f.name;
-      if (id === "intent-cv") state.cvName = f.name;
-      else if (id === "intent-jd") state.jdName = f.name;
-      else state.noteName = f.name;
+      if (id === "intent-cv") {
+        state.cvName = f.name;
+        state.cvFile = f;
+      } else if (id === "intent-jd") {
+        state.jdName = f.name;
+        state.jdFile = f;
+      } else {
+        state.noteName = f.name;
+        state.noteFile = f;
+      }
     });
   }
+}
+
+function clearDroppedFile(id) {
+  const ta = $(id);
+  if (id === "intent-cv") {
+    state.cvFile = null;
+    state.cvName = "";
+  } else if (id === "intent-jd") {
+    state.jdFile = null;
+    state.jdName = "";
+  } else {
+    state.noteFile = null;
+    state.noteName = "";
+  }
+  const labelId = ta && ta.dataset.nameTarget;
+  if (labelId && $(labelId)) $(labelId).textContent = "paste below or drop a file";
 }
 
 function setupModeTabs() {
