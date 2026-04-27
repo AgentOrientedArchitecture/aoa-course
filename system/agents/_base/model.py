@@ -61,18 +61,23 @@ class Model:
         *,
         system: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 2048,
+        max_tokens: int | None = None,
     ) -> Completion:
         """Run a single completion and return text + usage."""
         import time
 
+        token_budget = (
+            int(os.environ.get("MODEL_MAX_TOKENS", "8192"))
+            if max_tokens is None
+            else max_tokens
+        )
         start = time.perf_counter()
         if self.provider == "openai":
-            text, raw = self._complete_openai(prompt, system, temperature, max_tokens)
+            text, raw = self._complete_openai(prompt, system, temperature, token_budget)
         elif self.provider == "anthropic":
-            text, raw = self._complete_anthropic(prompt, system, temperature, max_tokens)
+            text, raw = self._complete_anthropic(prompt, system, temperature, token_budget)
         elif self.provider == "ollama":
-            text, raw = self._complete_ollama(prompt, system, temperature, max_tokens)
+            text, raw = self._complete_ollama(prompt, system, temperature, token_budget)
         else:
             raise RuntimeError(f"Unknown PROVIDER: {self.provider!r}")
         latency = time.perf_counter() - start
@@ -100,13 +105,52 @@ class Model:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         resp = self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
+            **self._openai_kwargs(messages, temperature, max_tokens)
         )
-        text = resp.choices[0].message.content or ""
-        return text, resp.model_dump()
+        raw = resp.model_dump()
+        text = self._openai_text(raw)
+        return text, raw
+
+    def _openai_kwargs(
+        self, messages: list[dict[str, str]], temperature: float, max_tokens: int
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low").strip()
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
+        response_format = os.environ.get("OPENAI_RESPONSE_FORMAT", "json_object").strip()
+        if response_format:
+            kwargs["response_format"] = {"type": response_format}
+        return kwargs
+
+    def _openai_text(self, raw: dict[str, Any]) -> str:
+        choice = (raw.get("choices") or [{}])[0]
+        message = choice.get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content
+        if isinstance(content, list):
+            parts = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") in {"text", "output_text"}
+            ]
+            text = "".join(parts)
+            if text.strip():
+                return text
+        finish_reason = choice.get("finish_reason")
+        reasoning = message.get("reasoning")
+        if finish_reason == "length" and isinstance(reasoning, str) and reasoning.strip():
+            raise RuntimeError(
+                "model exhausted its output budget during reasoning before producing final content; "
+                "increase MODEL_MAX_TOKENS or lower OPENAI_REASONING_EFFORT"
+            )
+        return ""
 
     def _complete_anthropic(
         self, prompt: str, system: str | None, temperature: float, max_tokens: int
