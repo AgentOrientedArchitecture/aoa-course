@@ -39,73 +39,143 @@ INVOKE_TIMEOUT = float(os.environ.get("PLANNER_INVOKE_TIMEOUT", "300"))
 # ----------------------------------------------------------------------
 
 @dataclass
-class Step:
-    """A single capability invocation in a workflow.
+class TaskSpec:
+    """A task produced from intent before discovery binds it to a capability.
 
     ``input_map`` maps this step's input name to a path in the running context
     (``inputs.cv`` or ``parser-cv.outputs.parsed``). The planner resolves these
     against the bag of step outputs accumulated so far.
     """
 
-    capability: str
+    id: str
+    purpose: str
+    discovery: dict[str, Any]
     input_map: dict[str, str]
 
 
 @dataclass
 class Workflow:
     name: str
-    steps: list[Step]
+    tasks: list[TaskSpec]
+
+
+@dataclass
+class ResolvedStep:
+    task: TaskSpec
+    capability: str
+    card: dict[str, Any]
 
 
 WORKFLOWS: dict[str, Workflow] = {
     "cv-fit": Workflow(
         name="cv-fit",
-        steps=[
+        tasks=[
             # The parser extracts the CV text via tool-document-text itself; the
             # planner only threads the path through.
-            Step(
-                capability="parser-cv",
+            TaskSpec(
+                id="parse-cv",
+                purpose="Extract structured CV data from a document path.",
+                discovery={
+                    "kind": "au",
+                    "text": "read parse extract structured cv data from document",
+                    "required_inputs": [{"name": "cv_path", "type": "string"}],
+                    "required_outputs": [{"type": "structured-cv"}],
+                },
                 input_map={"cv_path": "inputs.cv_path"},
             ),
             # The evaluator extracts the JD text via tool-document-text too; this is
             # how Session 2 shows that tools.yaml is honest about what each
             # agent actually reaches for.
-            Step(
-                capability="evaluator-cv",
+            TaskSpec(
+                id="evaluate-cv-fit",
+                purpose="Score a structured CV against a job description.",
+                discovery={
+                    "kind": "au",
+                    "text": "score evaluate cv against job description verdict strengths gaps",
+                    "required_inputs": [
+                        {"name": "cv", "type": "structured-cv"},
+                        {"name": "jd_path", "type": "string"},
+                    ],
+                    "required_outputs": [
+                        {"name": "scores"},
+                        {"name": "verdict"},
+                    ],
+                },
                 input_map={
-                    "cv": "parser-cv.outputs.parsed",
+                    "cv": "parse-cv.outputs.parsed",
                     "jd_path": "inputs.jd_path",
                 },
             ),
-            Step(
-                capability="reporter-cv-fit",
+            TaskSpec(
+                id="write-cv-fit-report",
+                purpose="Write a concise markdown CV fit report for a human reader.",
+                discovery={
+                    "kind": "au",
+                    "text": "write report markdown cv fit recommendation highlights concerns",
+                    "required_inputs": [
+                        {"name": "cv", "type": "structured-cv"},
+                        {"name": "evaluation", "type": "object"},
+                    ],
+                    "required_outputs": [{"name": "report_markdown"}],
+                },
                 input_map={
-                    "cv": "parser-cv.outputs.parsed",
-                    "evaluation": "evaluator-cv.outputs",
+                    "cv": "parse-cv.outputs.parsed",
+                    "evaluation": "evaluate-cv-fit.outputs",
                 },
             ),
         ],
     ),
     "knowledge-query": Workflow(
         name="knowledge-query",
-        steps=[
-            Step(
-                capability="parser-notes",
+        tasks=[
+            TaskSpec(
+                id="parse-note",
+                purpose="Extract structured passages and concepts from a source note.",
+                discovery={
+                    "kind": "au",
+                    "text": "read parse note passages concepts structured-note",
+                    "required_inputs": [{"name": "note_path", "type": "string"}],
+                    "required_outputs": [{"type": "structured-note"}],
+                },
                 input_map={"note_path": "inputs.note_path"},
             ),
-            Step(
-                capability="evaluator-query",
+            TaskSpec(
+                id="evaluate-question",
+                purpose="Rank parsed-note evidence against a user question.",
+                discovery={
+                    "kind": "au",
+                    "text": "rank passages evaluate question answer possible gaps rationale",
+                    "required_inputs": [
+                        {"name": "question", "type": "string"},
+                        {"name": "parsed_note", "type": "structured-note"},
+                    ],
+                    "required_outputs": [
+                        {"name": "ranked_passages"},
+                        {"name": "direct_answer_possible"},
+                    ],
+                },
                 input_map={
                     "question": "inputs.question",
-                    "parsed_note": "parser-notes.outputs.parsed_note",
+                    "parsed_note": "parse-note.outputs.parsed_note",
                 },
             ),
-            Step(
-                capability="reporter-answer",
+            TaskSpec(
+                id="write-grounded-answer",
+                purpose="Write a grounded markdown answer with citations and gaps.",
+                discovery={
+                    "kind": "au",
+                    "text": "write grounded answer markdown citations gaps confidence",
+                    "required_inputs": [
+                        {"name": "question", "type": "string"},
+                        {"name": "parsed_note", "type": "structured-note"},
+                        {"name": "evaluation", "type": "object"},
+                    ],
+                    "required_outputs": [{"name": "answer_markdown"}],
+                },
                 input_map={
                     "question": "inputs.question",
-                    "parsed_note": "parser-notes.outputs.parsed_note",
-                    "evaluation": "evaluator-query.outputs",
+                    "parsed_note": "parse-note.outputs.parsed_note",
+                    "evaluation": "evaluate-question.outputs",
                 },
             ),
         ],
@@ -114,12 +184,7 @@ WORKFLOWS: dict[str, Workflow] = {
 
 
 def _select_workflow(intent: dict[str, Any]) -> Workflow:
-    """Pick a workflow for the incoming intent.
-
-    Today this is a small mapping. The architectural point — that the planner
-    consults the registry for each step — does not depend on this mapping
-    being clever, and Session 4 keeps it just as small.
-    """
+    """Pick the deterministic task breakdown for the incoming intent."""
     kind = intent.get("kind")
     if kind in WORKFLOWS:
         return WORKFLOWS[kind]
@@ -176,14 +241,37 @@ def _append_line(path: Path, line: str) -> None:
         f.write(line)
 
 
+def _task_trace(task: TaskSpec) -> dict[str, Any]:
+    return {
+        "id": task.id,
+        "purpose": task.purpose,
+        "discovery": task.discovery,
+        "input_map": task.input_map,
+    }
+
+
+def _candidate_trace(candidate: dict[str, Any]) -> dict[str, Any]:
+    card = candidate.get("card", {}) or {}
+    return {
+        "id": card.get("id"),
+        "kind": card.get("kind"),
+        "score": candidate.get("score"),
+        "reasons": candidate.get("reasons", []),
+        "purpose": card.get("purpose"),
+        "inputs": card.get("inputs", []),
+        "outputs": card.get("outputs", []),
+        "agent_card_url": card.get("agent_card_url"),
+        "a2a_endpoint": card.get("a2a_endpoint"),
+        "endpoint": card.get("endpoint"),
+    }
+
+
 # ----------------------------------------------------------------------
 # Registry + agent IO
 # ----------------------------------------------------------------------
 
-async def _registry_find(client: httpx.AsyncClient, capability_id: str) -> dict[str, Any]:
-    r = await client.get(f"{REGISTRY_URL}/find", params={"id": capability_id})
-    if r.status_code == 404:
-        raise HTTPException(status_code=502, detail=f"registry has no capability {capability_id}")
+async def _registry_discover(client: httpx.AsyncClient, query: dict[str, Any]) -> dict[str, Any]:
+    r = await client.post(f"{REGISTRY_URL}/discover", json=query)
     r.raise_for_status()
     return r.json()
 
@@ -302,12 +390,69 @@ async def _run_workflow(
         "intent": intent,
     })
 
+    await _record({
+        "trace_id": trace_id,
+        "step": "breakdown",
+        "workflow": workflow.name,
+        "tasks": [_task_trace(task) for task in workflow.tasks],
+    })
+
+    resolved_steps: list[ResolvedStep] = []
     async with httpx.AsyncClient() as client:
-        for step in workflow.steps:
-            card = await _registry_find(client, step.capability)
+        for task in workflow.tasks:
+            discovery = await _registry_discover(client, task.discovery)
+            candidates = discovery.get("candidates", [])
+            await _record({
+                "trace_id": trace_id,
+                "step": "discover",
+                "task": task.id,
+                "query": task.discovery,
+                "candidates": [_candidate_trace(candidate) for candidate in candidates],
+            })
+            if not candidates:
+                message = f"no capability discovered for task {task.id}"
+                await _record({
+                    "trace_id": trace_id,
+                    "step": "error",
+                    "task": task.id,
+                    "error": message,
+                })
+                raise HTTPException(status_code=502, detail=message)
+
+            selected = candidates[0]
+            card = selected["card"]
+            resolved_steps.append(ResolvedStep(task=task, capability=card["id"], card=card))
+            await _record({
+                "trace_id": trace_id,
+                "step": "select",
+                "task": task.id,
+                "capability": card["id"],
+                "score": selected.get("score"),
+                "reasons": selected.get("reasons", []),
+                "card": card,
+            })
+
+        await _record({
+            "trace_id": trace_id,
+            "step": "plan",
+            "workflow": workflow.name,
+            "plan": [
+                {
+                    "task": step.task.id,
+                    "purpose": step.task.purpose,
+                    "capability": step.capability,
+                    "input_map": step.task.input_map,
+                }
+                for step in resolved_steps
+            ],
+        })
+
+        for step in resolved_steps:
+            card = step.card
             await _record({
                 "trace_id": trace_id,
                 "step": "lookup",
+                "task": step.task.id,
                 "capability": step.capability,
                 "card": card,
             })
@@ -315,12 +460,13 @@ async def _run_workflow(
             try:
                 inputs = {
                     name: _resolve_path(path, intent_inputs, step_outputs)
-                    for name, path in step.input_map.items()
+                    for name, path in step.task.input_map.items()
                 }
             except ValueError as e:
                 await _record({
                     "trace_id": trace_id,
                     "step": "error",
+                    "task": step.task.id,
                     "capability": step.capability,
                     "error": str(e),
                 })
@@ -329,6 +475,7 @@ async def _run_workflow(
             await _record({
                 "trace_id": trace_id,
                 "step": "invoke",
+                "task": step.task.id,
                 "capability": step.capability,
                 "inputs": inputs,
             })
@@ -339,6 +486,7 @@ async def _run_workflow(
                 await _record({
                     "trace_id": trace_id,
                     "step": "error",
+                    "task": step.task.id,
                     "capability": step.capability,
                     "error": repr(e),
                 })
@@ -347,6 +495,7 @@ async def _run_workflow(
             await _record({
                 "trace_id": trace_id,
                 "step": "response",
+                "task": step.task.id,
                 "capability": step.capability,
                 "outputs": response.get("outputs", {}),
                 "signals": response.get("signals", {}),
@@ -356,6 +505,7 @@ async def _run_workflow(
                 final_outputs = {
                     "error": response.get("outputs", {}).get("error", "capability failed"),
                     "failed_capability": step.capability,
+                    "failed_task": step.task.id,
                     "signals": response.get("signals", {}),
                 }
                 await _record({
@@ -365,12 +515,14 @@ async def _run_workflow(
                     "outputs": final_outputs,
                 })
                 return trace_id, final_outputs
-            step_outputs[step.capability] = {
+            step_result = {
                 "outputs": response.get("outputs", {}),
                 "signals": response.get("signals", {}),
             }
+            step_outputs[step.task.id] = step_result
+            step_outputs[step.capability] = step_result
 
-    final = step_outputs[workflow.steps[-1].capability]
+    final = step_outputs[resolved_steps[-1].task.id]
     await _record({
         "trace_id": trace_id,
         "step": "finish",

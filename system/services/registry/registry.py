@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -28,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 DATA_DIR = Path(os.environ.get("REGISTRY_DATA_DIR", "/data"))
 CARDS_PATH = DATA_DIR / "cards.json"
 PORT = int(os.environ.get("REGISTRY_PORT", "7100"))
+TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 # ----------------------------------------------------------------------
@@ -143,6 +145,86 @@ def _validate_card(card: dict[str, Any]) -> None:
         raise HTTPException(status_code=400, detail="card.endpoint is required")
 
 
+def _normalise_field_spec(spec: Any) -> dict[str, str]:
+    if isinstance(spec, str):
+        return {"type": spec}
+    if isinstance(spec, dict):
+        return {
+            key: str(value)
+            for key, value in spec.items()
+            if key in {"name", "type"} and value is not None
+        }
+    return {}
+
+
+def _field_score(spec: dict[str, str], fields: list[dict[str, Any]]) -> tuple[float, str]:
+    wanted_name = spec.get("name")
+    wanted_type = spec.get("type")
+    best = 0.0
+    best_reason = ""
+    for field in fields:
+        score = 0.0
+        reasons: list[str] = []
+        if wanted_name and field.get("name") == wanted_name:
+            score += 4.0
+            reasons.append(f"name:{wanted_name}")
+        if wanted_type and field.get("type") == wanted_type:
+            score += 5.0
+            reasons.append(f"type:{wanted_type}")
+        if score > best:
+            best = score
+            best_reason = "+".join(reasons)
+    return best, best_reason
+
+
+def _tokens(text: str) -> set[str]:
+    return set(TOKEN_RE.findall(text.lower()))
+
+
+def _score_card(card: dict[str, Any], query: dict[str, Any]) -> tuple[float, list[str]]:
+    kind = query.get("kind")
+    if kind and card.get("kind") != kind:
+        return 0.0, [f"kind mismatch: wanted {kind}, got {card.get('kind')}"]
+
+    score = 0.0
+    reasons: list[str] = []
+    if kind:
+        score += 2.0
+        reasons.append(f"kind:{kind}")
+
+    for raw_spec in query.get("required_inputs", []) or []:
+        spec = _normalise_field_spec(raw_spec)
+        field_score, reason = _field_score(spec, card.get("inputs", []) or [])
+        if field_score <= 0:
+            return 0.0, [f"missing input {spec}"]
+        score += field_score
+        reasons.append(f"input:{reason}")
+
+    for raw_spec in query.get("required_outputs", []) or []:
+        spec = _normalise_field_spec(raw_spec)
+        field_score, reason = _field_score(spec, card.get("outputs", []) or [])
+        if field_score <= 0:
+            return 0.0, [f"missing output {spec}"]
+        score += field_score
+        reasons.append(f"output:{reason}")
+
+    query_tokens = _tokens(str(query.get("text", "")))
+    card_text = " ".join([
+        str(card.get("id", "")),
+        str(card.get("purpose", "")),
+        " ".join(str(v.get("name", "")) for v in card.get("inputs", []) or []),
+        " ".join(str(v.get("type", "")) for v in card.get("inputs", []) or []),
+        " ".join(str(v.get("name", "")) for v in card.get("outputs", []) or []),
+        " ".join(str(v.get("type", "")) for v in card.get("outputs", []) or []),
+    ])
+    overlap = sorted(query_tokens & _tokens(card_text))
+    if overlap:
+        score += min(len(overlap), 8) * 0.75
+        reasons.append(f"text:{','.join(overlap[:6])}")
+
+    return score, reasons
+
+
 async def _store(card: dict[str, Any], event: str) -> None:
     async with state.lock:
         state.cards[card["id"]] = card
@@ -203,6 +285,24 @@ async def find(id: str) -> JSONResponse:
     if card is None:
         raise HTTPException(status_code=404, detail=f"unknown capability: {id}")
     return JSONResponse(card)
+
+
+@app.post("/discover")
+async def discover(request: Request) -> JSONResponse:
+    query = await request.json()
+    limit = int(query.get("limit", 5))
+    candidates: list[dict[str, Any]] = []
+    for card in state.snapshot():
+        score, reasons = _score_card(card, query)
+        if score <= 0:
+            continue
+        candidates.append({
+            "score": round(score, 3),
+            "reasons": reasons,
+            "card": card,
+        })
+    candidates.sort(key=lambda c: (-c["score"], c["card"].get("id", "")))
+    return JSONResponse({"query": query, "candidates": candidates[:limit]})
 
 
 @app.get("/list")

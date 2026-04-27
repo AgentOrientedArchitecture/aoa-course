@@ -100,6 +100,7 @@ function appendTraceRow(record) {
   const left = document.createElement("span");
   left.innerHTML = `
     <span class="row-step">${escapeHtml(record.step)}</span>
+    ${record.task ? ` <span class="row-cap">${escapeHtml(record.task)}</span>` : ""}
     ${record.capability ? ` <span class="row-cap">${escapeHtml(record.capability)}</span>` : ""}
   `;
 
@@ -134,6 +135,20 @@ function appendTraceRow(record) {
 }
 
 function pickPayload(record) {
+  if (record.step === "breakdown") return { tasks: record.tasks };
+  if (record.step === "discover") {
+    return { task: record.task, query: record.query, candidates: record.candidates };
+  }
+  if (record.step === "select") {
+    return {
+      task: record.task,
+      capability: record.capability,
+      score: record.score,
+      reasons: record.reasons,
+      card: record.card,
+    };
+  }
+  if (record.step === "plan") return { plan: record.plan };
   if (record.step === "lookup") return record.card;
   if (record.step === "invoke") return record.inputs;
   if (record.step === "response") {

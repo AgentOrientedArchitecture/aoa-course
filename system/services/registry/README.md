@@ -3,8 +3,9 @@
 A small HTTP service that holds the set of registered capabilities.
 
 Agents and tools `POST /register` on boot. The studio subscribes to `/stream`
-to keep its registry pane live. The planner calls `GET /find?id=<id>` to look
-a capability up by id.
+to keep its registry pane live. The planner calls `POST /discover` to rank
+capabilities for a task, then uses the selected card to orchestrate work.
+`GET /find?id=<id>` remains available for direct lookup and inspection.
 
 The state of the registry is a single file, `cards.json`, in the volume mounted
 at `/data`. The service watches that file: if you edit it by hand (say, to bump
@@ -17,6 +18,7 @@ you won't touch it — agents push their cards in.
 |---|---|---|---|
 | `POST` | `/register` | capability card | `{ "ok": true }` |
 | `POST` | `/update`   | capability card | `{ "ok": true }` |
+| `POST` | `/discover` | task query | ranked capability candidates |
 | `GET`  | `/find`     | `?id=<id>` | the card, or 404 |
 | `GET`  | `/list`     | — | `{ "capabilities": [...] }` |
 | `GET`  | `/stream`   | — | SSE: `{"event": "...", "card": ...}` |

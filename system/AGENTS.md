@@ -90,9 +90,10 @@ There is no restart. The studio's registry pane updates the `skills_hash` for th
 
 ## Invocation
 
-The planner asks the registry for a capability and gets back a card. For AU
-capabilities, the card includes `a2a_endpoint`, so the planner sends an A2A
-JSON-RPC request:
+The planner breaks intent into task specs and asks the registry to discover
+candidate capabilities for each task. Once a task is bound to an AU capability,
+the selected card includes `a2a_endpoint`, so the planner sends an A2A JSON-RPC
+request:
 
 ```json
 POST http://evaluator:8888/a2a
@@ -201,7 +202,9 @@ Tools live under `tools/<name>/` rather than `agents/<name>/`. Same shape, with 
 - The capability card has `kind: tool` and `provenance.model: none`.
 - There's no `skills.md` — tools are deterministic; their behaviour is in their code.
 
-Tools register the same way agents do and are looked up the same way. The planner doesn't distinguish between calling an agent and calling a tool — both come back from `find_capability(id)` with an `endpoint`.
+Tools register the same way agents do and are discovered through the same
+registry. The selected card tells the caller how to proceed: AUs include an
+`a2a_endpoint`; tools expose a registered bridge `endpoint`.
 
 The filesystem and document text extractors are MCP-backed examples. See
 [`tools/filesystem/`](tools/filesystem/) and
