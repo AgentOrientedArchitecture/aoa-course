@@ -25,15 +25,19 @@ outputs:
     type: array
   - name: confidence
     type: string
+  - name: answer_markdown
+    type: string
 constraints:
   - The output is a single JSON object.
   - answer is one or two paragraphs.
   - citations is an array of passage ids used in the answer.
   - confidence is one of "high", "medium", "low".
+  - answer_markdown is a concise Markdown rendering of the same answer.
 evaluation_signals:
   - valid_output_shape
   - has_answer
   - has_citations
+  - has_markdown
   - latency_p95_under(8s)
 provenance:
   model: ${MODEL}

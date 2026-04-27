@@ -27,6 +27,9 @@ Return a single JSON object with these keys:
 }
 ```
 
+The agent code will add `report_markdown` after parsing your JSON. Do not
+generate that field yourself.
+
 ## Rules for each field
 
 **headline** — one sentence, max 20 words. State the candidate's level and

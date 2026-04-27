@@ -121,6 +121,8 @@ function appendTraceRow(record) {
 
   const body = pickPayload(record);
   if (body !== null) {
+    const markdown = pickMarkdown(record);
+    if (markdown) details.appendChild(renderMarkdown(markdown));
     const pre = document.createElement("pre");
     pre.textContent = JSON.stringify(body, null, 2);
     details.appendChild(pre);
@@ -141,6 +143,61 @@ function pickPayload(record) {
   if (record.step === "finish") return record.outputs;
   if (record.step === "start") return record.intent;
   return null;
+}
+
+function pickMarkdown(record) {
+  const outputs = record.outputs || {};
+  if (record.step === "response" || record.step === "finish") {
+    return outputs.report_markdown || outputs.answer_markdown || "";
+  }
+  return "";
+}
+
+function renderMarkdown(markdown) {
+  const root = document.createElement("div");
+  root.className = "rendered-markdown";
+  let list = null;
+
+  for (const rawLine of markdown.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      list = null;
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      list = null;
+      const h = document.createElement("h4");
+      h.textContent = line.slice(3);
+      root.appendChild(h);
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      list = null;
+      const h = document.createElement("h3");
+      h.textContent = line.slice(2);
+      root.appendChild(h);
+      continue;
+    }
+    if (line.startsWith("- ")) {
+      if (!list) {
+        list = document.createElement("ul");
+        root.appendChild(list);
+      }
+      const li = document.createElement("li");
+      li.innerHTML = renderInlineMarkdown(line.slice(2));
+      list.appendChild(li);
+      continue;
+    }
+    list = null;
+    const p = document.createElement("p");
+    p.innerHTML = renderInlineMarkdown(line);
+    root.appendChild(p);
+  }
+  return root;
+}
+
+function renderInlineMarkdown(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 // ---------------------------------------------------------------------------

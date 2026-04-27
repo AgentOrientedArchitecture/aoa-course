@@ -273,6 +273,38 @@ main {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.rendered-markdown {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.rendered-markdown h3,
+.rendered-markdown h4,
+.rendered-markdown p,
+.rendered-markdown ul {
+  margin: 0 0 8px;
+}
+.rendered-markdown h3 {
+  font-size: 15px;
+  line-height: 1.25;
+}
+.rendered-markdown h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.rendered-markdown ul {
+  padding-left: 18px;
+}
+.rendered-markdown li {
+  margin-bottom: 4px;
+}
 
 .card-body {
   font: 12px/1.5 var(--mono);
@@ -282,4 +314,3 @@ main {
   flex: 1;
   overflow: auto;
 }
-

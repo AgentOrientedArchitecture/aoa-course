@@ -17,6 +17,9 @@ Return a single JSON object with these keys:
 }
 ```
 
+The agent code will add `answer_markdown` after parsing your JSON. Do not
+generate that field yourself.
+
 ## Rules
 
 - Use only the parsed note and the evaluator's ranked passages.

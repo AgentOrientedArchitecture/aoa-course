@@ -57,12 +57,14 @@ async def _report_cv_fit(inputs: dict, ctx: Context) -> dict:
 
     headline = report.get("headline")
     recommendation = report.get("recommendation")
+    report["report_markdown"] = _cv_report_markdown(report)
     return {
         "outputs": report,
         "signals": {
             "valid_output_shape": True,
             "has_headline": isinstance(headline, str) and len(headline) > 0,
             "has_recommendation": recommendation in {"interview", "hold", "pass"},
+            "has_markdown": bool(report.get("report_markdown")),
             "latency_seconds": completion.latency_seconds,
         },
     }
@@ -93,15 +95,63 @@ async def _report_answer(inputs: dict, ctx: Context) -> dict:
         return error_envelope("answer must be a JSON object")
 
     citations = answer.get("citations")
+    answer["answer_markdown"] = _answer_markdown(answer)
     return {
         "outputs": answer,
         "signals": {
             "valid_output_shape": True,
             "has_answer": isinstance(answer.get("answer"), str) and bool(answer.get("answer")),
             "has_citations": isinstance(citations, list) and len(citations) > 0,
+            "has_markdown": bool(answer.get("answer_markdown")),
             "latency_seconds": completion.latency_seconds,
         },
     }
+
+
+def _cv_report_markdown(report: dict) -> str:
+    headline = str(report.get("headline") or "CV fit report").strip()
+    summary = str(report.get("summary") or "").strip()
+    recommendation = str(report.get("recommendation") or "").strip()
+    highlights = report.get("highlights") if isinstance(report.get("highlights"), list) else []
+    concerns = report.get("concerns") if isinstance(report.get("concerns"), list) else []
+
+    lines = [f"# {headline}", ""]
+    if recommendation:
+        lines += [f"**Recommendation:** {recommendation}", ""]
+    if summary:
+        lines += [summary, ""]
+    lines += _markdown_list("Highlights", highlights)
+    lines += _markdown_list("Concerns", concerns)
+    return "\n".join(lines).strip()
+
+
+def _answer_markdown(answer: dict) -> str:
+    body = str(answer.get("answer") or "").strip()
+    confidence = str(answer.get("confidence") or "").strip()
+    citations = answer.get("citations") if isinstance(answer.get("citations"), list) else []
+    gaps = answer.get("gaps") if isinstance(answer.get("gaps"), list) else []
+    follow_ups = answer.get("follow_ups") if isinstance(answer.get("follow_ups"), list) else []
+
+    lines = ["# Answer", ""]
+    if body:
+        lines += [body, ""]
+    if confidence:
+        lines += [f"**Confidence:** {confidence}", ""]
+    lines += _markdown_list("Citations", citations)
+    lines += _markdown_list("Gaps", gaps)
+    lines += _markdown_list("Follow-ups", follow_ups)
+    return "\n".join(lines).strip()
+
+
+def _markdown_list(title: str, values: list) -> list[str]:
+    if not values:
+        return []
+    lines = [f"## {title}"]
+    for value in values:
+        text = str(value).strip()
+        if text:
+            lines.append(f"- {text}")
+    return lines + [""]
 
 
 if __name__ == "__main__":

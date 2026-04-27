@@ -23,16 +23,20 @@ outputs:
     type: array
   - name: recommendation
     type: string
+  - name: report_markdown
+    type: string
 constraints:
   - The output is a single JSON object.
   - headline is a single sentence (max 20 words).
   - summary is one paragraph (3-5 sentences).
   - highlights and concerns are arrays of short strings.
   - recommendation is one of "interview", "hold", "pass".
+  - report_markdown is a concise Markdown rendering of the same report.
 evaluation_signals:
   - valid_output_shape
   - has_headline
   - has_recommendation
+  - has_markdown
   - latency_p95_under(8s)
 provenance:
   model: ${MODEL}
