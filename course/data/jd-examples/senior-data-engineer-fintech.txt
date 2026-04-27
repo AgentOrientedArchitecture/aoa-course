@@ -1,0 +1,43 @@
+Senior Data Engineer — Healthcare Payments
+Hexley & Park (London / hybrid, 2 days in office)
+
+About us
+Hexley & Park is the payments platform behind several large NHS trusts and
+private healthcare networks. We move regulated money in regulated places,
+which means our data platform is held to a higher bar than most.
+
+The role
+We're hiring a senior data engineer to take ownership of our analytics
+warehouse and the contracts around it. You'll work with product engineers,
+finance, and our compliance team. Reporting to our Head of Data.
+
+What you'll do
+- Own our Snowflake + dbt warehouse end to end: modelling, tests, lineage,
+  the lot.
+- Define data contracts between product and analytics so schema changes
+  don't break dashboards on Monday morning.
+- Lead a small team (currently two; growing to four next year).
+- Be on the on-call rota with the rest of the data team (1 week in 5).
+- Work with our compliance lead on data classification and retention so we
+  stay on the right side of FCA and ICO expectations.
+
+What you'll bring
+Essential
+- 5+ years building production data pipelines in a regulated environment
+  (financial services, healthcare, insurance — something where audit
+  matters).
+- Deep Python and SQL.
+- Strong dbt + Snowflake (or close cousin like BigQuery + dbt) experience.
+- Track record of leading a small team through delivery.
+- Comfortable being on call for the data platform.
+
+Nice to have
+- Direct experience with NHS or healthcare data.
+- Experience of GDPR / DPA in practice (DPIAs, retention schedules).
+- Have shipped data contracts before — not just talked about them.
+- Open-source contributions to the data tooling ecosystem.
+
+What we offer
+Salary £85-105k depending on experience. Share options. 28 days holiday plus
+bank holidays. Hybrid: two days a week in the King's Cross office, three
+days from wherever you work best.

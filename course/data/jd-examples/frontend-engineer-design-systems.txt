@@ -1,0 +1,29 @@
+Frontend Engineer — Design Systems
+Marrowbone Studio (Remote, UK time zones)
+
+We make design tools for technical teams. Our flagship is a collaborative
+diagramming app used by a few thousand engineering teams. We're hiring a
+frontend engineer to come and own our design system.
+
+The work
+- Take ownership of our internal component library: a Tailwind + Radix
+  setup with around 80 components.
+- Drive the migration of two remaining product surfaces (admin and billing)
+  off the legacy Bootstrap stack onto the design system.
+- Be the engineer designers come to when they want to know "can we do this".
+- Own visual regression: build out the Storybook + Playwright pipeline.
+
+Must have
+- 3+ years professional frontend experience, primarily in React + TypeScript.
+- Track record of working closely with product designers.
+- Comfortable in CSS — you can read a Figma file and reproduce it without
+  fighting the layout system.
+- Experience with Storybook or a similar component-isolation tool.
+
+Nice to have
+- Have shipped a design system from scratch, or migrated one.
+- Open-source design-system or UI primitives work in your portfolio.
+- Comfortable writing and maintaining accessibility tests.
+
+Salary £70-85k. Fully remote, UK time zone. We meet up in person once a
+quarter, location rotates.

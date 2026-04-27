@@ -1,0 +1,44 @@
+Jordan Okafor
+jordan.okafor@example.com  |  +44 7700 900 412  |  Manchester, UK
+
+PROFILE
+Senior data engineer with seven years building production data platforms at
+mid-sized fintech and e-commerce companies. Comfortable owning a stack
+end-to-end: ingestion, modelling, orchestration, observability, and the
+on-call rota that goes with it.
+
+SKILLS
+Languages:  Python, SQL, Bash, a little Go
+Tools:      dbt, Airflow, Snowflake, BigQuery, Postgres, Kafka, Terraform
+Cloud:      AWS (primary), GCP
+Practices:  data contracts, code review, incident response, mentoring
+
+EXPERIENCE
+
+Senior Data Engineer — Northcote Pay, Mar 2022 – Present
+- Rebuilt the analytics warehouse on Snowflake + dbt; cut model run time from
+  90 minutes to 14 and made downstream SLAs reliable for the first time.
+- Introduced data contracts between product and data, brokered through a
+  shared YAML spec; reduced "schema changed overnight" incidents to zero
+  across two quarters.
+- Run a fortnightly office-hours session for product engineers on writing
+  query-friendly events.
+
+Data Engineer — ShopMint, Jul 2019 – Feb 2022
+- Owned the Airflow + BigQuery pipeline serving the marketing analytics team.
+- Migrated 60+ legacy stored procedures into dbt models with tests; the
+  finance team's monthly close moved from 4 days to 1.
+- Mentored two junior engineers through their first on-call rotations.
+
+Data Engineer — Greendale Insights, Aug 2017 – Jun 2019
+- Built the company's first data warehouse on Postgres and Looker.
+- Wrote the ingestion framework for new client tenants; onboarding time
+  dropped from two weeks to two days.
+
+EDUCATION
+
+University of Manchester — BSc Computer Science, 2014 – 2017
+First-class honours; final-year project on streaming joins in Kafka.
+
+INTERESTS
+Long-distance cycling, board games, occasional contributor to dbt-utils.

@@ -1,0 +1,30 @@
+Sam Everett
+sam.everett@example.com  |  Bristol, UK
+
+I'm a frontend developer with three years of experience building SPAs in
+React and TypeScript. Most recently at a B2B SaaS company where I owned the
+billing surface end to end.
+
+Skills
+React, TypeScript, JavaScript, HTML, CSS, Tailwind, Vite, Vitest, Playwright,
+Storybook, Figma. Some Node and Express. Light Python (data scripts).
+
+Experience
+
+Frontend Engineer — Lattice & Loop, Jan 2023 – Present
+* Owned the billing UI: subscription management, invoices, refunds.
+* Wrote the team's testing playbook; raised coverage on the billing pages
+  from 18% to 84% across two quarters.
+* Sole frontend on a team of four; pair with backend engineers daily.
+
+Junior Frontend Engineer — Pinevale Software, Sep 2021 – Dec 2022
+* Built and shipped the customer self-serve portal.
+* Migrated the design system from Bootstrap to a Tailwind + Radix setup.
+
+Education
+University of Bristol — BA English Literature, 2018 – 2021. Self-taught
+into web development through bootcamp and personal projects through 2021.
+
+Side projects
+* `react-modal-shell`  — small open-source modal primitive (300 stars).
+* `bristol-bus-board`  — TfL-style live bus board for Bristol routes.
