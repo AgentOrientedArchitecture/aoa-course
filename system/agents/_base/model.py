@@ -187,10 +187,19 @@ class Model:
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }
+        response_format = os.environ.get("OLLAMA_RESPONSE_FORMAT", "json").strip()
+        if response_format:
+            payload["format"] = response_format
+        think = os.environ.get("OLLAMA_THINK", "false").strip().lower()
+        if think in {"true", "false"}:
+            payload["think"] = think == "true"
         if system:
             payload["system"] = system
         with httpx.Client(timeout=self.timeout_seconds) as client:
             resp = client.post(f"{host}/api/generate", json=payload)
             resp.raise_for_status()
             data = resp.json()
-        return data.get("response", ""), data
+        text = data.get("response") or ""
+        if not text.strip() and isinstance(data.get("thinking"), str):
+            text = data["thinking"]
+        return text, data

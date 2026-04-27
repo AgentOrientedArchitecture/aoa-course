@@ -133,6 +133,8 @@ services:
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
       OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
     depends_on:
       registry:
         condition: service_healthy
@@ -164,6 +166,8 @@ services:
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
       OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
     depends_on:
       registry:
         condition: service_healthy
@@ -194,6 +198,8 @@ services:
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
       OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
     depends_on:
       registry:
         condition: service_healthy
