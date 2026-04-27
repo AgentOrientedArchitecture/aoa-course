@@ -1,0 +1,37 @@
+id: evaluator-cv
+version: 0.1.0
+kind: au
+purpose: |
+  Score a parsed CV against a job description and return per-criterion scores,
+  an overall verdict, and short reasons for both strengths and gaps.
+inputs:
+  - name: cv
+    type: structured-cv
+    required: true
+  - name: jd_path
+    type: string
+    required: true
+outputs:
+  - name: scores
+    type: object
+  - name: verdict
+    type: string
+  - name: strengths
+    type: array
+  - name: gaps
+    type: array
+  - name: rationale
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - scores is an object whose values are integers from 1 to 5.
+  - verdict is one of "strong", "fit", "weak", "no".
+  - strengths and gaps are arrays of short strings.
+  - rationale is one paragraph summarising the verdict.
+evaluation_signals:
+  - valid_output_shape
+  - has_scores
+  - has_verdict
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

@@ -1,0 +1,38 @@
+id: reporter-cv-fit
+version: 0.1.0
+kind: au
+purpose: |
+  Turn a parsed CV and a CV-vs-JD evaluation into a short, decisive report
+  for a human reader: a headline, a one-paragraph summary, the candidate's
+  strongest selling points, and a recommendation.
+inputs:
+  - name: cv
+    type: structured-cv
+    required: true
+  - name: evaluation
+    type: object
+    required: true
+outputs:
+  - name: headline
+    type: string
+  - name: summary
+    type: string
+  - name: highlights
+    type: array
+  - name: concerns
+    type: array
+  - name: recommendation
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - headline is a single sentence (max 20 words).
+  - summary is one paragraph (3-5 sentences).
+  - highlights and concerns are arrays of short strings.
+  - recommendation is one of "interview", "hold", "pass".
+evaluation_signals:
+  - valid_output_shape
+  - has_headline
+  - has_recommendation
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

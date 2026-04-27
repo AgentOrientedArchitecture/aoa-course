@@ -1,0 +1,2 @@
+# reporter-cv-fit consumes structured data only; no tool dependencies.
+needs: []
