@@ -1,0 +1,26 @@
+id: tool-filesystem
+version: 0.1.0
+kind: tool
+purpose: |
+  Read files and list directories under a configured filesystem root. Used by
+  agents that need to fetch CV or job-description text by path.
+inputs:
+  - name: op
+    type: enum<read_file|list_directory>
+    required: true
+  - name: path
+    type: string
+    required: true
+outputs:
+  - name: text
+    type: string             # populated for read_file
+  - name: entries
+    type: array<entry>       # populated for list_directory
+constraints:
+  - All operations are restricted to the configured filesystem root.
+  - read_file returns UTF-8 text; non-text files raise an error.
+evaluation_signals:
+  - path_within_root
+  - latency_p95_under(2s)
+provenance:
+  model: none
