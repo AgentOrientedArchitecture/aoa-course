@@ -112,7 +112,7 @@ services:
     image: aoa-course/parser:latest
     container_name: aoa-parser
     ports:
-      - "7301:7301"
+      - "7301:8888"
     volumes:
       # capabilities/ is mounted (not COPYed) so editing skills.md on the
       # host triggers the in-container hot reload.
@@ -122,7 +122,7 @@ services:
       REGISTRY_URL: http://registry:7100
       AGENT_NAME: parser
       AGENT_HOST: parser
-      AGENT_PORT: 7301
+      AGENT_PORT: 8888
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
@@ -145,7 +145,7 @@ services:
     image: aoa-course/evaluator:latest
     container_name: aoa-evaluator
     ports:
-      - "7302:7302"
+      - "7302:8888"
     volumes:
       - ./agents/evaluator/capabilities:/app/capabilities:ro
       - inbox:/data/inbox:ro
@@ -153,7 +153,7 @@ services:
       REGISTRY_URL: http://registry:7100
       AGENT_NAME: evaluator
       AGENT_HOST: evaluator
-      AGENT_PORT: 7302
+      AGENT_PORT: 8888
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
@@ -176,14 +176,14 @@ services:
     image: aoa-course/reporter:latest
     container_name: aoa-reporter
     ports:
-      - "7303:7303"
+      - "7303:8888"
     volumes:
       - ./agents/reporter/capabilities:/app/capabilities:ro
     environment:
       REGISTRY_URL: http://registry:7100
       AGENT_NAME: reporter
       AGENT_HOST: reporter
-      AGENT_PORT: 7303
+      AGENT_PORT: 8888
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}

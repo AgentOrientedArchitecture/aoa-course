@@ -22,7 +22,10 @@ agents/<name>/
 
 It's mounted read-only and **hot-reloaded**: a watcher inside the container re-reads `skills.md` when it changes. Editing `skills.md` on disk changes the capability's behaviour without a restart.
 
-**3. `tools.yaml`** — capability ids this agent calls. May reference other AUs (an A2A call to another agent) or pure tools (an MCP call to a registered tool). May be empty for AUs that don't need anything beyond their model — the reporter is the example.
+**3. `tools.yaml`** — capability ids this agent calls. In this course system
+the examples use pure tools here, called through registered tool endpoints.
+The planner is responsible for AU-to-AU A2A orchestration. May be empty for AUs
+that don't need anything beyond their model — the reporter is the example.
 
 ```yaml
 needs:
@@ -66,7 +69,10 @@ At container boot, `agent.py` (via `_base`) does:
 2. Compute `skills_hash` for each by SHA-ing the matching `skills.md`.
 3. Resolve listed `tools.yaml` capabilities through the registry, retrying until they're up.
 4. POST each card to the registry's `/register` endpoint with `provenance.skills_hash` filled in.
-5. Start the FastAPI server. Expose `/invoke?capability=<id>` and `/cards/<id>`.
+5. Start the FastAPI server on the standard in-container agent port `8888`.
+   Expose A2A at `/a2a`, publish an Agent Card at
+   `/.well-known/agent-card.json`, and keep `/invoke?capability=<id>` plus
+   `/cards/<id>` for compatibility and inspection.
 
 The registry stores cards in `cards.json`, watches that file for external edits, and broadcasts changes to subscribers (the studio).
 
@@ -83,36 +89,82 @@ There is no restart. The studio's registry pane updates the `skills_hash` for th
 
 ## Invocation
 
-The planner asks the registry for a capability, gets back a card (including `endpoint`), and POSTs an invocation:
+The planner asks the registry for a capability and gets back a card. For AU
+capabilities, the card includes `a2a_endpoint`, so the planner sends an A2A
+JSON-RPC request:
 
-```
-POST http://evaluator:7302/invoke?capability=evaluator-query
+```json
+POST http://evaluator:8888/a2a
 Content-Type: application/json
 
 {
-  "trace_id": "…",
-  "inputs": {
-    "question": "Why does observed behaviour matter?",
-    "parsed_note": { "passages": [] }
+  "jsonrpc": "2.0",
+  "id": "...",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "...",
+      "role": "user",
+      "parts": [
+        {
+          "kind": "data",
+          "data": {
+            "inputs": {
+              "question": "Why does observed behaviour matter?",
+              "parsed_note": { "passages": [] }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "trace_id": "...",
+        "aoa_capability": "evaluator-query"
+      }
+    }
   }
 }
 ```
 
-The agent looks up the capability locally, builds the prompt from `skills.md`, calls the model, validates the response against the capability card's `constraints`, runs the `evaluation_signals` checks, and returns:
+The agent looks up the capability locally, builds the prompt from `skills.md`,
+calls the model, validates the response against the capability card's
+`constraints`, runs the `evaluation_signals` checks, and returns an A2A message
+with the AOA result envelope in a `DataPart`:
 
-```
+```json
 {
-  "trace_id": "…",
-  "outputs": { … },
-  "signals": {
-    "all_passages_have_citation": true,
-    "score_distribution_not_degenerate": true,
-    "latency_p95_under(8s)": 4.2
+  "jsonrpc": "2.0",
+  "id": "...",
+  "result": {
+    "kind": "message",
+    "role": "agent",
+    "parts": [
+      {
+        "kind": "data",
+        "data": {
+          "outputs": {},
+          "signals": {
+            "all_passages_have_citation": true,
+            "score_distribution_not_degenerate": true,
+            "latency_p95_under(8s)": 4.2
+          }
+        }
+      }
+    ]
   }
 }
 ```
 
 Both the request and response are written to the planner's trace file for that flow. The studio renders them.
+
+`/invoke?capability=<id>` remains available as a simple compatibility endpoint
+and is the shape deterministic tools use. The course point is visible in the
+registry card: AUs advertise `endpoint`, `agent_card_url`, and `a2a_endpoint`;
+tools advertise only `endpoint`.
+
+The Docker-internal Agent Card URLs use service names, for example
+`http://parser:8888/.well-known/agent-card.json`. Host ports are mapped only so
+you can inspect agents from the laptop, such as `http://localhost:7301/`.
 
 ## Adding a new capability to an existing agent
 

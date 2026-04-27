@@ -18,8 +18,9 @@ The scaffold takes care of the four jobs every agent does the same way:
 3. Register each capability with the registry on boot.
 4. Watch each ``skills.md`` for changes and re-register on edit.
 
-It also exposes the standard agent HTTP surface: ``/invoke``, ``/cards/<id>``,
-and ``/healthz``.
+It also exposes the standard agent HTTP surface: ``/a2a``,
+``/.well-known/agent-card.json``, ``/invoke``, ``/cards/<id>``, and
+``/healthz``.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -139,6 +141,20 @@ def _agent_endpoint() -> str:
     return f"http://{host}:{port}/invoke"
 
 
+def _agent_a2a_endpoint() -> str:
+    """The A2A JSON-RPC endpoint for this agent."""
+    host = os.environ.get("AGENT_HOST", os.environ.get("AGENT_NAME", "agent"))
+    port = int(os.environ.get("AGENT_PORT", "7300"))
+    return f"http://{host}:{port}/a2a"
+
+
+def _agent_card_url() -> str:
+    """The well-known URL for this agent's A2A Agent Card."""
+    host = os.environ.get("AGENT_HOST", os.environ.get("AGENT_NAME", "agent"))
+    port = int(os.environ.get("AGENT_PORT", "7300"))
+    return f"http://{host}:{port}/.well-known/agent-card.json"
+
+
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -189,6 +205,9 @@ def discover_capabilities() -> list[Capability]:
         # Endpoint is filled in by the scaffold so cards don't have to know
         # their host. Per AGENTS.md the planner uses the registered endpoint.
         card["endpoint"] = _agent_endpoint()
+        if card.get("kind") == "au":
+            card["agent_card_url"] = _agent_card_url()
+            card["a2a_endpoint"] = _agent_a2a_endpoint()
 
         # tools.yaml is optional; an empty needs list is fine.
         tools_path = child / "tools.yaml"
@@ -286,12 +305,125 @@ def _resolve_tool_cards(
     return cards
 
 
+def _description_from_purpose(card: dict[str, Any]) -> str:
+    purpose = str(card.get("purpose", "")).strip()
+    if not purpose:
+        return f"Capability {card.get('id', 'unknown')}"
+    return " ".join(purpose.split())
+
+
+def _build_agent_card(capabilities: list[Capability]) -> dict[str, Any]:
+    """Build the public A2A Agent Card for this process.
+
+    AOA capability cards carry richer course-specific contracts than A2A skills,
+    so the full cards are advertised through a data-only A2A extension.
+    """
+    agent_name = os.environ.get("AGENT_NAME", "agent")
+    descriptions = [_description_from_purpose(cap.card) for cap in capabilities]
+    description = (
+        descriptions[0]
+        if len(descriptions) == 1
+        else f"{agent_name} agent serving {len(descriptions)} AOA capabilities."
+    )
+    return {
+        "protocolVersion": "0.3.0",
+        "name": agent_name,
+        "description": description,
+        "url": _agent_a2a_endpoint(),
+        "preferredTransport": "JSONRPC",
+        "version": "0.1.0",
+        "capabilities": {
+            "streaming": False,
+            "pushNotifications": False,
+            "stateTransitionHistory": False,
+            "extensions": [
+                {
+                    "uri": "urn:aoa:extensions:capability-card:v1",
+                    "description": "AOA capability-card contracts exposed by this A2A agent.",
+                    "required": False,
+                    "params": {
+                        "capabilities": [cap.card for cap in capabilities],
+                    },
+                }
+            ],
+        },
+        "defaultInputModes": ["application/json", "text/plain"],
+        "defaultOutputModes": ["application/json", "text/markdown", "text/plain"],
+        "skills": [
+            {
+                "id": cap.id,
+                "name": cap.id,
+                "description": _description_from_purpose(cap.card),
+                "tags": ["aoa", "agentic-unit"],
+                "inputModes": ["application/json"],
+                "outputModes": ["application/json", "text/markdown"],
+            }
+            for cap in capabilities
+        ],
+    }
+
+
+def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {"code": code, "message": message},
+    }
+
+
+def _extract_a2a_invocation(params: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """Extract AOA invocation details from A2A MessageSendParams."""
+    metadata = params.get("metadata") or {}
+    message = params.get("message") or {}
+    message_metadata = message.get("metadata") or {}
+    capability_id = (
+        metadata.get("aoa_capability")
+        or message_metadata.get("aoa_capability")
+        or metadata.get("capability")
+        or message_metadata.get("capability")
+        or ""
+    )
+    trace_id = (
+        metadata.get("trace_id")
+        or message_metadata.get("trace_id")
+        or params.get("taskId")
+        or ""
+    )
+
+    inputs: dict[str, Any] = {}
+    for part in message.get("parts") or []:
+        if part.get("kind") != "data":
+            continue
+        data = part.get("data")
+        if not isinstance(data, dict):
+            continue
+        if not capability_id:
+            capability_id = str(data.get("aoa_capability") or data.get("capability") or "")
+        if not trace_id:
+            trace_id = str(data.get("trace_id") or "")
+        maybe_inputs = data.get("inputs", data)
+        if isinstance(maybe_inputs, dict):
+            inputs = maybe_inputs
+            break
+
+    return capability_id, trace_id, inputs
+
+
+def _markdown_output(outputs: dict[str, Any]) -> str | None:
+    for key in ("report_markdown", "answer_markdown", "markdown"):
+        value = outputs.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
 def build_app(handle: Handler) -> FastAPI:
     """Build the FastAPI app for an agent given its ``handle`` function."""
     app = FastAPI()
 
     capabilities = discover_capabilities()
     by_id = {c.id: c for c in capabilities}
+    agent_card = _build_agent_card(capabilities)
     registry = RegistryClient()
     model: Model | None = None
     tool_cards: dict[str, dict[str, Any]] = {}
@@ -325,21 +457,25 @@ def build_app(handle: Handler) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown capability: {capability_id}")
         return JSONResponse(cap.card)
 
-    @app.post("/invoke")
-    async def invoke(request: Request) -> JSONResponse:
-        capability_id = request.query_params.get("capability")
-        if not capability_id:
-            raise HTTPException(status_code=400, detail="missing ?capability=<id>")
+    @app.get("/.well-known/agent-card.json")
+    async def get_agent_card() -> JSONResponse:
+        return JSONResponse(agent_card)
+
+    @app.get("/a2a/.well-known/agent-card.json")
+    async def get_scoped_agent_card() -> JSONResponse:
+        return JSONResponse(agent_card)
+
+    async def _invoke_capability(
+        capability_id: str,
+        trace_id: str,
+        inputs: dict[str, Any],
+    ) -> dict[str, Any]:
+        nonlocal model
         cap = by_id.get(capability_id)
         if cap is None:
             raise HTTPException(status_code=404, detail=f"unknown capability: {capability_id}")
 
-        body = await request.json()
-        trace_id = body.get("trace_id", "")
-        inputs = body.get("inputs", {})
-
         try:
-            nonlocal model
             if model is None:
                 model = Model()
 
@@ -362,17 +498,15 @@ def build_app(handle: Handler) -> FastAPI:
                 result = await result
         except Exception as e:  # noqa: BLE001
             logger.exception("capability %s failed", capability_id)
-            return JSONResponse(
-                {
-                    "trace_id": trace_id,
-                    "outputs": {"error": str(e)},
-                    "signals": {
-                        "exception": True,
-                        "exception_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                }
-            )
+            return {
+                "trace_id": trace_id,
+                "outputs": {"error": str(e)},
+                "signals": {
+                    "exception": True,
+                    "exception_type": type(e).__name__,
+                    "error": str(e),
+                },
+            }
 
         if not isinstance(result, dict):
             raise HTTPException(
@@ -381,9 +515,74 @@ def build_app(handle: Handler) -> FastAPI:
             )
         outputs = result.get("outputs", {})
         signals = result.get("signals", {})
-        return JSONResponse(
-            {"trace_id": trace_id, "outputs": outputs, "signals": signals}
-        )
+        return {"trace_id": trace_id, "outputs": outputs, "signals": signals}
+
+    @app.post("/invoke")
+    async def invoke(request: Request) -> JSONResponse:
+        capability_id = request.query_params.get("capability")
+        if not capability_id:
+            raise HTTPException(status_code=400, detail="missing ?capability=<id>")
+
+        body = await request.json()
+        trace_id = body.get("trace_id", "")
+        inputs = body.get("inputs", {})
+        envelope = await _invoke_capability(capability_id, trace_id, inputs)
+        return JSONResponse(envelope)
+
+    @app.post("/a2a")
+    async def a2a(request: Request) -> JSONResponse:
+        body = await request.json()
+        request_id = body.get("id")
+        if body.get("jsonrpc") != "2.0":
+            return JSONResponse(_jsonrpc_error(request_id, -32600, "expected JSON-RPC 2.0"))
+        if body.get("method") != "message/send":
+            return JSONResponse(_jsonrpc_error(request_id, -32601, "method not found"))
+        params = body.get("params") or {}
+        if not isinstance(params, dict):
+            return JSONResponse(_jsonrpc_error(request_id, -32602, "params must be an object"))
+
+        capability_id, trace_id, inputs = _extract_a2a_invocation(params)
+        if not capability_id:
+            return JSONResponse(_jsonrpc_error(request_id, -32602, "missing aoa_capability metadata"))
+        if not trace_id:
+            trace_id = uuid.uuid4().hex[:12]
+
+        try:
+            envelope = await _invoke_capability(capability_id, trace_id, inputs)
+        except HTTPException as e:
+            return JSONResponse(_jsonrpc_error(request_id, e.status_code, str(e.detail)))
+
+        outputs = envelope.get("outputs", {})
+        signals = envelope.get("signals", {})
+        parts: list[dict[str, Any]] = []
+        if isinstance(outputs, dict):
+            markdown = _markdown_output(outputs)
+            if markdown is not None:
+                parts.append({"kind": "text", "text": markdown})
+        parts.append({
+            "kind": "data",
+            "data": {
+                "trace_id": trace_id,
+                "aoa_capability": capability_id,
+                "outputs": outputs,
+                "signals": signals,
+            },
+        })
+
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "kind": "message",
+                "messageId": f"{trace_id}-{capability_id}-response",
+                "role": "agent",
+                "parts": parts,
+                "metadata": {
+                    "trace_id": trace_id,
+                    "aoa_capability": capability_id,
+                },
+            },
+        })
 
     return app
 

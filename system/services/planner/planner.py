@@ -191,6 +191,14 @@ async def _registry_find(client: httpx.AsyncClient, capability_id: str) -> dict[
 async def _invoke(
     client: httpx.AsyncClient, card: dict[str, Any], trace_id: str, inputs: dict[str, Any]
 ) -> dict[str, Any]:
+    if card.get("a2a_endpoint"):
+        return await _invoke_a2a(client, card, trace_id, inputs)
+    return await _invoke_http(client, card, trace_id, inputs)
+
+
+async def _invoke_http(
+    client: httpx.AsyncClient, card: dict[str, Any], trace_id: str, inputs: dict[str, Any]
+) -> dict[str, Any]:
     endpoint = card["endpoint"]
     payload = {"trace_id": trace_id, "inputs": inputs}
     r = await client.post(
@@ -198,6 +206,58 @@ async def _invoke(
     )
     r.raise_for_status()
     return r.json()
+
+
+async def _invoke_a2a(
+    client: httpx.AsyncClient, card: dict[str, Any], trace_id: str, inputs: dict[str, Any]
+) -> dict[str, Any]:
+    capability_id = card["id"]
+    payload = {
+        "jsonrpc": "2.0",
+        "id": f"{trace_id}-{capability_id}",
+        "method": "message/send",
+        "params": {
+            "message": {
+                "kind": "message",
+                "messageId": uuid.uuid4().hex,
+                "role": "user",
+                "parts": [
+                    {
+                        "kind": "data",
+                        "data": {
+                            "inputs": inputs,
+                        },
+                    }
+                ],
+                "metadata": {
+                    "trace_id": trace_id,
+                    "aoa_capability": capability_id,
+                },
+            },
+            "metadata": {
+                "trace_id": trace_id,
+                "aoa_capability": capability_id,
+            },
+        },
+    }
+    r = await client.post(card["a2a_endpoint"], json=payload, timeout=INVOKE_TIMEOUT)
+    r.raise_for_status()
+    response = r.json()
+    if response.get("error"):
+        raise RuntimeError(response["error"])
+    result = response.get("result") or {}
+    outputs: dict[str, Any] = {}
+    signals: dict[str, Any] = {}
+    for part in result.get("parts") or []:
+        if part.get("kind") != "data":
+            continue
+        data = part.get("data") or {}
+        if not isinstance(data, dict):
+            continue
+        outputs = data.get("outputs", {})
+        signals = data.get("signals", {})
+        break
+    return {"trace_id": trace_id, "outputs": outputs, "signals": signals}
 
 
 # ----------------------------------------------------------------------

@@ -3,11 +3,11 @@ FROM aoa-course/agent-base:latest
 
 ENV AGENT_NAME=reporter \
     AGENT_HOST=reporter \
-    AGENT_PORT=7303
+    AGENT_PORT=8888
 
 WORKDIR /app
 
 COPY agent.py /app/agent.py
 
-EXPOSE 7303
+EXPOSE 8888
 CMD ["python", "-u", "/app/agent.py"]

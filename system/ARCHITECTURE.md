@@ -2,7 +2,9 @@
 
 A small, container-shaped, readable AOA system. Two workflows, three agent
 codebases, six AU capabilities, two deterministic tools, and three plumbing
-services.
+services. AU-to-AU orchestration uses A2A Agent Cards and JSON-RPC
+`message/send`; deterministic tools remain registered capabilities called over
+their simpler tool endpoints.
 
 ## What the system does
 
@@ -14,7 +16,12 @@ Two workflows run through one registry:
 parser-cv → evaluator-cv → reporter-cv-fit
 ```
 
-You submit a CV and a job description through the studio. The planner queries the registry for `parser-cv` and calls it; the parser returns structured CV data. The planner then calls `evaluator-cv` with the parsed CV and the job description; the evaluator returns scores and a verdict. Finally the planner calls `reporter-cv-fit`, which produces a structured fit-verdict report. Every step is visible in the studio's trace pane.
+You submit a CV and a job description through the studio. The planner queries
+the registry for `parser-cv` and starts it with A2A `message/send`; the parser
+returns structured CV data. The planner then starts `evaluator-cv` with the
+parsed CV and the job description; the evaluator returns scores and a verdict.
+Finally the planner starts `reporter-cv-fit`, which produces a structured
+fit-verdict report. Every step is visible in the studio's trace pane.
 
 **Knowledge query** (Session 4) reuses the same three-agent shape:
 
@@ -33,7 +40,7 @@ general.
 Each is something you can see on screen as you build:
 
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
-2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU or by a deterministic tool is a property of the entry, not of the registry.
+2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool over a direct endpoint is a property of the entry, not of the registry.
 3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
@@ -72,7 +79,7 @@ When a single codebase backs more than one capability, the capability-specific f
 | Service | Job |
 |---|---|
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes `find_capability(intent)` and `list_capabilities()` over HTTP. |
-| **planner** | Receives intents from the studio. Queries the registry. Sequences agent invocations. Records each step to `traces/<event-id>.jsonl`. |
+| **planner** | Receives intents from the studio. Queries the registry. Sequences AU invocations with A2A `message/send` and falls back to direct endpoints for tools. Records each step to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
 
 ## Container topology
@@ -85,9 +92,9 @@ docker-compose.yml services:
   registry             FastAPI    7100
   planner              FastAPI    7200
   studio               FastAPI    8080
-  parser               FastAPI    7301
-  evaluator            FastAPI    7302
-  reporter             FastAPI    7303
+  parser               FastAPI    8888 (host: 7301)
+  evaluator            FastAPI    8888 (host: 7302)
+  reporter             FastAPI    8888 (host: 7303)
   tool-filesystem      MCP        7401
   tool-document-text   FastAPI    7402
   ollama               profile: local, optional
@@ -96,7 +103,58 @@ docker-compose.yml services:
 Eight containers run for both sessions, plus optional Ollama under the local
 profile.
 
-Every agent container has the same shape: a FastAPI app that mounts its `capabilities/` folder as a volume, registers itself with the registry on boot, exposes `/invoke` and `/cards/<id>`, and watches mounted `skills.md` files for hot reload. Read one agent and you've read them all.
+Every agent container has the same shape: a FastAPI app that mounts its
+`capabilities/` folder as a volume, registers itself with the registry on boot,
+exposes `/a2a`, `/.well-known/agent-card.json`, `/invoke`, and `/cards/<id>`,
+and watches mounted `skills.md` files for hot reload. Read one agent and
+you've read them all.
+
+## A2A surface
+
+Each AU process publishes a genuine A2A Agent Card at
+`/.well-known/agent-card.json`. Inside the Docker network these resolve to
+container-local addresses such as
+`http://parser:8888/.well-known/agent-card.json`, and the card's `url` points
+at `http://parser:8888/a2a`. The card includes standard A2A fields such as
+`protocolVersion`, `url`, `preferredTransport`, default input/output modes, and
+`skills`. A2A skills are intentionally lighter than AOA capability cards, so
+the full capability-card contracts are also advertised through an A2A
+`capabilities.extensions` entry.
+
+The planner still uses the AOA registry to choose concrete capabilities. When a
+registered card includes `a2a_endpoint`, the planner sends a JSON-RPC 2.0
+request to that endpoint:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "role": "user",
+      "parts": [
+        {
+          "kind": "data",
+          "data": {
+            "inputs": {}
+          }
+        }
+      ],
+      "metadata": {
+        "aoa_capability": "parser-cv",
+        "trace_id": "..."
+      }
+    }
+  }
+}
+```
+
+The agent replies with an A2A message. The structured AOA envelope lives in a
+`DataPart` so the planner can keep the same trace and workflow code. Reporter
+agents may also include a text part containing markdown for inline rendering.
+`/invoke` remains available as a compatibility endpoint and as the simple
+surface used by deterministic tools.
 
 ## Capability card schema
 
@@ -128,10 +186,15 @@ evaluation_signals:
 provenance:
   model: ${MODEL}
   skills_hash: <sha of skills.md>
-endpoint: http://evaluator:7302/invoke
+endpoint: http://evaluator:8888/invoke
+agent_card_url: http://evaluator:8888/.well-known/agent-card.json
+a2a_endpoint: http://evaluator:8888/a2a
 ```
 
-The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`, `constraints`, `evaluation_signals`, `skills.md`, and the `endpoint` path. They share `agent.py` and `model`. Pure tools have `kind: tool` and `provenance.model: none`; the planner doesn't branch on `kind`.
+The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`,
+`constraints`, `evaluation_signals`, `skills.md`, and the registered
+endpoints. They share `agent.py` and `model`. Pure tools have `kind: tool` and
+`provenance.model: none`; they register `endpoint` only.
 
 ## The studio
 
