@@ -106,6 +106,7 @@ services:
       PROVIDER: ${PROVIDER:-openai}
       MODEL: ${MODEL}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
     depends_on:
@@ -132,6 +133,7 @@ services:
       PROVIDER: ${PROVIDER:-openai}
       MODEL: ${MODEL}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
     depends_on:
@@ -157,6 +159,7 @@ services:
       PROVIDER: ${PROVIDER:-openai}
       MODEL: ${MODEL}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
     depends_on:

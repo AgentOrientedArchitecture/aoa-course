@@ -19,15 +19,22 @@ The point of the course is in that move: the same agents back different capabili
 
 ## Run it
 
-You'll need [Docker](https://docs.docker.com/get-docker/) and either an API key (OpenAI or Anthropic) or a local [Ollama](https://ollama.com) install.
+You'll need [Docker](https://docs.docker.com/get-docker/) and either a local
+[Ollama](https://ollama.com) install or an API key for a model provider. The
+course is designed around smaller, swappable models such as `gpt-oss:120b` or
+Qwen-family models, whether you run them locally or through an
+OpenAI-compatible hosted endpoint.
 
 ```bash
 git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
 cp .env.example .env
 # edit .env — set PROVIDER and MODEL
-make up
+make local-up   # local Ollama path
 ```
+
+For a hosted provider, set `PROVIDER=openai`, `MODEL`, and optionally
+`OPENAI_BASE_URL`, then run `make up` instead.
 
 Then open [http://localhost:8080](http://localhost:8080) for the studio. `make help` lists the rest (`down`, `logs`, `rebuild`, `clean`, `local-up` for Ollama).
 

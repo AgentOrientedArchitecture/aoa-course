@@ -14,8 +14,8 @@
 #   make local-up  - same as `up`, but also starts a local Ollama server
 #
 # Override the model on the fly:
-#   PROVIDER=openai MODEL=gpt-4o-mini make up
-#   PROVIDER=ollama MODEL=llama3.1     make local-up
+#   PROVIDER=ollama MODEL=gpt-oss:120b make local-up
+#   PROVIDER=openai MODEL=qwen3-32b OPENAI_BASE_URL=https://provider.example/v1 make up
 
 COMPOSE       := docker compose -f system/docker-compose.yml
 BASE_IMAGE    := aoa-course/agent-base:latest

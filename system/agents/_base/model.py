@@ -2,8 +2,9 @@
 
 Agents call ``model.complete(prompt, **opts)`` and don't know which provider
 is behind it. The provider is chosen by the ``PROVIDER`` env var; the model
-name comes from ``MODEL``. Switching from a hosted API to local Ollama is a
-``.env`` change.
+name comes from ``MODEL``. Hosted OpenAI-compatible endpoints can be selected
+with ``OPENAI_BASE_URL``. Switching model or hosting location is a ``.env``
+change.
 """
 from __future__ import annotations
 
@@ -88,7 +89,8 @@ class Model:
         from openai import OpenAI  # type: ignore[import-untyped]
 
         if self._client is None:
-            self._client = OpenAI(timeout=self.timeout_seconds)
+            base_url = os.environ.get("OPENAI_BASE_URL") or None
+            self._client = OpenAI(timeout=self.timeout_seconds, base_url=base_url)
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})

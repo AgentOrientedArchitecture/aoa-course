@@ -35,7 +35,7 @@ Each is something you can see on screen as you build:
 2. **A registered capability isn't always an AU.** The MCP filesystem server in `tools/` registers in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU or by a deterministic tool is a property of the entry, not of the registry.
 3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
-5. **The architecture is indifferent to where reasoning happens.** Switch the model from a hosted API to local Ollama through `.env`; nothing else changes.
+5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
 6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → plan → capability → tool.
 
 ## The agent set
@@ -155,8 +155,13 @@ The studio is for observing and driving the system. In the cut-down knowledge-ma
 Configure the model via `.env`:
 
 ```
-PROVIDER=openai|anthropic|ollama
-MODEL=…
+PROVIDER=ollama|openai|anthropic
+MODEL=...
+OPENAI_BASE_URL=...   # optional for OpenAI-compatible hosted providers
 ```
 
-Switching from a hosted API to Ollama is a `.env` change and a `docker compose up` away. The registry, the agents, the capability cards, and the planner all stay still.
+The intended baseline is a smaller model, for example `gpt-oss:120b` or a
+Qwen-family model, run locally through Ollama or through a service provider.
+Switching model, provider, or hosting location is a `.env` change and a
+`docker compose up` away. The registry, the agents, the capability cards, and
+the planner all stay still.
