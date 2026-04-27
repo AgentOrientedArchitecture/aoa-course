@@ -338,27 +338,41 @@ def build_app(handle: Handler) -> FastAPI:
         trace_id = body.get("trace_id", "")
         inputs = body.get("inputs", {})
 
-        nonlocal model
-        if model is None:
-            model = Model()
+        try:
+            nonlocal model
+            if model is None:
+                model = Model()
 
-        # Bind a fresh ToolHandle set per request so trace_id propagates.
-        assert tool_client is not None
-        handles: dict[str, ToolHandle] = {
-            cid: ToolHandle(cid, card, tool_client, lambda tid=trace_id: tid)
-            for cid, card in tool_cards.items()
-        }
-        ctx = Context(
-            capability=cap,
-            model=model,
-            skills=cap.skills_text,
-            trace_id=trace_id,
-            tools=handles,
-        )
+            # Bind a fresh ToolHandle set per request so trace_id propagates.
+            assert tool_client is not None
+            handles: dict[str, ToolHandle] = {
+                cid: ToolHandle(cid, card, tool_client, lambda tid=trace_id: tid)
+                for cid, card in tool_cards.items()
+            }
+            ctx = Context(
+                capability=cap,
+                model=model,
+                skills=cap.skills_text,
+                trace_id=trace_id,
+                tools=handles,
+            )
 
-        result = handle(capability_id, inputs, ctx)
-        if asyncio.iscoroutine(result):
-            result = await result
+            result = handle(capability_id, inputs, ctx)
+            if asyncio.iscoroutine(result):
+                result = await result
+        except Exception as e:  # noqa: BLE001
+            logger.exception("capability %s failed", capability_id)
+            return JSONResponse(
+                {
+                    "trace_id": trace_id,
+                    "outputs": {"error": str(e)},
+                    "signals": {
+                        "exception": True,
+                        "exception_type": type(e).__name__,
+                        "error": str(e),
+                    },
+                }
+            )
 
         if not isinstance(result, dict):
             raise HTTPException(
