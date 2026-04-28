@@ -132,7 +132,7 @@ main {
 }
 .mode-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -557,7 +557,7 @@ main {
   margin-bottom: 4px;
 }
 
-.graph-section {
+.graph-panel {
   min-height: 360px;
 }
 .wiki-graph {

@@ -228,11 +228,12 @@ A browser surface at `localhost:8080` with two roles:
 **Intent:**
 
 - **Submit an intent.** Free-form text, sent to the planner.
-- **Choose a workflow.** CV fit for Session 2, knowledge ingest and wiki query for Session 4.
+- **Choose a mode.** CV fit for Session 2; ingest, graph, and wiki query for Session 4.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
 - **Inspect the wiki graph.** The Session 4 wiki store projects its raw,
   promoted, and indexed knowledge into typed graph nodes. Documents, concepts,
-  passages, and open questions use different shapes and colours.
+  passages, and open questions use different shapes and colours. The graph is
+  its own mode, not part of the CV workflow.
 
 The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs.
 

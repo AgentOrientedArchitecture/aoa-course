@@ -17,12 +17,14 @@ The studio has two roles in this system:
 
 **Intent** — two ways to drive the system:
 
-- A workflow switch for `cv-fit`, `knowledge-ingest`, and `knowledge-query`.
+- A mode switch for `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
+  `knowledge-query`.
 - Text boxes and file drops that forward course inputs to the planner.
 
 The studio drives the demo workflows and shows the trace. For the cut-down
 knowledge-management system, ingest returns a stored wiki summary and query
-returns a grounded answer.
+returns a grounded answer. The graph mode is read-only and refreshes the wiki
+graph without submitting a planner intent.
 
 ## Internals
 

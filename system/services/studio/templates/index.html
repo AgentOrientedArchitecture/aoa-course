@@ -23,6 +23,7 @@
         <div class="mode-tabs" role="tablist" aria-label="Workflow">
           <button id="mode-cv" class="active" type="button" data-mode="cv-fit">CV fit</button>
           <button id="mode-ingest" type="button" data-mode="knowledge-ingest">Ingest</button>
+          <button id="mode-graph" type="button" data-mode="wiki-graph">Graph</button>
           <button id="mode-query" type="button" data-mode="knowledge-query">Ask</button>
         </div>
 
@@ -77,6 +78,22 @@
           </label>
         </div>
 
+        <div class="workflow-fields hidden" data-mode-panel="wiki-graph">
+          <section class="graph-panel">
+            <div class="section-head">
+              <span class="section-label">Wiki Graph</span>
+              <span id="wiki-graph-state" class="section-meta">waiting</span>
+            </div>
+            <div id="wiki-graph" class="wiki-graph muted-block">No wiki nodes yet.</div>
+            <div class="graph-legend" aria-label="Wiki graph legend">
+              <span><i class="legend document"></i>Document</span>
+              <span><i class="legend concept"></i>Concept</span>
+              <span><i class="legend passage"></i>Passage</span>
+              <span><i class="legend open_question"></i>Open question</span>
+            </div>
+          </section>
+        </div>
+
         <div class="intent-actions">
           <button id="intent-submit" type="button">Run cv-fit</button>
           <span id="intent-status"></span>
@@ -117,19 +134,6 @@
           <div id="result-body" class="result-body muted-block">No result yet.</div>
         </section>
 
-        <section class="lifecycle-section graph-section">
-          <div class="section-head">
-            <span class="section-label">Wiki Graph</span>
-            <span id="wiki-graph-state" class="section-meta">waiting</span>
-          </div>
-          <div id="wiki-graph" class="wiki-graph muted-block">No wiki nodes yet.</div>
-          <div class="graph-legend" aria-label="Wiki graph legend">
-            <span><i class="legend document"></i>Document</span>
-            <span><i class="legend concept"></i>Concept</span>
-            <span><i class="legend passage"></i>Passage</span>
-            <span><i class="legend open_question"></i>Open question</span>
-          </div>
-        </section>
       </div>
 
       <details class="event-details">

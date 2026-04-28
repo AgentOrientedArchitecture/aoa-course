@@ -300,9 +300,10 @@ async function loadWikiGraph() {
   try {
     const resp = await fetch("/api/wiki/graph");
     const graph = await resp.json();
+    const cleaned = cleanGraph(graph);
     state.wikiGraph = {
-      nodes: Array.isArray(graph.nodes) ? graph.nodes : [],
-      edges: Array.isArray(graph.edges) ? graph.edges : [],
+      nodes: cleaned.nodes,
+      edges: cleaned.edges,
       error: graph.error || "",
     };
   } catch (e) {
@@ -401,6 +402,38 @@ function renderWikiGraph() {
   root.appendChild(svg);
 }
 
+function cleanGraph(graph) {
+  const allowedTypes = new Set(["document", "concept", "passage", "open_question"]);
+  const nodes = [];
+  const seen = new Set();
+  for (const raw of Array.isArray(graph.nodes) ? graph.nodes : []) {
+    if (!raw || typeof raw !== "object") continue;
+    const id = String(raw.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    nodes.push({
+      id,
+      type: allowedTypes.has(raw.type) ? raw.type : "concept",
+      label: String(raw.label || id),
+      details: raw.details && typeof raw.details === "object" ? raw.details : {},
+    });
+  }
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = [];
+  for (const raw of Array.isArray(graph.edges) ? graph.edges : []) {
+    if (!raw || typeof raw !== "object") continue;
+    const source = String(raw.source || "").trim();
+    const target = String(raw.target || "").trim();
+    if (!nodeIds.has(source) || !nodeIds.has(target) || source === target) continue;
+    edges.push({
+      source,
+      target,
+      relation: String(raw.relation || "relates_to"),
+    });
+  }
+  return { nodes, edges };
+}
+
 function graphLayout(nodes) {
   const typeOrder = ["document", "concept", "passage", "open_question"];
   const groups = new Map(typeOrder.map((type) => [type, []]));
@@ -475,6 +508,7 @@ function lifecycleIntentTitle(life) {
   const kind = (life.intent && life.intent.kind) || life.workflow || state.mode;
   if (kind === "cv-fit") return "Evaluate a CV against a job description";
   if (kind === "knowledge-ingest") return "Ingest source material into the AOA wiki";
+  if (kind === "wiki-graph") return "Inspect the AOA wiki graph";
   if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
   return "No run yet";
 }
@@ -734,6 +768,14 @@ function setStatus(connected) {
 async function submitIntent() {
   const status = $("intent-status");
   const btn = $("intent-submit");
+  if (state.mode === "wiki-graph") {
+    btn.disabled = true;
+    status.textContent = "refreshing...";
+    await loadWikiGraph();
+    status.textContent = "refreshed";
+    btn.disabled = false;
+    return;
+  }
   const payload = buildIntentPayload(status);
   if (!payload) return;
   const formBody = intentFormData(payload);
@@ -882,13 +924,16 @@ function setMode(mode) {
   for (const panel of document.querySelectorAll("[data-mode-panel]")) {
     panel.classList.toggle("hidden", panel.dataset.modePanel !== mode);
   }
+  $("lifecycle").classList.toggle("hidden", mode === "wiki-graph");
   const labels = {
     "cv-fit": "Run cv-fit",
     "knowledge-ingest": "Run ingest",
+    "wiki-graph": "Refresh graph",
     "knowledge-query": "Run query",
   };
   $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";
+  if (mode === "wiki-graph") void loadWikiGraph();
   if (!state.lifecycle.intent) renderLifecycle();
 }
 
