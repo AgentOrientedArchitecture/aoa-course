@@ -288,7 +288,8 @@ function renderLifecycle() {
 function lifecycleIntentTitle(life) {
   const kind = (life.intent && life.intent.kind) || life.workflow || state.mode;
   if (kind === "cv-fit") return "Evaluate a CV against a job description";
-  if (kind === "knowledge-query") return "Answer a question from a source note";
+  if (kind === "knowledge-ingest") return "Ingest source material into the AOA wiki";
+  if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
   return "No run yet";
 }
 
@@ -409,7 +410,7 @@ function renderResult(life) {
     body.textContent = "No result yet.";
     return;
   }
-  const markdown = life.result.report_markdown || life.result.answer_markdown || "";
+  const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || "";
   resultState.textContent = life.result.error ? "error" : "complete";
   body.className = "result-body";
   if (markdown) {
@@ -461,7 +462,7 @@ function pickPayload(record) {
 function pickMarkdown(record) {
   const outputs = record.outputs || {};
   if (record.step === "response" || record.step === "finish") {
-    return outputs.report_markdown || outputs.answer_markdown || "";
+    return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || "";
   }
   return "";
 }
@@ -590,17 +591,27 @@ function buildIntentPayload(status) {
     };
   }
 
-  const note = $("intent-note").value.trim();
+  if (state.mode === "knowledge-ingest") {
+    const note = $("intent-note").value.trim();
+    if (!note && !state.noteFile) {
+      status.textContent = "need source material to ingest";
+      return null;
+    }
+    return {
+      kind: "knowledge-ingest",
+      note_text: note,
+      note_name: state.noteName || "source-note.txt",
+      note_file: state.noteFile,
+    };
+  }
+
   const question = $("intent-question").value.trim();
-  if ((!note && !state.noteFile) || !question) {
-    status.textContent = "need both a source note and a question";
+  if (!question) {
+    status.textContent = "need a question";
     return null;
   }
   return {
     kind: "knowledge-query",
-    note_text: note,
-    note_name: state.noteName || "source-note.txt",
-    note_file: state.noteFile,
     question,
   };
 }
@@ -685,7 +696,12 @@ function setMode(mode) {
   for (const panel of document.querySelectorAll("[data-mode-panel]")) {
     panel.classList.toggle("hidden", panel.dataset.modePanel !== mode);
   }
-  $("intent-submit").textContent = mode === "cv-fit" ? "Run cv-fit" : "Run knowledge-query";
+  const labels = {
+    "cv-fit": "Run cv-fit",
+    "knowledge-ingest": "Run ingest",
+    "knowledge-query": "Run query",
+  };
+  $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";
   if (!state.lifecycle.intent) renderLifecycle();
 }

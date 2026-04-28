@@ -1,0 +1,29 @@
+id: evaluator-promote
+version: 0.1.0
+kind: au
+purpose: |
+  Decide which parsed-note material should be promoted into the course wiki
+  layers and return concepts, citeable passages, relationships, and open
+  questions.
+inputs:
+  - name: parsed_note
+    type: structured-note
+    required: true
+  - name: source_path
+    type: string
+    required: true
+outputs:
+  - name: promotion
+    type: object
+constraints:
+  - The output is a single JSON object.
+  - promotion includes title, summary, concepts, promoted_passages,
+    relationships, and open_questions.
+  - promoted_passages include passage_id, quote, and why_it_matters.
+evaluation_signals:
+  - valid_output_shape
+  - has_concepts
+  - has_promoted_passages
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

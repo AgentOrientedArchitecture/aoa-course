@@ -1,9 +1,8 @@
 """reporter agent.
 
-Backs ``reporter-cv-fit`` for Session 2 and ``reporter-answer`` for Session 4.
-The reporter is the example of an Agentic Unit with no tool dependencies - it
-consumes structured data from upstream agents and asks the model for a
-human-readable result.
+Backs ``reporter-cv-fit`` for Session 2, plus Session 4 answer and ingest
+reporting. Some reporter capabilities only consume structured data; others
+use a declared tool to store the finished result.
 """
 from __future__ import annotations
 
@@ -32,6 +31,8 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _report_cv_fit(inputs, ctx)
     if capability_id == "reporter-answer":
         return await _report_answer(inputs, ctx)
+    if capability_id == "reporter-ingest-summary":
+        return await _report_ingest_summary(inputs, ctx)
     return error_envelope(f"reporter does not back capability {capability_id!r}")
 
 
@@ -108,6 +109,42 @@ async def _report_answer(inputs: dict, ctx: Context) -> dict:
     }
 
 
+async def _report_ingest_summary(inputs: dict, ctx: Context) -> dict:
+    promotion = inputs.get("promotion")
+    source_path = inputs.get("source_path")
+    if not isinstance(promotion, dict):
+        return error_envelope("promotion (object) is required")
+    if not isinstance(source_path, str) or not source_path.strip():
+        return error_envelope("source_path is required")
+    wiki_store = ctx.tools.get("tool-wiki-store")
+    if wiki_store is None:
+        return error_envelope("tool-wiki-store is not available")
+
+    stored_outputs = await wiki_store({
+        "op": "write_ingest",
+        "promotion": promotion,
+        "source_path": source_path,
+    })
+    stored = stored_outputs.get("stored")
+    if not isinstance(stored, dict):
+        return error_envelope(stored_outputs.get("error") or "wiki store did not return stored result")
+
+    markdown = _ingest_markdown(promotion, source_path, stored)
+    return {
+        "outputs": {
+            "stored": stored,
+            "ingest_markdown": markdown,
+        },
+        "signals": {
+            "valid_output_shape": True,
+            "stored_document": bool(stored.get("document_id")),
+            "has_markdown": bool(markdown),
+            "passage_count": stored.get("passage_count", 0),
+            "latency_seconds": 0,
+        },
+    }
+
+
 def _cv_report_markdown(report: dict) -> str:
     headline = str(report.get("headline") or "CV fit report").strip()
     summary = str(report.get("summary") or "").strip()
@@ -141,6 +178,59 @@ def _answer_markdown(answer: dict) -> str:
     lines += _markdown_list("Gaps", gaps)
     lines += _markdown_list("Follow-ups", follow_ups)
     return "\n".join(lines).strip()
+
+
+def _ingest_markdown(promotion: dict, source_path: str, stored: dict) -> str:
+    title = str(promotion.get("title") or "Wiki ingest").strip()
+    summary = str(promotion.get("summary") or "").strip()
+    concepts = promotion.get("concepts") if isinstance(promotion.get("concepts"), list) else []
+    open_questions = (
+        promotion.get("open_questions")
+        if isinstance(promotion.get("open_questions"), list)
+        else []
+    )
+    promoted_passages = (
+        promotion.get("promoted_passages")
+        if isinstance(promotion.get("promoted_passages"), list)
+        else []
+    )
+
+    lines = [f"# Ingested: {title}", "", f"**Source:** `{source_path}`", ""]
+    if summary:
+        lines += [summary, ""]
+    lines += [
+        "## Stored",
+        f"- Raw: `{stored.get('raw_path', '')}`",
+        f"- Promoted: `{stored.get('promoted_path', '')}`",
+        f"- Passages indexed: {stored.get('passage_count', 0)}",
+        "",
+    ]
+    lines += _markdown_list(
+        "Concepts",
+        [_concept_label(item) for item in concepts],
+    )
+    lines += _markdown_list(
+        "Promoted Passages",
+        [_passage_label(item) for item in promoted_passages],
+    )
+    lines += _markdown_list("Open Questions", open_questions)
+    return "\n".join(lines).strip()
+
+
+def _concept_label(value: object) -> str:
+    if isinstance(value, dict):
+        name = str(value.get("name") or "").strip()
+        description = str(value.get("description") or "").strip()
+        return f"{name}: {description}" if name and description else name or description
+    return str(value).strip()
+
+
+def _passage_label(value: object) -> str:
+    if isinstance(value, dict):
+        passage_id = str(value.get("passage_id") or "").strip()
+        why = str(value.get("why_it_matters") or "").strip()
+        return f"{passage_id}: {why}" if passage_id and why else passage_id or why
+    return str(value).strip()
 
 
 def _markdown_list(title: str, values: list) -> list[str]:

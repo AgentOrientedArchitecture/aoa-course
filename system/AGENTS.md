@@ -56,9 +56,19 @@ agents/evaluator/
       capability-card.yaml      # id: evaluator-query
       skills.md                 # rubric for passage relevance
       tools.yaml
+    promote/
+      capability-card.yaml      # id: evaluator-promote
+      skills.md                 # rubric for wiki promotion
+      tools.yaml
+    wiki-query/
+      capability-card.yaml      # id: evaluator-wiki-query
+      skills.md                 # rubric for retrieved wiki evidence
+      tools.yaml
 ```
 
-The container registers two capabilities at boot. The registry lists two rows. The studio shows two cards. One Python process serves both.
+The container registers multiple capabilities at boot. The registry lists
+separate rows. The studio shows separate cards. One Python process serves them
+all.
 
 Every agent uses the `capabilities/<name>/` pattern even when there's only one capability — it makes adding a second capability a structural copy rather than a refactor.
 
@@ -207,6 +217,7 @@ Tools register the same way agents do and are discovered through the same
 registry. The selected card tells the caller how to proceed: AUs include an
 `a2a_endpoint`; tools expose a registered bridge `endpoint`.
 
-The filesystem and document text extractors are MCP-backed examples. See
+The filesystem, document text extractor, and wiki store are MCP-backed examples. See
 [`tools/filesystem/`](tools/filesystem/) and
-[`tools/document-text/`](tools/document-text/).
+[`tools/document-text/`](tools/document-text/) plus
+[`tools/wiki-store/`](tools/wiki-store/).

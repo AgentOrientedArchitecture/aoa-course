@@ -115,6 +115,26 @@ services:
       registry:
         condition: service_healthy
 
+  tool-wiki-store:
+    build:
+      context: ./tools/wiki-store
+    image: aoa-course/tool-wiki-store:latest
+    container_name: aoa-tool-wiki-store
+    ports:
+      - "7403:7403"
+    volumes:
+      - wiki-data:/data/wiki
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      TOOL_HOST: tool-wiki-store
+      TOOL_PORT: 7403
+      FS_ROOT: /data
+      WIKI_ROOT: /data/wiki
+    depends_on:
+      registry:
+        condition: service_healthy
+
   # ------------------------------------------------------------------
   # Agents
   # ------------------------------------------------------------------
@@ -185,6 +205,8 @@ services:
         condition: service_healthy
       tool-document-text:
         condition: service_started
+      tool-wiki-store:
+        condition: service_started
 
   reporter:
     build:
@@ -215,6 +237,8 @@ services:
     depends_on:
       registry:
         condition: service_healthy
+      tool-wiki-store:
+        condition: service_started
 
   # ------------------------------------------------------------------
   # Optional: local model server (only started under `local` profile)
@@ -233,3 +257,4 @@ volumes:
   planner-traces:
   inbox:
   ollama-models:
+  wiki-data:

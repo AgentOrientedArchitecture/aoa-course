@@ -1,0 +1,34 @@
+id: tool-wiki-store
+version: 0.1.0
+kind: tool
+purpose: |
+  Persist promoted course knowledge into a small local wiki store and search
+  that store for citeable passages.
+inputs:
+  - name: op
+    type: enum<write_ingest|search>
+    required: true
+  - name: promotion
+    type: object
+    required: false
+  - name: source_path
+    type: string
+    required: false
+  - name: query
+    type: string
+    required: false
+outputs:
+  - name: stored
+    type: object
+  - name: passages
+    type: array
+constraints:
+  - All persisted files stay under the configured wiki root.
+  - Stored markdown includes provenance back to the source path.
+  - Search returns passage ids and source document paths.
+evaluation_signals:
+  - path_within_root
+  - index_updated
+  - passages_have_citations
+provenance:
+  model: none

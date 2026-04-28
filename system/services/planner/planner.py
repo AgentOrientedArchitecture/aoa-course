@@ -3,8 +3,8 @@
 The planner receives intents from the studio, asks the registry for the
 capabilities it needs, sequences the agent invocations, and records the trace.
 Session 2 starts with one workflow (`cv-fit`). Session 4 reuses the same
-parser/evaluator/reporter shape for a cut-down knowledge-management workflow
-(`knowledge-query`).
+parser/evaluator/reporter shape for cut-down knowledge-management workflows:
+ingest material into a wiki store, then answer questions from that store.
 """
 from __future__ import annotations
 
@@ -138,8 +138,8 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
-    "knowledge-query": Workflow(
-        name="knowledge-query",
+    "knowledge-ingest": Workflow(
+        name="knowledge-ingest",
         tasks=[
             TaskSpec(
                 id="parse-note",
@@ -153,23 +153,76 @@ WORKFLOWS: dict[str, Workflow] = {
                 input_map={"note_path": "inputs.note_path"},
             ),
             TaskSpec(
-                id="evaluate-question",
-                purpose="Rank parsed-note evidence against a user question.",
+                id="promote-note",
+                purpose="Decide which parsed-note material should be promoted into the course wiki.",
                 discovery={
                     "kind": "au",
-                    "text": "rank passages evaluate question answer possible gaps rationale",
+                    "text": "promote parsed note into wiki concepts passages relationships open questions",
                     "required_inputs": [
-                        {"name": "question", "type": "string"},
                         {"name": "parsed_note", "type": "structured-note"},
+                        {"name": "source_path", "type": "string"},
                     ],
                     "required_outputs": [
+                        {"name": "promotion"},
+                    ],
+                },
+                input_map={
+                    "parsed_note": "parse-note.outputs.parsed_note",
+                    "source_path": "inputs.note_path",
+                },
+            ),
+            TaskSpec(
+                id="write-wiki-ingest",
+                purpose="Store promoted material in the wiki and report what changed.",
+                discovery={
+                    "kind": "au",
+                    "text": "write wiki ingest summary store promoted knowledge markdown",
+                    "required_inputs": [
+                        {"name": "promotion", "type": "object"},
+                        {"name": "source_path", "type": "string"},
+                    ],
+                    "required_outputs": [{"name": "ingest_markdown"}],
+                },
+                input_map={
+                    "promotion": "promote-note.outputs.promotion",
+                    "source_path": "inputs.note_path",
+                },
+            ),
+        ],
+    ),
+    "knowledge-query": Workflow(
+        name="knowledge-query",
+        tasks=[
+            TaskSpec(
+                id="parse-query",
+                purpose="Parse the user question into a compact wiki retrieval query.",
+                discovery={
+                    "kind": "au",
+                    "text": "parse question retrieval query intent terms focus constraints",
+                    "required_inputs": [{"name": "question", "type": "string"}],
+                    "required_outputs": [{"name": "query"}],
+                },
+                input_map={"question": "inputs.question"},
+            ),
+            TaskSpec(
+                id="evaluate-wiki-query",
+                purpose="Search wiki passages and rank evidence against the user question.",
+                discovery={
+                    "kind": "au",
+                    "text": "search wiki rank passages evaluate question answer possible gaps rationale",
+                    "required_inputs": [
+                        {"name": "question", "type": "string"},
+                        {"name": "query", "type": "object"},
+                    ],
+                    "required_outputs": [
+                        {"name": "parsed_note"},
                         {"name": "ranked_passages"},
                         {"name": "direct_answer_possible"},
                     ],
                 },
                 input_map={
                     "question": "inputs.question",
-                    "parsed_note": "parse-note.outputs.parsed_note",
+                    "query": "parse-query.outputs.query",
                 },
             ),
             TaskSpec(
@@ -187,8 +240,8 @@ WORKFLOWS: dict[str, Workflow] = {
                 },
                 input_map={
                     "question": "inputs.question",
-                    "parsed_note": "parse-note.outputs.parsed_note",
-                    "evaluation": "evaluate-question.outputs",
+                    "parsed_note": "evaluate-wiki-query.outputs.parsed_note",
+                    "evaluation": "evaluate-wiki-query.outputs",
                 },
             ),
         ],
@@ -203,7 +256,9 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
         return WORKFLOWS[kind]
     if kind is None and {"cv_path", "jd_path"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["cv-fit"]
-    if kind is None and {"note_path", "question"} <= set(intent.get("inputs", {})):
+    if kind is None and {"note_path"} <= set(intent.get("inputs", {})):
+        return WORKFLOWS["knowledge-ingest"]
+    if kind is None and {"question"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["knowledge-query"]
     raise HTTPException(status_code=400, detail=f"no workflow for intent kind={kind!r}")
 
@@ -313,7 +368,10 @@ def _deterministic_capability_for_task(task: TaskSpec) -> str:
         "evaluate-cv-fit": "evaluator-cv",
         "write-cv-fit-report": "reporter-cv-fit",
         "parse-note": "parser-notes",
-        "evaluate-question": "evaluator-query",
+        "promote-note": "evaluator-promote",
+        "write-wiki-ingest": "reporter-ingest-summary",
+        "parse-query": "parser-query",
+        "evaluate-wiki-query": "evaluator-wiki-query",
         "write-grounded-answer": "reporter-answer",
     }
     return matches.get(task.id, "")
@@ -511,8 +569,9 @@ def _validate_plan(
         })
 
     final_outputs = prior_outputs.get(planned_tasks[-1].id, set())
-    if "report_markdown" not in final_outputs and "answer_markdown" not in final_outputs:
-        raise ValueError("final task must produce report_markdown or answer_markdown")
+    final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown"}
+    if not final_markdown_outputs.intersection(final_outputs):
+        raise ValueError("final task must produce report_markdown, answer_markdown, or ingest_markdown")
     return planned_tasks, {"valid": True, "checks": checks}
 
 

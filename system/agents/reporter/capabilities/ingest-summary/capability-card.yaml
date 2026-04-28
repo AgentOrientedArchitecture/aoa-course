@@ -1,0 +1,30 @@
+id: reporter-ingest-summary
+version: 0.1.0
+kind: au
+purpose: |
+  Write promoted knowledge into the course wiki store and return a concise
+  Markdown ingest summary showing what was stored, which concepts were
+  promoted, and what gaps remain.
+inputs:
+  - name: promotion
+    type: object
+    required: true
+  - name: source_path
+    type: string
+    required: true
+outputs:
+  - name: stored
+    type: object
+  - name: ingest_markdown
+    type: string
+constraints:
+  - The output includes the storage result returned by tool-wiki-store.
+  - ingest_markdown is suitable for rendering directly in the studio.
+  - The agent does not re-promote content; it reports and stores the evaluator's promotion.
+evaluation_signals:
+  - valid_output_shape
+  - stored_document
+  - has_markdown
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

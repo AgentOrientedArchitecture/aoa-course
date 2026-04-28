@@ -410,7 +410,7 @@ def _extract_a2a_invocation(params: dict[str, Any]) -> tuple[str, str, dict[str,
 
 
 def _markdown_output(outputs: dict[str, Any]) -> str | None:
-    for key in ("report_markdown", "answer_markdown", "markdown"):
+    for key in ("report_markdown", "answer_markdown", "ingest_markdown", "markdown"):
         value = outputs.get(key)
         if isinstance(value, str) and value.strip():
             return value

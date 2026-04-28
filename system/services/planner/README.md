@@ -12,11 +12,12 @@ For Session 2 there is one workflow:
 cv-fit:  parse-cv → evaluate-cv-fit → write-cv-fit-report
 ```
 
-Session 4 adds a second workflow on the same registry and the same three
-agent codebases:
+Session 4 adds ingest and access workflows on the same registry and the same
+three agent codebases:
 
 ```
-knowledge-query:  parse-note → evaluate-question → write-grounded-answer
+knowledge-ingest:  parse-note → promote-note → write-wiki-ingest
+knowledge-query:   parse-query → evaluate-wiki-query → write-grounded-answer
 ```
 
 Receiving an intent, the planner:

@@ -14,12 +14,12 @@ The studio has two roles in this system:
 
 **Intent** — two ways to drive the system:
 
-- A workflow switch for `cv-fit` and `knowledge-query`.
+- A workflow switch for `cv-fit`, `knowledge-ingest`, and `knowledge-query`.
 - Text boxes and file drops that forward course inputs to the planner.
 
 The studio drives the demo workflows and shows the trace. For the cut-down
-knowledge-management workflow, the grounded answer appears as the final trace
-output.
+knowledge-management system, ingest returns a stored wiki summary and query
+returns a grounded answer.
 
 ## Internals
 

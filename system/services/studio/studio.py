@@ -214,6 +214,9 @@ async def submit_intent(request: Request) -> JSONResponse:
         kind = body.get("kind", "cv-fit")
         inputs = body.get("inputs", {}) or {}
 
+    if kind == "knowledge-ingest":
+        return await _submit_knowledge_ingest(inputs, files)
+
     if kind == "knowledge-query":
         return await _submit_knowledge_query(inputs, files)
 
@@ -260,15 +263,14 @@ async def _submit_cv_fit(inputs: dict[str, Any], files: dict[str, Any] | None = 
     return JSONResponse(result)
 
 
-async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
+async def _submit_knowledge_ingest(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
     files = files or {}
     note_text = inputs.get("note_text") or ""
-    question = inputs.get("question") or ""
     note_name = inputs.get("note_name") or "source-note.txt"
     has_note = bool(files.get("note_file")) or bool(note_text.strip())
-    if not has_note or not question.strip():
+    if not has_note:
         return JSONResponse(
-            {"error": "both source note and question are required"}, status_code=400
+            {"error": "source material is required"}, status_code=400
         )
 
     if files.get("note_file"):
@@ -279,13 +281,28 @@ async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] 
     else:
         note_path = _write_inbox(note_text, note_name)
     planner_body = {
-        "kind": "knowledge-query",
-        "inputs": {"note_path": str(note_path), "question": question},
+        "kind": "knowledge-ingest",
+        "inputs": {"note_path": str(note_path)},
     }
     result = await _post_planner_intent(planner_body)
     if isinstance(result, JSONResponse):
         return result
     result["note_path"] = str(note_path)
+    return JSONResponse(result)
+
+
+async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
+    question = inputs.get("question") or ""
+    if not question.strip():
+        return JSONResponse({"error": "question is required"}, status_code=400)
+
+    planner_body = {
+        "kind": "knowledge-query",
+        "inputs": {"question": question},
+    }
+    result = await _post_planner_intent(planner_body)
+    if isinstance(result, JSONResponse):
+        return result
     return JSONResponse(result)
 
 

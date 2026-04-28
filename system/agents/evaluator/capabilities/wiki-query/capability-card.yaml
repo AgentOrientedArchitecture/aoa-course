@@ -1,0 +1,35 @@
+id: evaluator-wiki-query
+version: 0.1.0
+kind: au
+purpose: |
+  Search the course wiki store for passages relevant to a parsed user query
+  and return an evidence evaluation suitable for grounded answering.
+inputs:
+  - name: question
+    type: string
+    required: true
+  - name: query
+    type: object
+    required: true
+outputs:
+  - name: parsed_note
+    type: structured-note
+  - name: ranked_passages
+    type: array
+  - name: direct_answer_possible
+    type: boolean
+  - name: gaps
+    type: array
+  - name: rationale
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - ranked_passages cite passage ids returned by tool-wiki-store.
+  - parsed_note includes passages so reporter-answer can cite evidence.
+evaluation_signals:
+  - valid_output_shape
+  - has_ranked_passages
+  - passages_have_citations
+  - latency_p95_under(8s)
+provenance:
+  model: ${MODEL}

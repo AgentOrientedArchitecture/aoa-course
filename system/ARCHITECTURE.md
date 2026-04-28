@@ -1,7 +1,7 @@
 # Architecture
 
-A small, container-shaped, readable AOA system. Two workflows, three agent
-codebases, six AU capabilities, two deterministic tools, and three plumbing
+A small, container-shaped, readable AOA system. Three workflows, three agent
+codebases, ten AU capabilities, three deterministic tools, and three plumbing
 services. AU-to-AU orchestration uses A2A Agent Cards and JSON-RPC
 `message/send`; deterministic tools expose MCP tools behind small registered
 AOA bridges.
@@ -23,17 +23,28 @@ parsed CV and the job description; the evaluator returns scores and a verdict.
 Finally the planner starts `reporter-cv-fit`, which produces a structured
 fit-verdict report. Every step is visible in the studio's trace pane.
 
-**Knowledge query** (Session 4) reuses the same three-agent shape:
+**Knowledge ingest** (Session 4) starts the wiki-management loop:
 
 ```
-parser-notes → evaluator-query → reporter-answer
+parser-notes → evaluator-promote → reporter-ingest-summary
 ```
 
-You submit a source note and a question through the studio. The parser reads
-the note and extracts citeable passages. The evaluator ranks those passages
-against the question. The reporter writes a grounded answer with passage-id
-citations and named gaps. The chain you build in Session 2 turns out to be
-general.
+You submit source material through the studio. The parser extracts citeable
+passages and concepts. The evaluator decides which material should be promoted
+into the course wiki. The reporter writes the promoted layer through
+`tool-wiki-store` and returns a Markdown ingest summary.
+
+**Knowledge query** (Session 4) then uses the stored wiki:
+
+```
+parser-query → evaluator-wiki-query → reporter-answer
+```
+
+You submit a question through the studio. The parser turns it into a compact
+retrieval query. The evaluator searches the wiki store, ranks retrieved
+passages, and names gaps. The reporter writes a grounded answer with passage-id
+citations. The chain you build in Session 2 turns out to be general, but now
+it supports both ingest and access.
 
 ## Six things this system demonstrates
 
@@ -41,7 +52,7 @@ Each is something you can see on screen as you build:
 
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
 2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
-3. **One agent can back many capabilities.** Each Session 2 agent gains a second capability in Session 4: `parser-notes`, `evaluator-query`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
+3. **One agent can back many capabilities.** Each Session 2 agent gains extra Session 4 capabilities: `parser-notes`, `parser-query`, `evaluator-promote`, `evaluator-wiki-query`, `reporter-ingest-summary`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
 4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
 6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
@@ -52,9 +63,9 @@ Three agent codebases:
 
 | Codebase | Session 2 capabilities | Session 4 capabilities |
 |---|---|---|
-| `parser` | `parser-cv` | `parser-cv`, `parser-notes` |
-| `evaluator` | `evaluator-cv` | `evaluator-cv`, `evaluator-query` |
-| `reporter` | `reporter-cv-fit` | `reporter-cv-fit`, `reporter-answer` |
+| `parser` | `parser-cv` | `parser-notes`, `parser-query` |
+| `evaluator` | `evaluator-cv` | `evaluator-query`, `evaluator-promote`, `evaluator-wiki-query` |
+| `reporter` | `reporter-cv-fit` | `reporter-answer`, `reporter-ingest-summary` |
 
 Plus, in `tools/`:
 
@@ -62,6 +73,7 @@ Plus, in `tools/`:
 |---|---|---|
 | filesystem MCP server | `tool-filesystem` | non-AU registered capability |
 | document text MCP server | `tool-document-text` | non-AU registered capability |
+| wiki store MCP server | `tool-wiki-store` | non-AU registered capability |
 
 ## The four parts of an AU
 
@@ -97,10 +109,11 @@ docker-compose.yml services:
   reporter             FastAPI    8888 (host: 7303)
   tool-filesystem      MCP        7401
   tool-document-text   MCP+bridge 7402
+  tool-wiki-store      MCP+bridge 7403
   ollama               profile: local, optional
 ```
 
-Eight containers run for both sessions, plus optional Ollama under the local
+Nine containers run for both sessions, plus optional Ollama under the local
 profile.
 
 Every agent container has the same shape: a FastAPI app that mounts its
@@ -213,10 +226,10 @@ A browser surface at `localhost:8080` with two roles:
 **Intent:**
 
 - **Submit an intent.** Free-form text, sent to the planner.
-- **Choose a workflow.** CV fit for Session 2, knowledge query for Session 4.
+- **Choose a workflow.** CV fit for Session 2, knowledge ingest and wiki query for Session 4.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
 
-The studio is for observing and driving the system. In the cut-down knowledge-management workflow, the grounded answer appears as the final trace output.
+The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs.
 
 ## Running locally
 

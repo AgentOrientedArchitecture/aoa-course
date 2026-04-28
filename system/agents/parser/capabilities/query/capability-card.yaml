@@ -1,0 +1,23 @@
+id: parser-query
+version: 0.1.0
+kind: au
+purpose: |
+  Parse a user question into a compact retrieval query: intent, key terms,
+  expected answer focus, and any constraints.
+inputs:
+  - name: question
+    type: string
+    required: true
+outputs:
+  - name: query
+    type: object
+constraints:
+  - The output is a single JSON object.
+  - query includes intent, terms, focus, and constraints.
+  - terms is an array of short strings.
+evaluation_signals:
+  - valid_output_shape
+  - has_terms
+  - latency_p95_under(5s)
+provenance:
+  model: ${MODEL}
