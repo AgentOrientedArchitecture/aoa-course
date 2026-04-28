@@ -10,7 +10,10 @@ The studio has two roles in this system:
 - **Intent Studio.** The centre pane shows the selected intent, supplied
   inputs, planner summary, task cards, lifecycle rail, and final result. Raw
   event payloads remain available behind an expandable details section.
-- **Capability card.** Click a registry row to read its card.
+- **Details.** Click a registry row to read its card, or click a wiki graph
+  node to inspect that node.
+- **Wiki graph.** A typed graph view of the Session 4 wiki store: documents,
+  concepts, passages, and open questions use different shapes and colours.
 
 **Intent** — two ways to drive the system:
 

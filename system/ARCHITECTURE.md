@@ -221,13 +221,18 @@ A browser surface at `localhost:8080` with two roles:
 
 - **Registry pane.** Live listing of every registered capability — id, version, kind (`au` or `tool`), backing agent, current `skills_hash`. Updates as capabilities register, deregister, or change.
 - **Intent Studio pane.** The currently-running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, task plan, work status, and rendered result. Raw event payloads are still available in an expandable details section.
-- **Capability card pane.** Click any registry entry to see its card formatted.
+- **Right detail pane.** Click any registry entry to see its capability card, or
+  click a wiki graph node to inspect that document, concept, passage, or open
+  question.
 
 **Intent:**
 
 - **Submit an intent.** Free-form text, sent to the planner.
 - **Choose a workflow.** CV fit for Session 2, knowledge ingest and wiki query for Session 4.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
+- **Inspect the wiki graph.** The Session 4 wiki store projects its raw,
+  promoted, and indexed knowledge into typed graph nodes. Documents, concepts,
+  passages, and open questions use different shapes and colours.
 
 The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs.
 

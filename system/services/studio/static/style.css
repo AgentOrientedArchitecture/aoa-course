@@ -132,7 +132,7 @@ main {
 }
 .mode-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -555,6 +555,116 @@ main {
 }
 .rendered-markdown li {
   margin-bottom: 4px;
+}
+
+.graph-section {
+  min-height: 360px;
+}
+.wiki-graph {
+  min-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fbfbf9;
+  overflow: auto;
+}
+.wiki-graph svg {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+  height: auto;
+}
+.graph-edge {
+  stroke: #b8b8b0;
+  stroke-width: 1.4;
+}
+.graph-edges marker path {
+  fill: #b8b8b0;
+}
+.graph-edge-label {
+  fill: var(--muted);
+  font: 10px/1 var(--mono);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fbfbf9;
+  stroke-width: 4px;
+}
+.graph-node {
+  cursor: pointer;
+  outline: none;
+}
+.graph-node circle,
+.graph-node rect,
+.graph-node polygon {
+  stroke: #686760;
+  stroke-width: 1.5;
+  transition: stroke-width 0.15s, filter 0.15s;
+}
+.graph-node.document rect,
+.legend.document {
+  fill: #e7f0fb;
+  background: #e7f0fb;
+  border-color: #2b6cb0;
+}
+.graph-node.concept circle,
+.legend.concept {
+  fill: #e8f5ee;
+  background: #e8f5ee;
+  border-color: #2f855a;
+}
+.graph-node.passage rect,
+.legend.passage {
+  fill: #fff3d8;
+  background: #fff3d8;
+  border-color: #8a6500;
+}
+.graph-node.open_question polygon,
+.legend.open_question {
+  fill: #f9e7ec;
+  background: #f9e7ec;
+  border-color: #a13c5a;
+}
+.graph-node.selected circle,
+.graph-node.selected rect,
+.graph-node.selected polygon,
+.graph-node:focus circle,
+.graph-node:focus rect,
+.graph-node:focus polygon {
+  stroke: var(--ink);
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+}
+.graph-node-label {
+  fill: var(--ink);
+  font: 11px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fbfbf9;
+  stroke-width: 4px;
+}
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend {
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--border);
+  display: inline-block;
+}
+.legend.concept {
+  border-radius: 999px;
+}
+.legend.open_question {
+  transform: rotate(45deg);
 }
 
 .card-body {

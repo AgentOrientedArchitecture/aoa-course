@@ -17,3 +17,10 @@ MCP tools:
 | `search` | Return citeable passages from `index.json` |
 
 Agents call the bridge through the registry as `tool-wiki-store`.
+
+It also exposes a graph projection for the Studio:
+
+- `document` nodes for promoted wiki pages
+- `concept` nodes from promoted concepts and relationships
+- `passage` nodes for citeable indexed passages
+- `open_question` nodes for gaps raised during ingest

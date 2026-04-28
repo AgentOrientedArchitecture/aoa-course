@@ -227,6 +227,145 @@ def _tokens(text: str) -> set[str]:
     return set(TOKEN_RE.findall(text.lower()))
 
 
+def _graph_node(nodes: dict[str, dict[str, Any]], node: dict[str, Any]) -> None:
+    node_id = str(node.get("id") or "")
+    if not node_id:
+        return
+    if node_id in nodes:
+        existing = nodes[node_id]
+        for key, value in node.items():
+            if key == "details" and isinstance(value, dict):
+                existing.setdefault("details", {}).update(value)
+            elif value not in (None, "", []):
+                existing[key] = value
+        return
+    nodes[node_id] = node
+
+
+def _graph_edge(edges: list[dict[str, Any]], source: str, target: str, relation: str) -> None:
+    if not source or not target or source == target:
+        return
+    edge = {"source": source, "target": target, "relation": relation}
+    if edge not in edges:
+        edges.append(edge)
+
+
+def _concept_node_id(name: str) -> str:
+    return f"concept:{_slug(name)}"
+
+
+def _tool_graph(_args: dict[str, Any]) -> dict[str, Any]:
+    index = _read_index()
+    nodes: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
+
+    for doc in index.get("documents", []) or []:
+        if not isinstance(doc, dict):
+            continue
+        doc_id = str(doc.get("document_id") or "")
+        if not doc_id:
+            continue
+        doc_node_id = f"document:{doc_id}"
+        _graph_node(nodes, {
+            "id": doc_node_id,
+            "type": "document",
+            "label": str(doc.get("title") or doc_id),
+            "details": {
+                "summary": doc.get("summary", ""),
+                "source_path": doc.get("source_path", ""),
+                "raw_path": doc.get("raw_path", ""),
+                "markdown_path": doc.get("markdown_path", ""),
+                "stored_at": doc.get("stored_at", ""),
+            },
+        })
+
+        for concept in doc.get("concepts", []) or []:
+            if isinstance(concept, dict):
+                name = str(concept.get("name") or "").strip()
+                description = str(concept.get("description") or concept.get("reason") or "").strip()
+            else:
+                name = str(concept).strip()
+                description = ""
+            if not name:
+                continue
+            concept_id = _concept_node_id(name)
+            _graph_node(nodes, {
+                "id": concept_id,
+                "type": "concept",
+                "label": name,
+                "details": {
+                    "description": description,
+                },
+            })
+            _graph_edge(edges, doc_node_id, concept_id, "promotes")
+
+        for passage in doc.get("passages", []) or []:
+            if not isinstance(passage, dict):
+                continue
+            passage_id = str(passage.get("passage_id") or "").strip()
+            if not passage_id:
+                continue
+            node_id = f"passage:{passage_id}"
+            _graph_node(nodes, {
+                "id": node_id,
+                "type": "passage",
+                "label": passage_id,
+                "details": {
+                    "quote": passage.get("quote", ""),
+                    "why_it_matters": passage.get("why_it_matters", ""),
+                    "source_path": passage.get("source_path", ""),
+                    "document_id": doc_id,
+                },
+            })
+            _graph_edge(edges, doc_node_id, node_id, "contains")
+
+        for index_no, question in enumerate(doc.get("open_questions", []) or [], start=1):
+            text = str(question).strip()
+            if not text:
+                continue
+            question_id = f"question:{doc_id}:{index_no}"
+            _graph_node(nodes, {
+                "id": question_id,
+                "type": "open_question",
+                "label": text[:80],
+                "details": {
+                    "question": text,
+                    "document_id": doc_id,
+                },
+            })
+            _graph_edge(edges, doc_node_id, question_id, "raises")
+
+        for relationship in doc.get("relationships", []) or []:
+            if not isinstance(relationship, dict):
+                continue
+            source_name = str(relationship.get("source") or "").strip()
+            target_name = str(relationship.get("target") or "").strip()
+            relation = str(relationship.get("relation") or "relates_to").strip()
+            if not source_name or not target_name:
+                continue
+            source_id = _concept_node_id(source_name)
+            target_id = _concept_node_id(target_name)
+            _graph_node(nodes, {
+                "id": source_id,
+                "type": "concept",
+                "label": source_name,
+                "details": {},
+            })
+            _graph_node(nodes, {
+                "id": target_id,
+                "type": "concept",
+                "label": target_name,
+                "details": {},
+            })
+            _graph_edge(edges, source_id, target_id, relation)
+
+    graph = {
+        "nodes": sorted(nodes.values(), key=lambda item: (item.get("type", ""), item.get("label", ""))),
+        "edges": sorted(edges, key=lambda item: (item["source"], item["target"], item["relation"])),
+    }
+    return {"content": [{"type": "text", "text": json.dumps(graph)}], "graph": graph}
+
+
 def _tool_search(args: dict[str, Any]) -> dict[str, Any]:
     query = str(args.get("query") or "").strip()
     limit = int(args.get("limit") or 8)
@@ -288,6 +427,15 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["query"],
         },
         "_handler": _tool_search,
+    },
+    "graph": {
+        "name": "graph",
+        "description": "Return typed wiki graph nodes and labelled edges.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+        "_handler": _tool_graph,
     },
 }
 

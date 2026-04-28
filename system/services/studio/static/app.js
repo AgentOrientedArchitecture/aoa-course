@@ -12,6 +12,8 @@ const state = {
   currentTraceId: null,
   records: [],
   lifecycle: emptyLifecycle(),
+  wikiGraph: { nodes: [], edges: [] },
+  selectedWikiNode: null,
   mode: "cv-fit",
   cvName: "",                  // last filename loaded into the CV box
   jdName: "",                  // last filename loaded into the JD box
@@ -67,6 +69,8 @@ function renderRegistry() {
 
 async function selectCapability(id) {
   state.selectedCapability = id;
+  state.selectedWikiNode = null;
+  $("detail-title").textContent = "Capability card";
   renderRegistry();
   const resp = await fetch(`/api/capabilities/${encodeURIComponent(id)}`);
   if (!resp.ok) {
@@ -250,6 +254,7 @@ function applyLifecycleEvent(record) {
   if (record.step === "finish") {
     life.result = record.outputs || {};
     life.status = record.outputs && record.outputs.error ? "error" : "done";
+    void loadWikiGraph();
   }
 }
 
@@ -283,6 +288,187 @@ function renderLifecycle() {
   renderPlanner(life);
   renderTasks(life);
   renderResult(life);
+}
+
+// ---------------------------------------------------------------------------
+// Wiki graph
+// ---------------------------------------------------------------------------
+
+async function loadWikiGraph() {
+  const stateLabel = $("wiki-graph-state");
+  if (stateLabel) stateLabel.textContent = "loading";
+  try {
+    const resp = await fetch("/api/wiki/graph");
+    const graph = await resp.json();
+    state.wikiGraph = {
+      nodes: Array.isArray(graph.nodes) ? graph.nodes : [],
+      edges: Array.isArray(graph.edges) ? graph.edges : [],
+      error: graph.error || "",
+    };
+  } catch (e) {
+    state.wikiGraph = { nodes: [], edges: [], error: String(e) };
+  }
+  renderWikiGraph();
+}
+
+function renderWikiGraph() {
+  const root = $("wiki-graph");
+  const stateLabel = $("wiki-graph-state");
+  if (!root || !stateLabel) return;
+  const graph = state.wikiGraph || { nodes: [], edges: [] };
+  const nodes = graph.nodes || [];
+  const edges = graph.edges || [];
+  stateLabel.textContent = graph.error ? "error" : `${nodes.length} nodes`;
+  root.innerHTML = "";
+  root.className = "wiki-graph";
+  if (graph.error) {
+    root.classList.add("muted-block");
+    root.textContent = `Could not load wiki graph: ${graph.error}`;
+    return;
+  }
+  if (!nodes.length) {
+    root.classList.add("muted-block");
+    root.textContent = "No wiki nodes yet.";
+    return;
+  }
+
+  const layout = graphLayout(nodes);
+  const svg = svgEl("svg", {
+    viewBox: `0 0 ${layout.width} ${layout.height}`,
+    role: "img",
+    "aria-label": "Wiki graph",
+  });
+  const defs = svgEl("defs", {});
+  const marker = svgEl("marker", {
+    id: "arrow",
+    viewBox: "0 0 10 10",
+    refX: "9",
+    refY: "5",
+    markerWidth: "6",
+    markerHeight: "6",
+    orient: "auto-start-reverse",
+  });
+  marker.appendChild(svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#b8b8b0" }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const edgeLayer = svgEl("g", { class: "graph-edges" });
+  for (const edge of edges) {
+    const source = layout.positions.get(edge.source);
+    const target = layout.positions.get(edge.target);
+    if (!source || !target) continue;
+    edgeLayer.appendChild(svgEl("line", {
+      x1: source.x,
+      y1: source.y,
+      x2: target.x,
+      y2: target.y,
+      class: "graph-edge",
+      "marker-end": "url(#arrow)",
+    }));
+    const label = truncate(edge.relation || "", 18);
+    if (label) {
+      const text = svgEl("text", {
+        x: (source.x + target.x) / 2,
+        y: (source.y + target.y) / 2 - 4,
+        class: "graph-edge-label",
+      });
+      text.textContent = label;
+      edgeLayer.appendChild(text);
+    }
+  }
+  svg.appendChild(edgeLayer);
+
+  const nodeLayer = svgEl("g", { class: "graph-nodes" });
+  for (const node of nodes) {
+    const pos = layout.positions.get(node.id);
+    if (!pos) continue;
+    const group = svgEl("g", {
+      class: `graph-node ${node.type || "unknown"} ${node.id === state.selectedWikiNode ? "selected" : ""}`,
+      transform: `translate(${pos.x} ${pos.y})`,
+      tabindex: "0",
+    });
+    group.addEventListener("click", () => selectWikiNode(node.id));
+    group.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") selectWikiNode(node.id);
+    });
+    appendNodeShape(group, node.type || "unknown");
+    const text = svgEl("text", { y: 37, class: "graph-node-label" });
+    text.textContent = truncate(node.label || node.id, 24);
+    group.appendChild(text);
+    nodeLayer.appendChild(group);
+  }
+  svg.appendChild(nodeLayer);
+  root.appendChild(svg);
+}
+
+function graphLayout(nodes) {
+  const typeOrder = ["document", "concept", "passage", "open_question"];
+  const groups = new Map(typeOrder.map((type) => [type, []]));
+  for (const node of nodes) {
+    const type = typeOrder.includes(node.type) ? node.type : "concept";
+    groups.get(type).push(node);
+  }
+  const maxGroupSize = Math.max(1, ...[...groups.values()].map((items) => items.length));
+  const width = 920;
+  const height = Math.max(330, maxGroupSize * 82 + 70);
+  const positions = new Map();
+  typeOrder.forEach((type, typeIndex) => {
+    const items = groups.get(type);
+    const x = 80 + typeIndex * ((width - 160) / (typeOrder.length - 1));
+    items.forEach((node, itemIndex) => {
+      const gap = items.length <= 1 ? 0 : (height - 130) / (items.length - 1);
+      positions.set(node.id, {
+        x,
+        y: items.length <= 1 ? height / 2 : 65 + itemIndex * gap,
+      });
+    });
+  });
+  return { width, height, positions };
+}
+
+function appendNodeShape(group, type) {
+  if (type === "document") {
+    group.appendChild(svgEl("rect", { x: -42, y: -20, width: 84, height: 40, rx: 6 }));
+  } else if (type === "passage") {
+    group.appendChild(svgEl("rect", { x: -34, y: -16, width: 68, height: 32, rx: 2 }));
+  } else if (type === "open_question") {
+    group.appendChild(svgEl("polygon", { points: "0,-24 42,0 0,24 -42,0" }));
+  } else {
+    group.appendChild(svgEl("circle", { r: 21 }));
+  }
+}
+
+function selectWikiNode(id) {
+  state.selectedWikiNode = id;
+  state.selectedCapability = null;
+  renderRegistry();
+  renderWikiGraph();
+  const node = (state.wikiGraph.nodes || []).find((item) => item.id === id);
+  if (!node) return;
+  $("detail-title").textContent = "Wiki node";
+  const edges = (state.wikiGraph.edges || []).filter(
+    (edge) => edge.source === id || edge.target === id,
+  );
+  $("card-body").textContent = JSON.stringify({
+    id: node.id,
+    type: node.type,
+    label: node.label,
+    details: node.details || {},
+    edges,
+  }, null, 2);
+}
+
+function svgEl(name, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    el.setAttribute(key, value);
+  }
+  return el;
+}
+
+function truncate(value, max) {
+  const text = String(value || "");
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function lifecycleIntentTitle(life) {
@@ -733,5 +919,6 @@ window.addEventListener("DOMContentLoaded", () => {
   setupFileDrop();
   renderLifecycle();
   loadInitialRegistry();
+  loadWikiGraph();
   connectEvents();
 });

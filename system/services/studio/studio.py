@@ -179,6 +179,41 @@ async def get_capability(capability_id: str) -> JSONResponse:
         return JSONResponse(r.json())
 
 
+@app.get("/api/wiki/graph")
+async def get_wiki_graph() -> JSONResponse:
+    """Return a typed graph projection of the local wiki store."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            card_resp = await client.get(f"{REGISTRY_URL}/find", params={"id": "tool-wiki-store"})
+            card_resp.raise_for_status()
+            card = card_resp.json()
+            invoke_resp = await client.post(
+                card["endpoint"],
+                params={"capability": "tool-wiki-store"},
+                json={"trace_id": "studio-wiki-graph", "inputs": {"op": "graph"}},
+            )
+            invoke_resp.raise_for_status()
+            envelope = invoke_resp.json()
+            graph = envelope.get("outputs", {}).get("graph", {"nodes": [], "edges": []})
+            return JSONResponse(graph)
+        except httpx.HTTPStatusError as e:
+            return JSONResponse(
+                {
+                    "nodes": [],
+                    "edges": [],
+                    "error": e.response.text,
+                },
+                status_code=e.response.status_code,
+            )
+        except httpx.HTTPError as e:
+            return JSONResponse({"nodes": [], "edges": [], "error": repr(e)}, status_code=502)
+        except KeyError:
+            return JSONResponse(
+                {"nodes": [], "edges": [], "error": "tool-wiki-store endpoint is not registered"},
+                status_code=502,
+            )
+
+
 @app.post("/api/intent")
 async def submit_intent(request: Request) -> JSONResponse:
     """Persist browser payloads to the inbox and submit paths to the planner.

@@ -116,6 +116,20 @@
           </div>
           <div id="result-body" class="result-body muted-block">No result yet.</div>
         </section>
+
+        <section class="lifecycle-section graph-section">
+          <div class="section-head">
+            <span class="section-label">Wiki Graph</span>
+            <span id="wiki-graph-state" class="section-meta">waiting</span>
+          </div>
+          <div id="wiki-graph" class="wiki-graph muted-block">No wiki nodes yet.</div>
+          <div class="graph-legend" aria-label="Wiki graph legend">
+            <span><i class="legend document"></i>Document</span>
+            <span><i class="legend concept"></i>Concept</span>
+            <span><i class="legend passage"></i>Passage</span>
+            <span><i class="legend open_question"></i>Open question</span>
+          </div>
+        </section>
       </div>
 
       <details class="event-details">
@@ -125,7 +139,7 @@
     </section>
 
     <section id="card-pane" class="pane">
-      <h2>Capability card</h2>
+      <h2 id="detail-title">Capability card</h2>
       <pre id="card-body" class="card-body">Click a capability on the left.</pre>
     </section>
   </main>
