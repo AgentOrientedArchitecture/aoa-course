@@ -6,6 +6,13 @@
 
 const $ = (id) => document.getElementById(id);
 
+const WORKFLOWS = ["cv-fit", "knowledge-ingest", "wiki-graph", "knowledge-query"];
+const studioConfig = window.STUDIO_CONFIG || {};
+const configuredWorkflows = Array.isArray(studioConfig.workflows)
+  ? studioConfig.workflows.filter((mode) => WORKFLOWS.includes(mode))
+  : WORKFLOWS;
+const enabledWorkflows = new Set(configuredWorkflows.length ? configuredWorkflows : ["cv-fit"]);
+
 const state = {
   capabilities: new Map(),     // id -> card
   selectedCapability: null,
@@ -916,7 +923,19 @@ function setupModeTabs() {
   }
 }
 
+function applyWorkflowConfig() {
+  for (const btn of document.querySelectorAll("[data-mode]")) {
+    btn.hidden = !enabledWorkflows.has(btn.dataset.mode);
+  }
+  for (const panel of document.querySelectorAll("[data-mode-panel]")) {
+    if (!enabledWorkflows.has(panel.dataset.modePanel)) panel.classList.add("hidden");
+  }
+  const initialMode = enabledWorkflows.has(state.mode) ? state.mode : configuredWorkflows[0] || "cv-fit";
+  setMode(initialMode);
+}
+
 function setMode(mode) {
+  if (!enabledWorkflows.has(mode)) return;
   state.mode = mode;
   for (const btn of document.querySelectorAll("[data-mode]")) {
     btn.classList.toggle("active", btn.dataset.mode === mode);
@@ -959,11 +978,12 @@ function escapeHtml(s) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  applyWorkflowConfig();
   setupModeTabs();
   $("intent-submit").addEventListener("click", submitIntent);
   setupFileDrop();
   renderLifecycle();
   loadInitialRegistry();
-  loadWikiGraph();
+  if (enabledWorkflows.has("wiki-graph")) void loadWikiGraph();
   connectEvents();
 });

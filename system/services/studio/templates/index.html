@@ -149,7 +149,9 @@
   </main>
 
 
-
+  <script>
+    window.STUDIO_CONFIG = {{ studio_config | tojson }};
+  </script>
   <script type="module" src="/static/app.js"></script>
 </body>
 </html>

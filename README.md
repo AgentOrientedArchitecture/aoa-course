@@ -30,13 +30,45 @@ git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
 cp .env.example .env
 # edit .env — set PROVIDER and MODEL
-make local-up   # local Ollama path
 ```
 
-For a hosted provider, set `PROVIDER=openai`, `MODEL`, and optionally
-`OPENAI_BASE_URL`, then run `make up` instead.
+Session 2 only needs the CV-fit workflow:
 
-Then open [http://localhost:8080](http://localhost:8080) for the studio. `make help` lists the rest (`down`, `logs`, `rebuild`, `clean`, `local-up` for Ollama).
+```bash
+docker compose --env-file .env \
+  -f system/docker-compose.yml \
+  -f system/docker-compose.session2.yml \
+  --profile session2 \
+  up --build -d
+```
+
+Session 4 starts the full knowledge-management workflow:
+
+```bash
+docker compose --env-file .env \
+  -f system/docker-compose.yml \
+  --profile session4 \
+  up --build -d
+```
+
+If you want Compose to start the included Ollama container as well, add
+`--profile local` to either command.
+
+There are also thin helper scripts for the common paths:
+
+```bash
+./scripts/session2-up.sh
+./scripts/session4-up.sh
+./scripts/logs.sh
+./scripts/down.sh
+```
+
+For the included Ollama container with a helper script, prefix it with
+`AOA_LOCAL=1`.
+
+Then open [http://localhost:8080](http://localhost:8080) for the studio.
+Session 2 shows only the CV intent. Session 4 shows CV fit, ingest, graph, and
+ask modes.
 
 ## Repo layout
 
@@ -53,8 +85,9 @@ system/
   tools/
   inbox/
   docker-compose.yml
+  docker-compose.session2.yml
 .env.example
-Makefile
+scripts/
 ```
 
 For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.md). For how the agents work, see [`system/AGENTS.md`](system/AGENTS.md).

@@ -1,9 +1,10 @@
-# Course system. Bring everything up with `make up` from the repo root,
-# or `docker compose -f system/docker-compose.yml up --build` directly.
+# Course system. Run directly with Docker Compose from the repo root.
 #
-# Build order matters once: the `agent-base` service builds the shared base
-# image that every agent extends. Compose handles this through the
-# `depends_on` graph. Concrete agents reference it by image name.
+# Session 2 starts only the CV-fit workflow:
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d
+#
+# Session 4 starts the full knowledge-management workflow:
+#   docker compose --env-file .env -f system/docker-compose.yml --profile session4 up --build -d
 
 services:
 
@@ -11,6 +12,7 @@ services:
   # Services
   # ------------------------------------------------------------------
   registry:
+    profiles: ["session2", "session4"]
     build:
       context: ./services/registry
     image: aoa-course/registry:latest
@@ -28,6 +30,7 @@ services:
       retries: 20
 
   planner:
+    profiles: ["session2", "session4"]
     build:
       context: ./services/planner
     image: aoa-course/planner:latest
@@ -57,6 +60,7 @@ services:
         condition: service_healthy
 
   studio:
+    profiles: ["session2", "session4"]
     build:
       context: ./services/studio
     image: aoa-course/studio:latest
@@ -70,6 +74,7 @@ services:
       PLANNER_URL: http://planner:7200
       INBOX_DIR: /data/inbox
       PLANNER_REQUEST_TIMEOUT: ${PLANNER_REQUEST_TIMEOUT:-420}
+      STUDIO_WORKFLOWS: ${STUDIO_WORKFLOWS:-cv-fit,knowledge-ingest,wiki-graph,knowledge-query}
     depends_on:
       registry:
         condition: service_healthy
@@ -80,6 +85,7 @@ services:
   # Tools
   # ------------------------------------------------------------------
   tool-filesystem:
+    profiles: ["session4"]
     build:
       context: ./tools/filesystem
     image: aoa-course/tool-filesystem:latest
@@ -98,6 +104,7 @@ services:
         condition: service_healthy
 
   tool-document-text:
+    profiles: ["session2", "session4"]
     build:
       context: ./tools/document-text
     image: aoa-course/tool-document-text:latest
@@ -116,6 +123,7 @@ services:
         condition: service_healthy
 
   tool-wiki-store:
+    profiles: ["session4"]
     build:
       context: ./tools/wiki-store
     image: aoa-course/tool-wiki-store:latest
@@ -139,8 +147,10 @@ services:
   # Agents
   # ------------------------------------------------------------------
   parser:
+    profiles: ["session2", "session4"]
     build:
-      context: ./agents/parser
+      context: ./agents
+      dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-parser
     ports:
@@ -155,6 +165,7 @@ services:
       AGENT_NAME: parser
       AGENT_HOST: parser
       AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: ${PARSER_CAPABILITY_ALLOWLIST:-}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
@@ -174,8 +185,10 @@ services:
         condition: service_started
 
   evaluator:
+    profiles: ["session2", "session4"]
     build:
-      context: ./agents/evaluator
+      context: ./agents
+      dockerfile: evaluator/Dockerfile
     image: aoa-course/evaluator:latest
     container_name: aoa-evaluator
     ports:
@@ -188,6 +201,7 @@ services:
       AGENT_NAME: evaluator
       AGENT_HOST: evaluator
       AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: ${EVALUATOR_CAPABILITY_ALLOWLIST:-}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
@@ -205,12 +219,12 @@ services:
         condition: service_healthy
       tool-document-text:
         condition: service_started
-      tool-wiki-store:
-        condition: service_started
 
   reporter:
+    profiles: ["session2", "session4"]
     build:
-      context: ./agents/reporter
+      context: ./agents
+      dockerfile: reporter/Dockerfile
     image: aoa-course/reporter:latest
     container_name: aoa-reporter
     ports:
@@ -222,6 +236,7 @@ services:
       AGENT_NAME: reporter
       AGENT_HOST: reporter
       AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: ${REPORTER_CAPABILITY_ALLOWLIST:-}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
@@ -237,8 +252,6 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-      tool-wiki-store:
-        condition: service_started
 
   # ------------------------------------------------------------------
   # Optional: local model server (only started under `local` profile)

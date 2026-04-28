@@ -31,6 +31,17 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
+SUPPORTED_WORKFLOWS = ("cv-fit", "knowledge-ingest", "wiki-graph", "knowledge-query")
+
+
+def _configured_workflows() -> list[str]:
+    raw = os.environ.get("STUDIO_WORKFLOWS", ",".join(SUPPORTED_WORKFLOWS))
+    requested = [item.strip() for item in raw.split(",") if item.strip()]
+    workflows = [item for item in requested if item in SUPPORTED_WORKFLOWS]
+    return workflows or ["cv-fit"]
+
+
+ENABLED_WORKFLOWS = _configured_workflows()
 
 # The inbox is a shared volume the studio writes to and the filesystem tool
 # reads from. Both containers see it at the same path so the agents can be
@@ -153,7 +164,12 @@ async def healthz() -> dict[str, Any]:
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "registry_url": REGISTRY_URL, "planner_url": PLANNER_URL},
+        {
+            "request": request,
+            "registry_url": REGISTRY_URL,
+            "planner_url": PLANNER_URL,
+            "studio_config": {"workflows": ENABLED_WORKFLOWS},
+        },
     )
 
 
@@ -182,6 +198,8 @@ async def get_capability(capability_id: str) -> JSONResponse:
 @app.get("/api/wiki/graph")
 async def get_wiki_graph() -> JSONResponse:
     """Return a typed graph projection of the local wiki store."""
+    if "wiki-graph" not in ENABLED_WORKFLOWS:
+        raise HTTPException(status_code=404, detail="wiki graph workflow is not enabled")
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             card_resp = await client.get(f"{REGISTRY_URL}/find", params={"id": "tool-wiki-store"})
@@ -248,6 +266,9 @@ async def submit_intent(request: Request) -> JSONResponse:
         body = await request.json()
         kind = body.get("kind", "cv-fit")
         inputs = body.get("inputs", {}) or {}
+
+    if kind not in ENABLED_WORKFLOWS:
+        return JSONResponse({"error": f"workflow is not enabled: {kind}"}, status_code=404)
 
     if kind == "knowledge-ingest":
         return await _submit_knowledge_ingest(inputs, files)

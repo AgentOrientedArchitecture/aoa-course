@@ -239,7 +239,30 @@ The studio is for observing and driving the system. In the cut-down knowledge-ma
 
 ## Running locally
 
-`docker compose up` brings everything alive. Open `http://localhost:8080` and you'll see the registry pane populate as agents come up.
+Use Docker Compose profiles to start the part of the system needed for the
+session.
+
+Session 2 starts only the CV-fit path:
+
+```bash
+docker compose --env-file .env \
+  -f system/docker-compose.yml \
+  -f system/docker-compose.session2.yml \
+  --profile session2 \
+  up --build -d
+```
+
+Session 4 starts the full knowledge-management path:
+
+```bash
+docker compose --env-file .env \
+  -f system/docker-compose.yml \
+  --profile session4 \
+  up --build -d
+```
+
+Open `http://localhost:8080` and you'll see the registry pane populate as
+agents and tools register.
 
 Configure the model via `.env`:
 
@@ -252,5 +275,5 @@ OPENAI_BASE_URL=...   # optional for OpenAI-compatible hosted providers
 The intended baseline is a smaller model, for example `gpt-oss:120b` or a
 Qwen-family model, run locally through Ollama or through a service provider.
 Switching model, provider, or hosting location is a `.env` change and a
-`docker compose up` away. The registry, the agents, the capability cards, and
-the planner all stay still.
+Compose restart away. The registry, the agents, the capability cards, and the
+planner all stay still.

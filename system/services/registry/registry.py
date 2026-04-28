@@ -30,6 +30,11 @@ DATA_DIR = Path(os.environ.get("REGISTRY_DATA_DIR", "/data"))
 CARDS_PATH = DATA_DIR / "cards.json"
 PORT = int(os.environ.get("REGISTRY_PORT", "7100"))
 TOKEN_RE = re.compile(r"[a-z0-9]+")
+CARD_ALLOWLIST = {
+    item.strip()
+    for item in os.environ.get("REGISTRY_CARD_ALLOWLIST", "").split(",")
+    if item.strip()
+}
 
 
 # ----------------------------------------------------------------------
@@ -95,6 +100,20 @@ def _write_cards_file(cards: dict[str, dict[str, Any]]) -> None:
     tmp.replace(CARDS_PATH)
 
 
+def _card_allowed(card_id: str) -> bool:
+    return not CARD_ALLOWLIST or card_id in CARD_ALLOWLIST
+
+
+def _filter_allowed_cards(cards: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    if not CARD_ALLOWLIST:
+        return cards
+    return {
+        cid: card
+        for cid, card in cards.items()
+        if _card_allowed(cid)
+    }
+
+
 # ----------------------------------------------------------------------
 # File watcher
 # ----------------------------------------------------------------------
@@ -105,7 +124,7 @@ async def _watch_cards_file() -> None:
 
     try:
         async for _changes in awatch(str(CARDS_PATH)):
-            on_disk = _read_cards_file()
+            on_disk = _filter_allowed_cards(_read_cards_file())
             async with state.lock:
                 old_ids = set(state.cards)
                 new_ids = set(on_disk)
@@ -226,6 +245,9 @@ def _score_card(card: dict[str, Any], query: dict[str, Any]) -> tuple[float, lis
 
 
 async def _store(card: dict[str, Any], event: str) -> None:
+    if not _card_allowed(card["id"]):
+        logger.info("ignored %s; not in REGISTRY_CARD_ALLOWLIST", card["id"])
+        return
     async with state.lock:
         state.cards[card["id"]] = card
         _write_cards_file(state.cards)
@@ -235,7 +257,9 @@ async def _store(card: dict[str, Any], event: str) -> None:
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_data_dir()
-    state.cards = _read_cards_file()
+    state.cards = _filter_allowed_cards(_read_cards_file())
+    if CARD_ALLOWLIST:
+        _write_cards_file(state.cards)
     logger.info("loaded %d cards from %s", len(state.cards), CARDS_PATH)
     asyncio.create_task(_watch_cards_file())
 

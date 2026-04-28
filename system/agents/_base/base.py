@@ -163,6 +163,13 @@ def _capabilities_root() -> Path:
     return Path(os.environ.get("CAPABILITIES_DIR", "/app/capabilities"))
 
 
+def _capability_allowlist() -> set[str]:
+    raw = os.environ.get("CAPABILITY_ALLOWLIST", "").strip()
+    if not raw:
+        return set()
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
 def discover_capabilities() -> list[Capability]:
     """Walk ``capabilities/<name>/`` and load every capability card.
 
@@ -174,6 +181,7 @@ def discover_capabilities() -> list[Capability]:
     if not root.exists():
         raise RuntimeError(f"capabilities directory not found: {root}")
 
+    allowed = _capability_allowlist()
     capabilities: list[Capability] = []
     for child in sorted(root.iterdir()):
         if not child.is_dir():
@@ -188,6 +196,8 @@ def discover_capabilities() -> list[Capability]:
         cap_id = card.get("id")
         if not cap_id:
             raise RuntimeError(f"{card_path} is missing 'id'")
+        if allowed and cap_id not in allowed:
+            continue
 
         skills_path = child / "skills.md"
         if skills_path.exists():
@@ -228,7 +238,8 @@ def discover_capabilities() -> list[Capability]:
         )
 
     if not capabilities:
-        raise RuntimeError(f"no capabilities found under {root}")
+        suffix = f" matching CAPABILITY_ALLOWLIST={sorted(allowed)}" if allowed else ""
+        raise RuntimeError(f"no capabilities found under {root}{suffix}")
     return capabilities
 
 

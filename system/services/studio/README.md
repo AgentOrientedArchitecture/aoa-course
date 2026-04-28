@@ -26,6 +26,11 @@ knowledge-management system, ingest returns a stored wiki summary and query
 returns a grounded answer. The graph mode is read-only and refreshes the wiki
 graph without submitting a planner intent.
 
+The visible workflow modes are controlled by `STUDIO_WORKFLOWS`, a comma
+separated list of `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
+`knowledge-query`. The Session 2 compose override sets it to `cv-fit`; Session
+4 uses all modes.
+
 ## Internals
 
 The backend (`studio.py`) is a thin FastAPI proxy:
@@ -54,4 +59,5 @@ The studio runs on port 8080. It expects:
 ```
 REGISTRY_URL=http://registry:7100
 PLANNER_URL=http://planner:7200
+STUDIO_WORKFLOWS=cv-fit,knowledge-ingest,wiki-graph,knowledge-query
 ```

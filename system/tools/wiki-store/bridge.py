@@ -24,6 +24,7 @@ PORT = int(os.environ.get("TOOL_PORT", "7403"))
 HOST = os.environ.get("TOOL_HOST", "tool-wiki-store")
 CARD_PATH = Path(os.environ.get("CARD_PATH", "/app/capability-card.yaml"))
 MCP_SERVER_CMD = [sys.executable, "/app/mcp_server.py"]
+MCP_STDIO_LIMIT = int(os.environ.get("MCP_STDIO_LIMIT", str(4 * 1024 * 1024)))
 
 
 class McpClient:
@@ -41,6 +42,7 @@ class McpClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=sys.stderr.buffer,
             env=env,
+            limit=MCP_STDIO_LIMIT,
         )
         await self.request("initialize", {})
         tools = (await self.request("tools/list", {})).get("tools", [])

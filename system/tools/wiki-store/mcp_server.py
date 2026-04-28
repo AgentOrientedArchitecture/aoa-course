@@ -363,7 +363,8 @@ def _tool_graph(_args: dict[str, Any]) -> dict[str, Any]:
         "nodes": sorted(nodes.values(), key=lambda item: (item.get("type", ""), item.get("label", ""))),
         "edges": sorted(edges, key=lambda item: (item["source"], item["target"], item["relation"])),
     }
-    return {"content": [{"type": "text", "text": json.dumps(graph)}], "graph": graph}
+    summary = f"{len(graph['nodes'])} nodes, {len(graph['edges'])} edges"
+    return {"content": [{"type": "text", "text": summary}], "graph": graph}
 
 
 def _tool_search(args: dict[str, Any]) -> dict[str, Any]:
