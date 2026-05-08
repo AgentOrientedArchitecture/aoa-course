@@ -7,3 +7,7 @@ Starter material for the AOA knowledge-management workflow.
 
 In the Studio, ingest one or more files first, then ask questions against the
 built wiki.
+
+The seed pack includes both AOA background material and a small post-course
+action kit: an adoption plan, a context-aware principles workshop, and a
+short FAQ for common "how do we start?" questions.

@@ -270,6 +270,7 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
 class State:
     def __init__(self) -> None:
         self.subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self.record_lock = asyncio.Lock()
 
     async def broadcast(self, record: dict[str, Any]) -> None:
         for q in list(self.subscribers):
@@ -295,12 +296,13 @@ def _trace_path(trace_id: str) -> Path:
 
 
 async def _record(record: dict[str, Any]) -> None:
-    record.setdefault("ts", _now_iso())
-    line = json.dumps(record) + "\n"
-    path = _trace_path(record["trace_id"])
-    # File IO is sync but tiny — a thread keeps the event loop responsive.
-    await asyncio.to_thread(_append_line, path, line)
-    await state.broadcast(record)
+    async with state.record_lock:
+        record.setdefault("ts", _now_iso())
+        line = json.dumps(record) + "\n"
+        path = _trace_path(record["trace_id"])
+        # File IO is sync but tiny — a thread keeps the event loop responsive.
+        await asyncio.to_thread(_append_line, path, line)
+        await state.broadcast(record)
 
 
 def _append_line(path: Path, line: str) -> None:
@@ -449,7 +451,10 @@ async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]
     think = os.environ.get("OLLAMA_THINK", "false").strip().lower()
     payload: dict[str, Any] = {
         "model": model,
-        "prompt": prompt,
+        "messages": [
+            {"role": "system", "content": "Return only a valid JSON object."},
+            {"role": "user", "content": prompt},
+        ],
         "stream": False,
         "options": {
             "temperature": 0.0,
@@ -461,10 +466,11 @@ async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]
     if think in {"true", "false"}:
         payload["think"] = think == "true"
     async with httpx.AsyncClient(timeout=PLANNER_MODEL_TIMEOUT) as client:
-        r = await client.post(f"{host}/api/generate", json=payload)
+        r = await client.post(f"{host}/api/chat", json=payload)
         r.raise_for_status()
         raw = r.json()
-    text = raw.get("response") or ""
+    message = raw.get("message") if isinstance(raw.get("message"), dict) else {}
+    text = message.get("content") or ""
     if not text.strip() and isinstance(raw.get("thinking"), str):
         text = raw["thinking"]
     return text, raw
@@ -966,6 +972,26 @@ async def intent(request: Request) -> JSONResponse:
     workflow = _select_workflow(body)
     trace_id, outputs = await _run_workflow(workflow, body)
     return JSONResponse({"trace_id": trace_id, "workflow": workflow.name, "outputs": outputs})
+
+
+@app.post("/trace-events")
+async def trace_event(request: Request) -> JSONResponse:
+    """Accept trace records emitted by AUs while the orchestrator is waiting.
+
+    The planner remains the trace owner: agent/tool boundary events are posted
+    here with the same trace id and then persisted and streamed like native
+    planner records.
+    """
+    record = await request.json()
+    trace_id = record.get("trace_id")
+    step = record.get("step")
+    if not isinstance(trace_id, str) or not trace_id.strip():
+        raise HTTPException(status_code=400, detail="trace_id is required")
+    if not isinstance(step, str) or not step.strip():
+        raise HTTPException(status_code=400, detail="step is required")
+    record.setdefault("source", "agent")
+    await _record(record)
+    return JSONResponse({"ok": True})
 
 
 @app.get("/traces")

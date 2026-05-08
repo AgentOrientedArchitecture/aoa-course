@@ -6,7 +6,7 @@ purpose: |
   that store for citeable passages.
 inputs:
   - name: op
-    type: enum<write_ingest|search|graph>
+    type: enum<write_ingest|search|graph|reset>
     required: true
   - name: promotion
     type: object
@@ -29,10 +29,12 @@ constraints:
   - Stored markdown includes provenance back to the source path.
   - Search returns passage ids and source document paths.
   - Graph returns typed nodes and labelled edges.
+  - Reset clears only the configured wiki root layers used by this tool.
 evaluation_signals:
   - path_within_root
   - index_updated
   - passages_have_citations
   - graph_has_typed_nodes
+  - index_reset
 provenance:
   model: none

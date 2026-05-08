@@ -6,8 +6,15 @@ It handles the four jobs every agent does the same way:
 
 1. Discovers capability cards under `capabilities/<name>/`.
 2. Computes `skills_hash` for each by SHA-ing the matching `skills.md`.
-3. Registers each capability with the registry on boot.
-4. Watches each `skills.md` for changes and re-registers on edit.
+3. Stamps each card with a stable `agent_id`/`identity` for policy, trace, and audit.
+4. Registers each capability with the registry on boot.
+5. Watches each `skills.md` for changes and re-registers on edit.
+
+`agent_id` identifies the acting AU runtime (`urn:aoa:agent:parser`,
+`urn:aoa:agent:evaluator`, `urn:aoa:agent:reporter` in the course compose
+file). `skills_hash` identifies the current working instructions for a
+capability. Editing `skills.md` changes the hash and updates registration, but
+it does not create a new agent identity.
 
 A concrete agent provides a `handle(capability_id, inputs, ctx) -> outputs` function and a couple of lines of wiring. See [`AGENTS.md`](../../AGENTS.md) for the agent contract; see any of the agents under `agents/` for examples.
 

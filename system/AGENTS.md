@@ -16,9 +16,9 @@ agents/<name>/
       tools.yaml           # 3. tool dependencies (capability ids)
 ```
 
-**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only and exposed at `/cards/<id>`.
+**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. At runtime the shared scaffold also stamps the card with `agent_id`/`identity`. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only and exposed at `/cards/<id>`.
 
-**2. `skills.md`** — practical know-how for fulfilling this capability: prompt structure, judgement rubric, examples, edge-case guidance. This is what gives a capability its identity. Two capabilities backed by the same code differ here.
+**2. `skills.md`** — practical know-how for fulfilling this capability: prompt structure, judgement rubric, examples, edge-case guidance. This shapes the capability's working behaviour. Two capabilities backed by the same code differ here, and edits show up as a changed `skills_hash`; the Agent ID stays stable.
 
 It's mounted read-only and **hot-reloaded**: a watcher inside the container re-reads `skills.md` when it changes. Editing `skills.md` on disk changes the capability's behaviour without a restart.
 
@@ -78,9 +78,10 @@ At container boot, `agent.py` (via `_base`) does:
 
 1. Load every `capability-card.yaml` under `capabilities/`.
 2. Compute `skills_hash` for each by SHA-ing the matching `skills.md`.
-3. Resolve listed `tools.yaml` capabilities through the registry, retrying until they're up.
-4. POST each card to the registry's `/register` endpoint with `provenance.skills_hash` filled in.
-5. Start the FastAPI server on the standard in-container agent port `8888`.
+3. Stamp `agent_id` and `identity` onto each card from the container environment.
+4. Resolve listed `tools.yaml` capabilities through the registry, retrying until they're up.
+5. POST each card to the registry's `/register` endpoint with `provenance.skills_hash` filled in.
+6. Start the FastAPI server on the standard in-container agent port `8888`.
    Expose A2A at `/a2a`, publish an Agent Card at
    `/.well-known/agent-card.json`, and keep `/invoke?capability=<id>` plus
    `/cards/<id>` for compatibility and inspection.
@@ -140,9 +141,9 @@ Content-Type: application/json
 ```
 
 The agent looks up the capability locally, builds the prompt from `skills.md`,
-calls the model, validates the response against the capability card's
-`constraints`, runs the `evaluation_signals` checks, and returns an A2A message
-with the AOA result envelope in a `DataPart`:
+calls the model when that capability needs model judgement, computes the
+focused signals implemented in `agent.py`, and returns an A2A message with the
+AOA result envelope in a `DataPart`:
 
 ```json
 {
@@ -168,7 +169,9 @@ with the AOA result envelope in a `DataPart`:
 }
 ```
 
-Both the request and response are written to the planner's trace file for that flow. The studio renders them.
+Both the orchestrator-level request/response and the AU/tool boundary records
+are written to the planner's trace file for that flow. The studio renders
+those records as the responsibility walk.
 
 `/invoke?capability=<id>` remains available as a simple compatibility endpoint
 and is the AOA bridge shape deterministic MCP-backed tools use. The course
@@ -183,9 +186,11 @@ you can inspect agents from the laptop, such as `http://localhost:7301/`.
 
 1. Create `agents/<name>/capabilities/<new-capability>/`.
 2. Write `capability-card.yaml`, `skills.md`, `tools.yaml`.
-3. Restart the agent container (or wait for hot reload, depending on your loop).
+3. Restart the agent container.
 
-The registry picks up the new capability. The studio shows it. No code changes elsewhere.
+Hot reload watches existing `skills.md` files; discovering a new capability
+folder is a boot-time operation. After the restart, the registry picks up the
+new capability and the studio shows it. No code changes elsewhere.
 
 ## Adding a new agent
 

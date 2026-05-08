@@ -11,12 +11,13 @@ A concrete agent does roughly this::
     if __name__ == "__main__":
         run(handle)
 
-The scaffold takes care of the four jobs every agent does the same way:
+The scaffold takes care of the shared jobs every agent does the same way:
 
 1. Discover capability cards under ``capabilities/<name>/``.
 2. Compute ``skills_hash`` for each by SHA-ing the matching ``skills.md``.
-3. Register each capability with the registry on boot.
-4. Watch each ``skills.md`` for changes and re-register on edit.
+3. Stamp ``agent_id``/``identity`` onto each registered card.
+4. Register each capability with the registry on boot.
+5. Watch each ``skills.md`` for changes and re-register on edit.
 
 It also exposes the standard agent HTTP surface: ``/a2a``,
 ``/.well-known/agent-card.json``, ``/invoke``, ``/cards/<id>``, and
@@ -28,6 +29,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +46,8 @@ from .registry_client import RegistryClient
 
 logger = logging.getLogger("agent")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+PLANNER_URL = os.environ.get("PLANNER_URL", "").rstrip("/")
 
 
 # ----------------------------------------------------------------------
@@ -87,12 +91,16 @@ class ToolHandle:
         card: dict[str, Any],
         client: httpx.AsyncClient,
         trace_id_provider: Callable[[], str],
+        owner_capability_id: str,
+        emit_trace: Callable[[dict[str, Any]], Awaitable[None]],
         timeout_seconds: float = 60.0,
     ) -> None:
         self.capability_id = capability_id
         self.card = card
         self._client = client
         self._trace_id_provider = trace_id_provider
+        self._owner_capability_id = owner_capability_id
+        self._emit_trace = emit_trace
         self._timeout = timeout_seconds
 
     async def __call__(self, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -100,15 +108,50 @@ class ToolHandle:
         return envelope.get("outputs", {})
 
     async def invoke_raw(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        payload = {"trace_id": self._trace_id_provider(), "inputs": inputs}
-        r = await self._client.post(
-            self.card["endpoint"],
-            params={"capability": self.capability_id},
-            json=payload,
-            timeout=self._timeout,
-        )
-        r.raise_for_status()
-        return r.json()
+        trace_id = self._trace_id_provider()
+        payload = {"trace_id": trace_id, "inputs": inputs}
+        await self._emit_trace({
+            "trace_id": trace_id,
+            "step": "tool-invoke",
+            "parent_capability": self._owner_capability_id,
+            "capability": self.capability_id,
+            "boundary": "tool",
+            "transport": "http",
+            "inputs_shape": _shape_summary(inputs),
+        })
+        t0 = time.perf_counter()
+        try:
+            r = await self._client.post(
+                self.card["endpoint"],
+                params={"capability": self.capability_id},
+                json=payload,
+                timeout=self._timeout,
+            )
+            r.raise_for_status()
+            envelope = r.json()
+        except Exception as e:  # noqa: BLE001
+            await self._emit_trace({
+                "trace_id": trace_id,
+                "step": "tool-error",
+                "parent_capability": self._owner_capability_id,
+                "capability": self.capability_id,
+                "boundary": "tool",
+                "error": repr(e),
+                "latency_seconds": time.perf_counter() - t0,
+            })
+            raise
+
+        await self._emit_trace({
+            "trace_id": trace_id,
+            "step": "tool-response",
+            "parent_capability": self._owner_capability_id,
+            "capability": self.capability_id,
+            "boundary": "tool",
+            "outputs_shape": _shape_summary(envelope.get("outputs", {})),
+            "signals": envelope.get("signals", {}),
+            "latency_seconds": time.perf_counter() - t0,
+        })
+        return envelope
 
 
 @dataclass
@@ -153,6 +196,23 @@ def _agent_card_url() -> str:
     host = os.environ.get("AGENT_HOST", os.environ.get("AGENT_NAME", "agent"))
     port = int(os.environ.get("AGENT_PORT", "7300"))
     return f"http://{host}:{port}/.well-known/agent-card.json"
+
+
+def _agent_name() -> str:
+    return os.environ.get("AGENT_NAME", "agent")
+
+
+def _agent_id() -> str:
+    return os.environ.get("AGENT_ID", f"urn:aoa:agent:{_agent_name()}")
+
+
+def _agent_identity() -> dict[str, Any]:
+    return {
+        "agent_id": _agent_id(),
+        "agent_name": _agent_name(),
+        "runtime": os.environ.get("AGENT_RUNTIME", "docker-compose"),
+        "principal": os.environ.get("AGENT_PRINCIPAL", _agent_id()),
+    }
 
 
 def _sha256(text: str) -> str:
@@ -211,6 +271,10 @@ def discover_capabilities() -> list[Capability]:
         prov = card.setdefault("provenance", {})
         if prov.get("model") in (None, "${MODEL}"):
             prov["model"] = os.environ.get("MODEL", "${MODEL}")
+
+        identity = _agent_identity()
+        card["agent_id"] = identity["agent_id"]
+        card.setdefault("identity", {}).update(identity)
 
         # Endpoint is filled in by the scaffold so cards don't have to know
         # their host. Per AGENTS.md the planner uses the registered endpoint.
@@ -323,13 +387,37 @@ def _description_from_purpose(card: dict[str, Any]) -> str:
     return " ".join(purpose.split())
 
 
+def _shape_summary(value: Any, depth: int = 0) -> Any:
+    """Small structural summary for traces without copying large payloads."""
+    if depth >= 2:
+        if isinstance(value, dict):
+            return {"type": "object", "keys": sorted(str(k) for k in value.keys())[:12]}
+        if isinstance(value, list):
+            return {"type": "array", "count": len(value)}
+        return {"type": type(value).__name__}
+    if isinstance(value, dict):
+        return {
+            str(k): _shape_summary(v, depth + 1)
+            for k, v in list(value.items())[:12]
+        }
+    if isinstance(value, list):
+        sample = _shape_summary(value[0], depth + 1) if value else None
+        return {"type": "array", "count": len(value), "sample": sample}
+    if isinstance(value, str):
+        return {"type": "string", "chars": len(value), "empty": not bool(value.strip())}
+    if value is None:
+        return {"type": "null"}
+    return {"type": type(value).__name__}
+
+
 def _build_agent_card(capabilities: list[Capability]) -> dict[str, Any]:
     """Build the public A2A Agent Card for this process.
 
     AOA capability cards carry richer course-specific contracts than A2A skills,
     so the full cards are advertised through a data-only A2A extension.
     """
-    agent_name = os.environ.get("AGENT_NAME", "agent")
+    agent_name = _agent_name()
+    identity = _agent_identity()
     descriptions = [_description_from_purpose(cap.card) for cap in capabilities]
     description = (
         descriptions[0]
@@ -353,8 +441,15 @@ def _build_agent_card(capabilities: list[Capability]) -> dict[str, Any]:
                     "description": "AOA capability-card contracts exposed by this A2A agent.",
                     "required": False,
                     "params": {
+                        "agent_identity": identity,
                         "capabilities": [cap.card for cap in capabilities],
                     },
+                },
+                {
+                    "uri": "urn:aoa:extensions:agent-identity:v1",
+                    "description": "Stable AOA Agent ID used by registry, policy, trace, and audit.",
+                    "required": False,
+                    "params": identity,
                 }
             ],
         },
@@ -476,6 +571,17 @@ def build_app(handle: Handler) -> FastAPI:
     async def get_scoped_agent_card() -> JSONResponse:
         return JSONResponse(agent_card)
 
+    async def _emit_trace(record: dict[str, Any]) -> None:
+        if not PLANNER_URL or tool_client is None:
+            return
+        trace_id = record.get("trace_id")
+        if not isinstance(trace_id, str) or not trace_id:
+            return
+        try:
+            await tool_client.post(f"{PLANNER_URL}/trace-events", json=record, timeout=5.0)
+        except Exception:  # noqa: BLE001
+            logger.debug("trace event emit failed", exc_info=True)
+
     async def _invoke_capability(
         capability_id: str,
         trace_id: str,
@@ -493,7 +599,14 @@ def build_app(handle: Handler) -> FastAPI:
             # Bind a fresh ToolHandle set per request so trace_id propagates.
             assert tool_client is not None
             handles: dict[str, ToolHandle] = {
-                cid: ToolHandle(cid, card, tool_client, lambda tid=trace_id: tid)
+                cid: ToolHandle(
+                    cid,
+                    card,
+                    tool_client,
+                    lambda tid=trace_id: tid,
+                    cap.id,
+                    _emit_trace,
+                )
                 for cid, card in tool_cards.items()
             }
             ctx = Context(
@@ -504,11 +617,32 @@ def build_app(handle: Handler) -> FastAPI:
                 tools=handles,
             )
 
+            await _emit_trace({
+                "trace_id": trace_id,
+                "step": "au-start",
+                "capability": capability_id,
+                "agent": _agent_name(),
+                "agent_id": _agent_id(),
+                "boundary": "au",
+                "model": cap.card.get("provenance", {}).get("model", ""),
+                "skills_hash": cap.card.get("provenance", {}).get("skills_hash", ""),
+                "inputs_shape": _shape_summary(inputs),
+            })
+            t0 = time.perf_counter()
             result = handle(capability_id, inputs, ctx)
             if asyncio.iscoroutine(result):
                 result = await result
         except Exception as e:  # noqa: BLE001
             logger.exception("capability %s failed", capability_id)
+            await _emit_trace({
+                "trace_id": trace_id,
+                "step": "au-error",
+                "capability": capability_id,
+                "agent": _agent_name(),
+                "agent_id": _agent_id(),
+                "boundary": "au",
+                "error": str(e),
+            })
             return {
                 "trace_id": trace_id,
                 "outputs": {"error": str(e)},
@@ -520,12 +654,32 @@ def build_app(handle: Handler) -> FastAPI:
             }
 
         if not isinstance(result, dict):
+            await _emit_trace({
+                "trace_id": trace_id,
+                "step": "au-error",
+                "capability": capability_id,
+                "agent": _agent_name(),
+                "agent_id": _agent_id(),
+                "boundary": "au",
+                "error": f"handle() returned {type(result).__name__}, expected dict",
+            })
             raise HTTPException(
                 status_code=500,
                 detail=f"handle() returned {type(result).__name__}, expected dict",
             )
         outputs = result.get("outputs", {})
         signals = result.get("signals", {})
+        await _emit_trace({
+            "trace_id": trace_id,
+            "step": "au-finish",
+            "capability": capability_id,
+            "agent": _agent_name(),
+            "agent_id": _agent_id(),
+            "boundary": "au",
+            "outputs_shape": _shape_summary(outputs),
+            "signals": signals,
+            "latency_seconds": time.perf_counter() - t0,
+        })
         return {"trace_id": trace_id, "outputs": outputs, "signals": signals}
 
     @app.post("/invoke")

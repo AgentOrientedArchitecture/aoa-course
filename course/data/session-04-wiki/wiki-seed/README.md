@@ -26,6 +26,9 @@ repo so the course copy can be replaced or expanded later.
 5. `05-real-world-implementations.md`
 6. `06-scale-and-operations.md`
 7. `07-standards-and-governance.md`
+8. `08-adoption-action-plan.md`
+9. `09-context-aware-principles.md`
+10. `10-post-course-questions.md`
 
 After ingesting these, try questions such as:
 
@@ -34,6 +37,10 @@ After ingesting these, try questions such as:
 - Where do A2A and MCP sit in the architecture?
 - Which real-world platforms look closest to AOA?
 - What failure modes does AOA inherit from microservices?
+- How do we get started with AOA?
+- How do we create context-aware principles for our organisation?
+- When should we build a registry?
+- What should we do in the first week after the course?
 
 ## Why Markdown only for now
 

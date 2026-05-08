@@ -82,7 +82,10 @@
           <section class="graph-panel">
             <div class="section-head">
               <span class="section-label">Wiki Graph</span>
-              <span id="wiki-graph-state" class="section-meta">waiting</span>
+              <span class="graph-actions">
+                <button id="wiki-reset" type="button" class="secondary danger">Reset wiki</button>
+                <span id="wiki-graph-state" class="section-meta">waiting</span>
+              </span>
             </div>
             <div id="wiki-graph" class="wiki-graph muted-block">No wiki nodes yet.</div>
             <div class="graph-legend" aria-label="Wiki graph legend">
@@ -109,6 +112,15 @@
         </section>
 
         <ol id="lifecycle-rail" class="lifecycle-rail"></ol>
+
+        <section class="lifecycle-section trace-section">
+          <div class="section-head">
+            <span class="section-label">Trace</span>
+            <span id="trace-id-label" class="section-meta">waiting</span>
+          </div>
+          <div id="trace-summary" class="trace-summary muted-block">No trace yet.</div>
+          <ol id="responsibility-walk" class="responsibility-walk"></ol>
+        </section>
 
         <section class="lifecycle-section">
           <div class="section-head">

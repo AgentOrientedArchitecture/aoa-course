@@ -181,9 +181,13 @@ class Model:
         self, prompt: str, system: str | None, temperature: float, max_tokens: int
     ) -> tuple[str, dict[str, Any]]:
         host = os.environ.get("OLLAMA_HOST", "http://ollama:11434")
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": prompt,
+            "messages": messages,
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }
@@ -193,13 +197,12 @@ class Model:
         think = os.environ.get("OLLAMA_THINK", "false").strip().lower()
         if think in {"true", "false"}:
             payload["think"] = think == "true"
-        if system:
-            payload["system"] = system
         with httpx.Client(timeout=self.timeout_seconds) as client:
-            resp = client.post(f"{host}/api/generate", json=payload)
+            resp = client.post(f"{host}/api/chat", json=payload)
             resp.raise_for_status()
             data = resp.json()
-        text = data.get("response") or ""
+        message = data.get("message") if isinstance(data.get("message"), dict) else {}
+        text = message.get("content") or ""
         if not text.strip() and isinstance(data.get("thinking"), str):
             text = data["thinking"]
         return text, data

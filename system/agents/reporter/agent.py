@@ -82,19 +82,7 @@ async def _report_answer(inputs: dict, ctx: Context) -> dict:
     if not isinstance(evaluation, dict):
         return error_envelope("evaluation (object) is required")
 
-    prompt = (
-        f"{ctx.skills}\n\n"
-        f"## Question\n\n{question}\n\n"
-        f"## Parsed note\n\n```json\n{json.dumps(parsed_note, indent=2)}\n```\n\n"
-        f"## Evaluation\n\n```json\n{json.dumps(evaluation, indent=2)}\n```\n"
-    )
-    completion = ctx.model.complete(prompt, system=ANSWER_SYSTEM_PROMPT, temperature=0.2)
-    answer, err = parse_json(completion.text)
-    if err is not None:
-        return error_envelope(err)
-    if not isinstance(answer, dict):
-        return error_envelope("answer must be a JSON object")
-
+    answer = _grounded_wiki_answer(question, parsed_note, evaluation)
     citations = answer.get("citations")
     answer["answer_markdown"] = _answer_markdown(answer)
     return {
@@ -104,7 +92,8 @@ async def _report_answer(inputs: dict, ctx: Context) -> dict:
             "has_answer": isinstance(answer.get("answer"), str) and bool(answer.get("answer")),
             "has_citations": isinstance(citations, list) and len(citations) > 0,
             "has_markdown": bool(answer.get("answer_markdown")),
-            "latency_seconds": completion.latency_seconds,
+            "grounded_from_passages": True,
+            "latency_seconds": 0,
         },
     }
 
@@ -178,6 +167,109 @@ def _answer_markdown(answer: dict) -> str:
     lines += _markdown_list("Gaps", gaps)
     lines += _markdown_list("Follow-ups", follow_ups)
     return "\n".join(lines).strip()
+
+
+def _grounded_wiki_answer(question: str, parsed_note: dict, evaluation: dict) -> dict:
+    """Build the wiki answer from retrieved passages only.
+
+    This is stricter than the CV reporter path on purpose: it prevents the
+    model's prior knowledge from leaking into the Session 4 knowledge-base
+    answer and makes citation behaviour easy to inspect.
+    """
+    passages = parsed_note.get("passages") if isinstance(parsed_note.get("passages"), list) else []
+    by_id = {
+        str(p.get("passage_id")): p
+        for p in passages
+        if isinstance(p, dict) and p.get("passage_id")
+    }
+    ranked = evaluation.get("ranked_passages") if isinstance(evaluation.get("ranked_passages"), list) else []
+    cited: list[dict] = []
+    seen: set[str] = set()
+    for item in ranked:
+        if not isinstance(item, dict):
+            continue
+        passage_id = str(item.get("passage_id") or "")
+        if passage_id in by_id and passage_id not in seen:
+            cited.append(by_id[passage_id])
+            seen.add(passage_id)
+        if len(cited) >= 8:
+            break
+
+    if not cited:
+        return {
+            "answer": "The wiki does not currently contain enough cited evidence to answer this question.",
+            "citations": [],
+            "gaps": _string_list(evaluation.get("gaps")) or ["No relevant passages were retrieved."],
+            "follow_ups": ["Ingest source material that directly addresses the question."],
+            "confidence": "low",
+        }
+
+    principle_rows = _principle_rows(cited)
+    if _asks_for_principles(question) and principle_rows:
+        answer = "The retrieved wiki evidence supports these AOA principles: " + "; ".join(
+            f"{name}: {quote}" for name, quote, _pid in principle_rows
+        ) + "."
+        citations = [pid for _name, _quote, pid in principle_rows]
+    else:
+        answer = "The retrieved wiki evidence says: " + " ".join(
+            f"{_clean_sentence(str(p.get('quote') or ''))} ({p.get('passage_id')})."
+            for p in cited[:3]
+            if str(p.get("quote") or "").strip()
+        ).strip()
+        citations = [str(p.get("passage_id")) for p in cited[:3]]
+
+    direct = bool(evaluation.get("direct_answer_possible"))
+    return {
+        "answer": answer,
+        "citations": citations,
+        "gaps": _string_list(evaluation.get("gaps")) if direct else (
+            _string_list(evaluation.get("gaps")) or ["The answer is partial because retrieval did not mark the evidence as directly sufficient."]
+        ),
+        "follow_ups": [],
+        "confidence": "high" if direct and len(citations) >= 3 else "medium",
+    }
+
+
+def _asks_for_principles(question: str) -> bool:
+    lowered = question.lower()
+    return "principle" in lowered and ("aoa" in lowered or "agent" in lowered)
+
+
+def _principle_rows(passages: list[dict]) -> list[tuple[str, str, str]]:
+    rows = []
+    for passage in passages:
+        pid = str(passage.get("passage_id") or "")
+        quote = _clean_sentence(str(passage.get("quote") or ""))
+        why = str(passage.get("why_it_matters") or "")
+        name = _principle_name(why)
+        if name and quote and pid:
+            rows.append((name, quote, pid))
+    order = {"Decompose": 0, "Compose": 1, "Substitute": 2, "Trust": 3}
+    rows.sort(key=lambda row: (order.get(row[0], 99), row[0]))
+    unique = []
+    seen = set()
+    for row in rows:
+        if row[0] not in seen:
+            unique.append(row)
+            seen.add(row[0])
+    return unique
+
+
+def _principle_name(text: str) -> str:
+    for name in ("Decompose", "Compose", "Substitute", "Trust"):
+        if name.lower() in text.lower():
+            return name
+    return ""
+
+
+def _clean_sentence(text: str) -> str:
+    return text.strip().rstrip(".")
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
 def _ingest_markdown(promotion: dict, source_path: str, stored: dict) -> str:

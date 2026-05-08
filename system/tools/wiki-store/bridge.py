@@ -148,7 +148,7 @@ async def invoke(request: Request) -> JSONResponse:
     trace_id = body.get("trace_id", "")
     inputs = body.get("inputs", {}) or {}
     op = inputs.get("op")
-    if op not in {"write_ingest", "search", "graph"}:
+    if op not in {"write_ingest", "search", "graph", "reset"}:
         raise HTTPException(status_code=400, detail=f"unsupported op: {op!r}")
 
     try:
@@ -172,6 +172,9 @@ async def invoke(request: Request) -> JSONResponse:
         outputs["text"] = _first_text(mcp_result)
     elif op == "graph":
         outputs["graph"] = mcp_result.get("graph", {"nodes": [], "edges": []})
+    elif op == "reset":
+        outputs["reset"] = mcp_result.get("reset", {})
+        outputs["text"] = _first_text(mcp_result)
 
     return JSONResponse(
         {
@@ -180,6 +183,7 @@ async def invoke(request: Request) -> JSONResponse:
             "signals": {
                 "path_within_root": True,
                 "index_updated": op == "write_ingest" and bool(outputs.get("stored")),
+                "index_reset": op == "reset" and bool(outputs.get("reset")),
                 "passages_have_citations": op != "search" or all(
                     isinstance(p, dict) and p.get("passage_id") and p.get("source_path")
                     for p in outputs.get("passages", [])

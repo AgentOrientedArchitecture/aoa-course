@@ -180,6 +180,7 @@ async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
     )
     search_outputs = await wiki({"op": "search", "query": search_text, "limit": 8})
     passages = search_outputs.get("passages", [])
+    ranked = _rank_wiki_passages(passages)
 
     parsed_note = {
         "title": "Course wiki search results",
@@ -198,22 +199,16 @@ async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
             if isinstance(p, dict)
         ],
     }
-
-    prompt = (
-        f"{ctx.skills}\n\n"
-        f"## Question\n\n{question}\n\n"
-        f"## Query\n\n```json\n{json.dumps(query, indent=2)}\n```\n\n"
-        f"## Retrieved passages\n\n```json\n{json.dumps(passages, indent=2)}\n```\n"
-    )
-    completion = ctx.model.complete(prompt, system=WIKI_QUERY_SYSTEM_PROMPT, temperature=0.1)
-    evaluation, err = parse_json(completion.text)
-    if err is not None:
-        return error_envelope(err)
-    if not isinstance(evaluation, dict):
-        return error_envelope("wiki query evaluation must be a JSON object")
-    evaluation["parsed_note"] = parsed_note
-
-    ranked = evaluation.get("ranked_passages")
+    direct_answer_possible = bool(ranked and ranked[0].get("relevance", 0) >= 3)
+    evaluation = {
+        "ranked_passages": ranked,
+        "direct_answer_possible": direct_answer_possible,
+        "gaps": [] if direct_answer_possible else ["The wiki did not return enough cited passages to answer directly."],
+        "rationale": (
+            "Ranked deterministically from wiki-store retrieval scores; answer text must stay within returned passages."
+        ),
+        "parsed_note": parsed_note,
+    }
     return {
         "outputs": evaluation,
         "signals": {
@@ -223,9 +218,39 @@ async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
                 isinstance(item, dict) and item.get("passage_id")
                 for item in ranked
             ) if isinstance(ranked, list) else False,
-            "latency_seconds": completion.latency_seconds,
+            "latency_seconds": 0,
         },
     }
+
+
+def _rank_wiki_passages(passages: object) -> list[dict]:
+    """Convert wiki-store retrieval scores into evaluator output.
+
+    The Session 4 query path is a grounding demo, so this capability keeps the
+    ranking deterministic and citation-preserving instead of asking the model to
+    judge sparse evidence.
+    """
+    if not isinstance(passages, list):
+        return []
+    ranked = []
+    for passage in passages:
+        if not isinstance(passage, dict) or not passage.get("passage_id"):
+            continue
+        score = int(passage.get("score") or 0)
+        relevance = max(1, min(5, score))
+        matched = passage.get("matched_terms") if isinstance(passage.get("matched_terms"), list) else []
+        reason = (
+            f"Matched wiki terms: {', '.join(str(term) for term in matched[:6])}."
+            if matched
+            else "Returned by wiki search."
+        )
+        ranked.append({
+            "passage_id": passage["passage_id"],
+            "relevance": relevance,
+            "reason": reason,
+        })
+    ranked.sort(key=lambda item: (-item["relevance"], item["passage_id"]))
+    return ranked
 
 
 if __name__ == "__main__":

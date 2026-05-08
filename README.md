@@ -1,10 +1,12 @@
 # aoa-course
 
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
+The system is a reference implementation for learning the architecture shape,
+not a production deployment platform.
 
 This repo holds two things:
 
-- **`course/`** — session narratives, slides, handouts, and example data.
+- **`course/`** — pre-work and example data.
 - **`system/`** — a small, container-shaped AOA system you build across the course.
 
 ## What you'll build
@@ -74,10 +76,7 @@ ask modes.
 
 ```
 course/
-  sessions/
-    02-anatomy-of-aoa/
-    04-lets-build/
-  handouts/
+  pre-work/
   data/
 system/
   agents/
@@ -94,8 +93,8 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 
 ## Sessions
 
-- **Session 2 — Anatomy of AOA** — [`course/sessions/02-anatomy-of-aoa/`](course/sessions/02-anatomy-of-aoa/)
-- **Session 4 — Let's build** — [`course/sessions/04-lets-build/`](course/sessions/04-lets-build/)
+- **Session 2 — Anatomy of AOA** — CV-fit data in [`course/data/session-02-cv-fit/`](course/data/session-02-cv-fit/)
+- **Session 4 — Let's build** — wiki seed data in [`course/data/session-04-wiki/`](course/data/session-04-wiki/)
 
 ## License
 

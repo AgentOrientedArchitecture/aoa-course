@@ -23,6 +23,12 @@ SERVER_VERSION = "0.1.0"
 PROTOCOL_VERSION = "2025-06-18"
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 SLUG_RE = re.compile(r"[^a-z0-9]+")
+STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "can", "for",
+    "from", "how", "in", "is", "it", "of", "on", "or", "that", "the",
+    "their", "then", "there", "these", "this", "to", "what", "when", "where",
+    "which", "who", "why", "with",
+}
 
 
 class WikiError(Exception):
@@ -61,6 +67,19 @@ def _write_index(index: dict[str, Any]) -> None:
     tmp = _index_path().with_suffix(".json.tmp")
     tmp.write_text(json.dumps(index, indent=2, sort_keys=True))
     tmp.replace(_index_path())
+
+
+def _clear_dir(path: Path) -> int:
+    """Delete files/directories inside path, leaving path itself in place."""
+    count = 0
+    path.mkdir(parents=True, exist_ok=True)
+    for child in path.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+        count += 1
+    return count
 
 
 def _slug(value: str) -> str:
@@ -227,6 +246,16 @@ def _tokens(text: str) -> set[str]:
     return set(TOKEN_RE.findall(text.lower()))
 
 
+def _query_tokens(text: str) -> set[str]:
+    tokens = _tokens(text)
+    return {token for token in tokens if token not in STOPWORDS and len(token) > 1}
+
+
+def _score_text(query_tokens: set[str], text: str, weight: int = 1) -> tuple[int, set[str]]:
+    overlap = query_tokens & _tokens(text)
+    return len(overlap) * weight, overlap
+
+
 def _graph_node(nodes: dict[str, dict[str, Any]], node: dict[str, Any]) -> None:
     node_id = str(node.get("id") or "")
     if not node_id:
@@ -367,28 +396,53 @@ def _tool_graph(_args: dict[str, Any]) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": summary}], "graph": graph}
 
 
+def _tool_reset(_args: dict[str, Any]) -> dict[str, Any]:
+    _ensure_dirs()
+    removed = {
+        "raw": _clear_dir(_root() / "raw"),
+        "promoted": _clear_dir(_root() / "promoted"),
+    }
+    _write_index({"documents": []})
+    summary = f"Reset wiki store; removed {removed['raw']} raw and {removed['promoted']} promoted file(s)."
+    return {
+        "content": [{"type": "text", "text": summary}],
+        "reset": {
+            "documents": 0,
+            "removed": removed,
+        },
+    }
+
+
 def _tool_search(args: dict[str, Any]) -> dict[str, Any]:
+    """Return a tiny inspectable lexical search result for the course wiki.
+
+    This is intentionally not a vector database. The point is that learners can
+    understand exactly why a passage was retrieved by reading `matched_terms`
+    and `score` in the trace payload.
+    """
     query = str(args.get("query") or "").strip()
     limit = int(args.get("limit") or 8)
     if not query:
         raise WikiError("query is required")
-    query_tokens = _tokens(query)
+    query_tokens = _query_tokens(query)
+    if not query_tokens:
+        raise WikiError("query must contain at least one searchable term")
     index = _read_index()
     scored = []
     for doc in index.get("documents", []) or []:
         for passage in doc.get("passages", []) or []:
-            text = " ".join([
-                str(doc.get("title", "")),
-                str(doc.get("summary", "")),
-                str(passage.get("quote", "")),
-                str(passage.get("why_it_matters", "")),
-            ])
-            overlap = sorted(query_tokens & _tokens(text))
-            if not overlap:
+            title_score, title_overlap = _score_text(query_tokens, str(doc.get("title", "")), 3)
+            summary_score, summary_overlap = _score_text(query_tokens, str(doc.get("summary", "")), 2)
+            quote_score, quote_overlap = _score_text(query_tokens, str(passage.get("quote", "")), 4)
+            why_score, why_overlap = _score_text(query_tokens, str(passage.get("why_it_matters", "")), 3)
+            total = title_score + summary_score + quote_score + why_score
+            overlap = sorted(title_overlap | summary_overlap | quote_overlap | why_overlap)
+            if total <= 0:
                 continue
+            total *= len(overlap)
             scored.append({
                 **passage,
-                "score": len(overlap),
+                "score": total,
                 "matched_terms": overlap,
             })
     scored.sort(key=lambda p: (-p["score"], p["passage_id"]))
@@ -437,6 +491,15 @@ TOOLS: dict[str, dict[str, Any]] = {
             "properties": {},
         },
         "_handler": _tool_graph,
+    },
+    "reset": {
+        "name": "reset",
+        "description": "Clear the local wiki store so the course demo can be replayed.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+        "_handler": _tool_reset,
     },
 }
 

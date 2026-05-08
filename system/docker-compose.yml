@@ -162,6 +162,8 @@ services:
       - inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:parser
       AGENT_NAME: parser
       AGENT_HOST: parser
       AGENT_PORT: 8888
@@ -198,6 +200,8 @@ services:
       - inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:evaluator
       AGENT_NAME: evaluator
       AGENT_HOST: evaluator
       AGENT_PORT: 8888
@@ -233,6 +237,8 @@ services:
       - ./agents/reporter/capabilities:/app/capabilities:ro
     environment:
       REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:reporter
       AGENT_NAME: reporter
       AGENT_HOST: reporter
       AGENT_PORT: 8888

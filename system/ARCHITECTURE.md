@@ -1,14 +1,15 @@
 # Architecture
 
-A small, container-shaped, readable AOA system. Three workflows, three agent
-codebases, ten AU capabilities, three deterministic tools, and three plumbing
-services. AU-to-AU orchestration uses A2A Agent Cards and JSON-RPC
-`message/send`; deterministic tools expose MCP tools behind small registered
-AOA bridges.
+A small, container-shaped, readable AOA system. This is a reference
+implementation for learning the shape of AOA, not a deployment platform. It
+keeps the moving parts explicit: three workflows, three agent codebases, ten AU
+capabilities, three deterministic tools, and three plumbing services. AU-to-AU
+orchestration uses A2A Agent Cards and JSON-RPC `message/send`; deterministic
+tools expose MCP tools behind small registered AOA bridges.
 
 ## What the system does
 
-Two workflows run through one registry:
+Three workflows run through one registry:
 
 **CV evaluation** (Session 2):
 
@@ -41,10 +42,11 @@ parser-query → evaluator-wiki-query → reporter-answer
 ```
 
 You submit a question through the studio. The parser turns it into a compact
-retrieval query. The evaluator searches the wiki store, ranks retrieved
-passages, and names gaps. The reporter writes a grounded answer with passage-id
-citations. The chain you build in Session 2 turns out to be general, but now
-it supports both ingest and access.
+retrieval query. The evaluator searches the wiki store and ranks retrieved
+passages. The reporter writes a grounded answer from those retrieved passages,
+with passage-id citations. For this reference implementation the final wiki
+answer is deliberately deterministic over retrieved evidence, so the demo shows
+grounding rather than a model free-writing from prior knowledge.
 
 ## Six things this system demonstrates
 
@@ -53,7 +55,7 @@ Each is something you can see on screen as you build:
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
 2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
 3. **One agent can back many capabilities.** Each Session 2 agent gains extra Session 4 capabilities: `parser-notes`, `parser-query`, `evaluator-promote`, `evaluator-wiki-query`, `reporter-ingest-summary`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
-4. **`skills.md` gives a capability its identity.** Same model, same code, same tools — different `skills.md`, different capability. Edit `evaluator-query/skills.md` while the system is running and you'll see that one entry's `skills_hash` change in the registry pane while everything else holds.
+4. **Identity and behaviour are separate.** `agent_id` is the stable governed actor shown in the registry and trace. `skills.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation. Edit a mounted `skills.md` while the system is running and you'll see that one entry's `skills_hash` change while the Agent ID stays still.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
 6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
 
@@ -77,12 +79,16 @@ Plus, in `tools/`:
 
 ## The four parts of an AU
 
-Every AU has four addressable parts:
+Every AU has four addressable parts plus a stamped runtime identity:
 
 1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only and exposed at `/cards/<id>`.
 2. **`skills.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
 3. **`tools.yaml`** — the capability ids this agent will call. May reference other AUs or pure tools. May be empty.
 4. **`agent.py`** — the wiring. Built on the shared FastAPI scaffold in `agents/_base/`.
+
+At boot the shared scaffold stamps each card with `agent_id` and `identity`
+from the container environment. In this course compose file those are stable
+URNs such as `urn:aoa:agent:parser`.
 
 When a single codebase backs more than one capability, the capability-specific files live in `capabilities/<name>/` subfolders; the code lives at the agent root. Every agent uses this pattern even when it has only one capability.
 
@@ -113,8 +119,9 @@ docker-compose.yml services:
   ollama               profile: local, optional
 ```
 
-Nine containers run for both sessions, plus optional Ollama under the local
-profile.
+Session 2 starts the CV-only subset: registry, planner, studio,
+tool-document-text, and the three agent containers. Session 4 starts the full
+set above. Optional Ollama runs only when the `local` profile is enabled.
 
 Every agent container has the same shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
@@ -130,9 +137,12 @@ container-local addresses such as
 `http://parser:8888/.well-known/agent-card.json`, and the card's `url` points
 at `http://parser:8888/a2a`. The card includes standard A2A fields such as
 `protocolVersion`, `url`, `preferredTransport`, default input/output modes, and
-`skills`. A2A skills are intentionally lighter than AOA capability cards, so
-the full capability-card contracts are also advertised through an A2A
-`capabilities.extensions` entry.
+`skills`. The A2A core card identifies the service surface, but this course
+also needs a governed actor identity for policy and audit. The scaffold exposes
+that as an AOA extension (`urn:aoa:extensions:agent-identity:v1`) and stamps
+the same `agent_id` onto each registered capability card. A2A skills are
+intentionally lighter than AOA capability cards, so the full capability-card
+contracts are advertised through a second A2A extension.
 
 The planner still uses the AOA registry to ground concrete capabilities. In
 this small course registry it sends compact AU capability summaries to the
@@ -203,6 +213,12 @@ evaluation_signals:
 provenance:
   model: ${MODEL}
   skills_hash: <sha of skills.md>
+agent_id: urn:aoa:agent:evaluator
+identity:
+  agent_id: urn:aoa:agent:evaluator
+  agent_name: evaluator
+  runtime: docker-compose
+  principal: urn:aoa:agent:evaluator
 endpoint: http://evaluator:8888/invoke
 agent_card_url: http://evaluator:8888/.well-known/agent-card.json
 a2a_endpoint: http://evaluator:8888/a2a
@@ -213,13 +229,19 @@ The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`,
 endpoints. They share `agent.py` and `model`. Pure tools have `kind: tool` and
 `provenance.model: none`; they register `endpoint` only.
 
+This reference system treats `constraints` as the public promise to inspect and
+discuss. It implements focused output-shape and signal checks in each agent
+rather than a generic policy engine that enforces every constraint string.
+
 ## The studio
 
 A browser surface at `localhost:8080` with two roles:
 
 **Observation:**
 
-- **Registry pane.** Live listing of every registered capability — id, version, kind (`au` or `tool`), backing agent, current `skills_hash`. Updates as capabilities register, deregister, or change.
+- **Registry pane.** Live listing of every registered capability — capability
+  id, Agent ID, version, kind (`au` or `tool`), and current `skills_hash`.
+  Updates as capabilities register, deregister, or change.
 - **Intent Studio pane.** The currently-running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, task plan, work status, and rendered result. Raw event payloads are still available in an expandable details section.
 - **Right detail pane.** Click any registry entry to see its capability card, or
   click a wiki graph node to inspect that document, concept, passage, or open

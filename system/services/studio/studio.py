@@ -232,6 +232,35 @@ async def get_wiki_graph() -> JSONResponse:
             )
 
 
+@app.post("/api/wiki/reset")
+async def reset_wiki() -> JSONResponse:
+    """Clear the local wiki store so Session 4 can be replayed."""
+    if "wiki-graph" not in ENABLED_WORKFLOWS:
+        raise HTTPException(status_code=404, detail="wiki graph workflow is not enabled")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            card_resp = await client.get(f"{REGISTRY_URL}/find", params={"id": "tool-wiki-store"})
+            card_resp.raise_for_status()
+            card = card_resp.json()
+            invoke_resp = await client.post(
+                card["endpoint"],
+                params={"capability": "tool-wiki-store"},
+                json={"trace_id": "studio-wiki-reset", "inputs": {"op": "reset"}},
+            )
+            invoke_resp.raise_for_status()
+            envelope = invoke_resp.json()
+            return JSONResponse(envelope.get("outputs", {}))
+        except httpx.HTTPStatusError as e:
+            return JSONResponse({"error": e.response.text}, status_code=e.response.status_code)
+        except httpx.HTTPError as e:
+            return JSONResponse({"error": repr(e)}, status_code=502)
+        except KeyError:
+            return JSONResponse(
+                {"error": "tool-wiki-store endpoint is not registered"},
+                status_code=502,
+            )
+
+
 @app.post("/api/intent")
 async def submit_intent(request: Request) -> JSONResponse:
     """Persist browser payloads to the inbox and submit paths to the planner.

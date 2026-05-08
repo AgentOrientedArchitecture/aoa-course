@@ -64,10 +64,12 @@ function renderRegistry() {
     if (card.id === state.selectedCapability) li.classList.add("selected");
     const kind = (card.kind || "au").toLowerCase();
     const hash = (card.provenance && card.provenance.skills_hash) || "";
+    const agentId = card.agent_id || (card.identity && card.identity.agent_id) || "unbound";
     li.innerHTML = `
       <span class="cap-kind ${kind}">${kind}</span>
       <span class="cap-id">${escapeHtml(card.id)}</span>
-      <span class="cap-meta">v${escapeHtml(card.version || "?")} · ${hash ? hash.slice(0, 8) : "—"}</span>
+      <span class="cap-meta">${escapeHtml(agentId)}</span>
+      <span class="cap-meta">v${escapeHtml(card.version || "?")} · skills ${hash ? hash.slice(0, 8) : "—"}</span>
     `;
     li.addEventListener("click", () => selectCapability(card.id));
     list.appendChild(li);
@@ -292,6 +294,8 @@ function renderLifecycle() {
   runState.textContent = life.status;
   runState.className = `run-state ${life.status}`;
   renderLifecycleRail(life);
+  renderTraceSummary();
+  renderResponsibilityWalk();
   renderPlanner(life);
   renderTasks(life);
   renderResult(life);
@@ -317,6 +321,29 @@ async function loadWikiGraph() {
     state.wikiGraph = { nodes: [], edges: [], error: String(e) };
   }
   renderWikiGraph();
+}
+
+async function resetWikiStore() {
+  const stateLabel = $("wiki-graph-state");
+  const btn = $("wiki-reset");
+  if (!window.confirm("Clear the local wiki store and graph?")) return;
+  if (btn) btn.disabled = true;
+  if (stateLabel) stateLabel.textContent = "resetting";
+  try {
+    const resp = await fetch("/api/wiki/reset", { method: "POST" });
+    const body = await resp.json();
+    if (!resp.ok) {
+      state.wikiGraph = { nodes: [], edges: [], error: body.error || resp.statusText };
+    } else {
+      state.selectedWikiNode = null;
+      state.wikiGraph = { nodes: [], edges: [], error: "" };
+    }
+  } catch (e) {
+    state.wikiGraph = { nodes: [], edges: [], error: String(e) };
+  } finally {
+    if (btn) btn.disabled = false;
+    renderWikiGraph();
+  }
 }
 
 function renderWikiGraph() {
@@ -545,6 +572,221 @@ function renderLifecycleRail(life) {
   }
 }
 
+function renderTraceSummary() {
+  const idLabel = $("trace-id-label");
+  const root = $("trace-summary");
+  if (!idLabel || !root) return;
+  const records = state.records || [];
+  if (!state.currentTraceId || !records.length) {
+    idLabel.textContent = "waiting";
+    root.className = "trace-summary muted-block";
+    root.textContent = "No trace yet.";
+    return;
+  }
+
+  idLabel.textContent = state.currentTraceId;
+  root.className = "trace-summary";
+  const auCount = records.filter((r) => r.step === "au-start").length;
+  const toolCount = records.filter((r) => r.step === "tool-invoke").length;
+  const errorCount = records.filter((r) => r.step === "error" || r.step === "au-error" || r.step === "tool-error").length;
+  const duration = traceDuration(records);
+  const planner = state.lifecycle.source || "pending";
+  root.innerHTML = `
+    <span><strong>${escapeHtml(state.currentTraceId)}</strong><em>trace id</em></span>
+    <span><strong>${escapeHtml(planner)}</strong><em>planner</em></span>
+    <span><strong>${auCount}</strong><em>AU starts</em></span>
+    <span><strong>${toolCount}</strong><em>tool calls</em></span>
+    <span class="${errorCount ? "warn-text" : ""}"><strong>${errorCount}</strong><em>errors</em></span>
+    <span><strong>${duration}</strong><em>duration</em></span>
+  `;
+}
+
+function renderResponsibilityWalk() {
+  const list = $("responsibility-walk");
+  if (!list) return;
+  list.innerHTML = "";
+  const records = (state.records || []).filter(isResponsibilityRecord);
+  if (!records.length) {
+    const li = document.createElement("li");
+    li.className = "trace-step muted";
+    li.textContent = "Run an intent to see the correlated responsibility walk.";
+    list.appendChild(li);
+    return;
+  }
+  for (const record of records) {
+    const view = traceEventView(record);
+    const li = document.createElement("li");
+    li.className = `trace-step ${view.layer} ${view.status}`;
+    li.innerHTML = `
+      <span class="trace-layer">${escapeHtml(view.layerLabel)}</span>
+      <div class="trace-copy">
+        <div class="trace-title">${escapeHtml(view.title)}</div>
+        <div class="trace-detail">${escapeHtml(view.detail)}</div>
+        ${view.meta ? `<div class="trace-meta">${escapeHtml(view.meta)}</div>` : ""}
+      </div>
+    `;
+    const payload = pickPayload(record);
+    if (payload !== null) {
+      const details = document.createElement("details");
+      details.className = "compact-details trace-payload";
+      details.innerHTML = `<summary>Payload</summary><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+      li.appendChild(details);
+    }
+    list.appendChild(li);
+  }
+}
+
+function isResponsibilityRecord(record) {
+  return new Set([
+    "start",
+    "capability-context",
+    "plan-proposal",
+    "select",
+    "lookup",
+    "invoke",
+    "au-start",
+    "tool-invoke",
+    "tool-response",
+    "tool-error",
+    "au-finish",
+    "au-error",
+    "response",
+    "error",
+    "finish",
+  ]).has(record.step);
+}
+
+function traceEventView(record) {
+  const step = record.step || "event";
+  const cap = record.capability || "";
+  const task = record.task || "";
+  const parent = record.parent_capability || "";
+  const agentId = record.agent_id || "";
+  const layer = traceLayer(step);
+  const status = step.includes("error") || step === "error" ? "error" : step.endsWith("response") || step === "finish" || step === "au-finish" ? "done" : "";
+  const latency = record.latency_seconds != null ? `${record.latency_seconds.toFixed(2)}s` : "";
+  if (step === "start") {
+    return traceView(layer, status, "Intent received", record.workflow || (record.intent && record.intent.kind) || "workflow", latency);
+  }
+  if (step === "capability-context") {
+    return traceView(layer, status, "Registry context loaded", `${(record.capabilities || []).length} AU cards considered`, latency);
+  }
+  if (step === "plan-proposal") {
+    const validation = record.validation && record.validation.valid ? "validated" : record.fallback_reason ? "fallback" : "pending validation";
+    return traceView(layer, status, "Planner proposed route", `${record.source || "planner"} plan, ${validation}`, latency);
+  }
+  if (step === "select") {
+    const hash = record.card && record.card.provenance && record.card.provenance.skills_hash;
+    return traceView(layer, status, `Selected ${cap}`, task || "task", hash ? `skills ${hash.slice(0, 8)}` : latency);
+  }
+  if (step === "lookup") {
+    return traceView(layer, status, `Looked up ${cap}`, task || "capability card", endpointHost(record.card && record.card.endpoint));
+  }
+  if (step === "invoke") {
+    return traceView(layer, status, `Orchestrator invoked ${cap}`, shapeLine(record.inputs), latency || task);
+  }
+  if (step === "au-start") {
+    const hash = record.skills_hash ? `skills ${String(record.skills_hash).slice(0, 8)}` : "";
+    return traceView(layer, status, `${cap} started`, shapeLine(record.inputs_shape), [agentId || record.agent, record.model, hash].filter(Boolean).join(" · "));
+  }
+  if (step === "tool-invoke") {
+    return traceView(layer, status, `${parent} called ${cap}`, shapeLine(record.inputs_shape), "inward tool boundary");
+  }
+  if (step === "tool-response") {
+    return traceView(layer, status, `${cap} returned`, shapeLine(record.outputs_shape), signalLine(record.signals) || latency);
+  }
+  if (step === "tool-error") {
+    return traceView(layer, status, `${cap} failed`, record.error || "tool error", latency);
+  }
+  if (step === "au-finish") {
+    return traceView(layer, status, `${cap} finished`, shapeLine(record.outputs_shape), signalLine(record.signals) || latency);
+  }
+  if (step === "au-error") {
+    return traceView(layer, status, `${cap} failed`, record.error || "AU error", agentId || record.agent || "");
+  }
+  if (step === "response") {
+    return traceView(layer, status, `Orchestrator received ${cap}`, shapeLine(record.outputs), signalLine(record.signals) || latency);
+  }
+  if (step === "error") {
+    return traceView(layer, status, `Error in ${cap || task || "workflow"}`, record.error || "error", latency);
+  }
+  if (step === "finish") {
+    return traceView(layer, status, "Final artefact ready", shapeLine(record.outputs), latency);
+  }
+  return traceView(layer, status, step, cap || task || "", latency);
+}
+
+function traceView(layer, status, title, detail, meta) {
+  const labels = {
+    intent: "Intent",
+    planner: "Planner",
+    registry: "Registry",
+    orchestrator: "Run",
+    au: "AU",
+    tool: "Tool",
+    result: "Result",
+  };
+  return {
+    layer,
+    status,
+    layerLabel: labels[layer] || "Trace",
+    title,
+    detail: detail || "",
+    meta: meta || "",
+  };
+}
+
+function traceLayer(step) {
+  if (step === "start") return "intent";
+  if (step === "capability-context" || step === "lookup" || step === "select") return "registry";
+  if (step === "plan-proposal") return "planner";
+  if (step === "au-start" || step === "au-finish" || step === "au-error") return "au";
+  if (step === "tool-invoke" || step === "tool-response" || step === "tool-error") return "tool";
+  if (step === "finish") return "result";
+  return "orchestrator";
+}
+
+function traceDuration(records) {
+  const first = Date.parse(records[0] && records[0].ts);
+  const last = Date.parse(records[records.length - 1] && records[records.length - 1].ts);
+  if (!Number.isFinite(first) || !Number.isFinite(last) || last < first) return "running";
+  return `${((last - first) / 1000).toFixed(1)}s`;
+}
+
+function shapeLine(value) {
+  if (!value || typeof value !== "object") return "";
+  const keys = Object.keys(value);
+  if (!keys.length) return "empty payload";
+  return keys.slice(0, 5).map((key) => `${key}:${shapeToken(value[key])}`).join(", ");
+}
+
+function shapeToken(value) {
+  if (value && typeof value === "object" && value.type) {
+    if (value.type === "string") return `${value.chars || 0} chars`;
+    if (value.type === "array") return `array(${value.count || 0})`;
+    return value.type;
+  }
+  if (Array.isArray(value)) return `array(${value.length})`;
+  if (value && typeof value === "object") return "object";
+  if (typeof value === "string") return `${value.length} chars`;
+  return typeof value;
+}
+
+function signalLine(signals) {
+  if (!signals || typeof signals !== "object") return "";
+  const entries = Object.entries(signals).slice(0, 4);
+  return entries.map(([key, value]) => `${key}=${String(value)}`).join(" · ");
+}
+
+function endpointHost(endpoint) {
+  if (!endpoint) return "";
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return String(endpoint);
+  }
+}
+
 function renderPlanner(life) {
   const source = life.source || "waiting";
   $("planner-source").textContent = source;
@@ -677,6 +919,38 @@ function pickPayload(record) {
   if (record.step === "plan") return { plan: record.plan };
   if (record.step === "lookup") return record.card;
   if (record.step === "invoke") return record.inputs;
+  if (record.step === "au-start") {
+    return {
+      capability: record.capability,
+      agent: record.agent,
+      agent_id: record.agent_id,
+      model: record.model,
+      skills_hash: record.skills_hash,
+      inputs_shape: record.inputs_shape,
+    };
+  }
+  if (record.step === "tool-invoke") {
+    return {
+      parent_capability: record.parent_capability,
+      capability: record.capability,
+      inputs_shape: record.inputs_shape,
+    };
+  }
+  if (record.step === "tool-response") {
+    return { outputs_shape: record.outputs_shape, signals: record.signals };
+  }
+  if (record.step === "au-finish") {
+    return {
+      capability: record.capability,
+      agent: record.agent,
+      agent_id: record.agent_id,
+      outputs_shape: record.outputs_shape,
+      signals: record.signals,
+    };
+  }
+  if (record.step === "au-error" || record.step === "tool-error") {
+    return { capability: record.capability, agent: record.agent, agent_id: record.agent_id, error: record.error };
+  }
   if (record.step === "response") {
     return { outputs: record.outputs, signals: record.signals };
   }
@@ -981,6 +1255,8 @@ window.addEventListener("DOMContentLoaded", () => {
   applyWorkflowConfig();
   setupModeTabs();
   $("intent-submit").addEventListener("click", submitIntent);
+  const reset = $("wiki-reset");
+  if (reset) reset.addEventListener("click", resetWikiStore);
   setupFileDrop();
   renderLifecycle();
   loadInitialRegistry();

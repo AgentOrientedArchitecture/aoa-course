@@ -6,14 +6,18 @@ The studio has two roles in this system:
 
 **Observation** — three live panes:
 
-- **Registry.** Every registered capability — id, version, kind, current `skills_hash`. Updates as capabilities register, deregister, or change.
+- **Registry.** Every registered capability — capability id, Agent ID,
+  version, kind, and current `skills_hash`. Updates as capabilities register,
+  deregister, or change.
 - **Intent Studio.** The centre pane shows the selected intent, supplied
-  inputs, planner summary, task cards, lifecycle rail, and final result. Raw
-  event payloads remain available behind an expandable details section.
+  inputs, lifecycle rail, trace summary, responsibility walk, planner summary,
+  task cards, and final result. Raw event payloads remain available behind an
+  expandable details section.
 - **Details.** Click a registry row to read its card, or click a wiki graph
   node to inspect that node.
 - **Wiki graph.** A typed graph view of the Session 4 wiki store: documents,
-  concepts, passages, and open questions use different shapes and colours.
+  concepts, passages, and open questions use different shapes and colours. The
+  reset button clears the local wiki store so the ingest demo can be replayed.
 
 **Intent** — two ways to drive the system:
 
@@ -21,7 +25,10 @@ The studio has two roles in this system:
   `knowledge-query`.
 - Text boxes and file drops that forward course inputs to the planner.
 
-The studio drives the demo workflows and shows the trace. For the cut-down
+The studio drives the demo workflows and shows the trace. The responsibility
+walk is the Session 2 teaching surface: it follows intent, planner proposal,
+registry selection, AU invocation, inward tool calls, AU responses, signals,
+timings, Agent ID, and the final artefact. For the cut-down
 knowledge-management system, ingest returns a stored wiki summary and query
 returns a grounded answer. The graph mode is read-only and refreshes the wiki
 graph without submitting a planner intent.
@@ -43,6 +50,11 @@ The backend (`studio.py`) is a thin FastAPI proxy:
 The frontend is plain HTML and ES modules — no build step. Look at
 `templates/index.html` and `static/app.js` to see what's going on.
 
+The graph view is intentionally direct: Studio asks `tool-wiki-store` for a
+read-only graph projection and for demo reset. Those actions are UI controls
+over wiki state, not AU workflows, so the AU responsibility trace remains
+focused on ingest and query.
+
 ## Endpoints
 
 | Method | Path | Returns |
@@ -50,6 +62,8 @@ The frontend is plain HTML and ES modules — no build step. Look at
 | `GET`  | `/` | the studio page |
 | `GET`  | `/events` | merged SSE stream of registry + trace events |
 | `POST` | `/intent` | proxied to the planner |
+| `GET`  | `/api/wiki/graph` | read-only wiki graph projection |
+| `POST` | `/api/wiki/reset` | clear the local wiki store for replay |
 | `GET`  | `/healthz` | `{ "ok": true }` |
 
 ## Running locally

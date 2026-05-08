@@ -1,11 +1,17 @@
 # Skills: reporter-answer
 
-You answer a user question using only a parsed research note and the evaluator's
-ranked passages. You are concise, grounded, and explicit about evidence gaps.
+This capability answers a user question using only a parsed research note and
+the evaluator's ranked passages. It is concise, grounded, and explicit about
+evidence gaps.
+
+In the reference implementation the final wiki answer is deterministic:
+`agent.py` assembles the answer from retrieved passage quotes and passage ids
+instead of asking the model to write from memory. This file documents the
+behavioural contract the code enforces.
 
 ## Output shape
 
-Return a single JSON object with these keys:
+The returned JSON object has these keys:
 
 ```json
 {
@@ -17,8 +23,7 @@ Return a single JSON object with these keys:
 }
 ```
 
-The agent code will add `answer_markdown` after parsing your JSON. Do not
-generate that field yourself.
+The agent code adds `answer_markdown` after constructing the JSON object.
 
 ## Rules
 

@@ -20,6 +20,12 @@ knowledge-ingest:  parse-note → promote-note → write-wiki-ingest
 knowledge-query:   parse-query → evaluate-wiki-query → write-grounded-answer
 ```
 
+The query workflow is intentionally conservative. The wiki store performs a
+small deterministic search over the indexed passages, `evaluator-wiki-query`
+ranks those retrieved passage ids, and `reporter-answer` builds the final
+answer from those passages instead of asking the model to free-write. That
+keeps the demo focused on grounded retrieval and visible citations.
+
 Receiving an intent, the planner:
 
 1. Loads the current capability cards from the registry.
@@ -30,7 +36,8 @@ Receiving an intent, the planner:
 5. Records task breakdown, selected capabilities, and the resolved plan.
 6. Starts AU capabilities over A2A `message/send`; tool bridges remain direct.
 7. Threads outputs into the next task's inputs.
-8. Writes every visible step to `traces/<event-id>.jsonl`.
+8. Accepts AU/tool boundary events from running agents on the same trace id.
+9. Writes every visible step to `traces/<event-id>.jsonl`.
 
 The studio subscribes to `/events` and renders the running trace live.
 
@@ -39,6 +46,7 @@ The studio subscribes to `/events` and renders the running trace live.
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `POST` | `/intent` | `{ "kind": "...", "inputs": {...} }` | `{ "trace_id": "...", "outputs": {...} }` |
+| `POST` | `/trace-events` | agent/tool trace record | `{ "ok": true }` |
 | `GET`  | `/events` | — | SSE stream of trace lines |
 | `GET`  | `/traces` | — | list of recent trace ids |
 | `GET`  | `/traces/{id}` | — | trace as a JSON array |
@@ -46,7 +54,8 @@ The studio subscribes to `/events` and renders the running trace live.
 
 ## Trace format
 
-Each trace is a JSON-lines file. One record per planner-visible step:
+Each trace is a JSON-lines file. Planner records show intent, discovery,
+selection, orchestration, and final output:
 
 ```json
 {"ts": "...", "trace_id": "...", "step": "capability-context", "capabilities": [...]}
@@ -58,6 +67,15 @@ Each trace is a JSON-lines file. One record per planner-visible step:
 {"ts": "...", "trace_id": "...", "step": "lookup", "capability": "parser-cv", "card": {...}}
 {"ts": "...", "trace_id": "...", "step": "invoke",   "capability": "parser-cv", "inputs": {...}}
 {"ts": "...", "trace_id": "...", "step": "response", "capability": "parser-cv", "outputs": {...}, "signals": {...}}
+```
+
+Agents also post boundary records while the orchestrator is waiting:
+
+```json
+{"ts": "...", "trace_id": "...", "step": "au-start", "capability": "parser-cv", "agent_id": "urn:aoa:agent:parser", "inputs_shape": {...}}
+{"ts": "...", "trace_id": "...", "step": "tool-invoke", "parent_capability": "parser-cv", "capability": "tool-document-text", "inputs_shape": {...}}
+{"ts": "...", "trace_id": "...", "step": "tool-response", "capability": "tool-document-text", "outputs_shape": {...}, "signals": {...}}
+{"ts": "...", "trace_id": "...", "step": "au-finish", "capability": "parser-cv", "agent_id": "urn:aoa:agent:parser", "outputs_shape": {...}, "signals": {...}}
 ```
 
 Traces persist under `/data/traces/` in the planner container, mounted from
