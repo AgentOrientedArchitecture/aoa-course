@@ -1,7 +1,7 @@
 # Session 2 narrows the system to the CV-fit workflow.
 #
 # Use with:
-#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d --remove-orphans
 
 services:
   registry:
@@ -11,10 +11,6 @@ services:
   studio:
     environment:
       STUDIO_WORKFLOWS: cv-fit
-
-  parser:
-    environment:
-      CAPABILITY_ALLOWLIST: parser-cv
 
   evaluator:
     environment:

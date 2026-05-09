@@ -13,4 +13,4 @@ exec "${compose[@]}" \
   -f system/docker-compose.session2.yml \
   --profile session2 \
   --profile session4 \
-  down "$@"
+  down --remove-orphans "$@"

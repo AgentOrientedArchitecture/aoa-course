@@ -15,6 +15,7 @@ const enabledWorkflows = new Set(configuredWorkflows.length ? configuredWorkflow
 
 const state = {
   capabilities: new Map(),     // id -> card
+  governanceEvents: [],
   selectedCapability: null,
   currentTraceId: null,
   records: [],
@@ -65,15 +66,40 @@ function renderRegistry() {
     const kind = (card.kind || "au").toLowerCase();
     const hash = (card.provenance && card.provenance.skills_hash) || "";
     const agentId = card.agent_id || (card.identity && card.identity.agent_id) || "unbound";
+    const lifecycle = card.lifecycle || {};
     li.innerHTML = `
       <span class="cap-kind ${kind}">${kind}</span>
       <span class="cap-id">${escapeHtml(card.id)}</span>
       <span class="cap-meta">${escapeHtml(agentId)}</span>
+      <span class="cap-governance">
+        ${lifecycle.status ? `<span class="life-status">${escapeHtml(lifecycle.status)}</span>` : ""}
+        ${actorChip("published", lifecycle.published_by)}
+        ${actorChip("approved", lifecycle.approved_by)}
+        ${actorChip("deprecated", lifecycle.deprecated_by)}
+      </span>
       <span class="cap-meta">v${escapeHtml(card.version || "?")} · skills ${hash ? hash.slice(0, 8) : "—"}</span>
     `;
     li.addEventListener("click", () => selectCapability(card.id));
+    li.querySelectorAll("[data-actor-id]").forEach((actor) => {
+      actor.addEventListener("click", (event) => {
+        event.stopPropagation();
+        selectGovernanceActor(actor.dataset.actorId, card.id);
+      });
+    });
     list.appendChild(li);
   }
+  renderGovernanceEvents();
+}
+
+function actorChip(label, actorId) {
+  if (!actorId) return "";
+  return `<button type="button" class="actor-chip" data-actor-id="${escapeHtml(actorId)}">${escapeHtml(label)} ${escapeHtml(shortActor(actorId))}</button>`;
+}
+
+function shortActor(actorId) {
+  const text = String(actorId || "");
+  const parts = text.split(":");
+  return parts[parts.length - 1] || text;
 }
 
 async function selectCapability(id) {
@@ -83,11 +109,11 @@ async function selectCapability(id) {
   renderRegistry();
   const resp = await fetch(`/api/capabilities/${encodeURIComponent(id)}`);
   if (!resp.ok) {
-    $("card-body").textContent = `Could not load card for ${id}`;
+    setDetailText(`Could not load card for ${id}`);
     return;
   }
   const card = await resp.json();
-  $("card-body").textContent = JSON.stringify(card, null, 2);
+  setDetailJson(card);
 }
 
 function applyRegistryEvent(payload) {
@@ -95,10 +121,12 @@ function applyRegistryEvent(payload) {
   if (ev === "snapshot") {
     state.capabilities.clear();
     for (const card of payload.cards || []) state.capabilities.set(card.id, card);
-  } else if (ev === "registered" || ev === "updated") {
+    seedGovernanceEvents(payload.cards || []);
+  } else if (ev === "registered" || ev === "updated" || isGovernanceEvent(ev)) {
     if (payload.card && payload.card.id) {
       state.capabilities.set(payload.card.id, payload.card);
     }
+    if (isGovernanceEvent(ev)) recordGovernanceEvent(payload);
   } else if (ev === "deregistered") {
     if (payload.card && payload.card.id) state.capabilities.delete(payload.card.id);
   }
@@ -107,6 +135,110 @@ function applyRegistryEvent(payload) {
   if (state.selectedCapability && payload.card && payload.card.id === state.selectedCapability) {
     selectCapability(state.selectedCapability);
   }
+}
+
+function isGovernanceEvent(ev) {
+  return ev === "card_published" || ev === "card_approved" || ev === "card_deprecated";
+}
+
+function seedGovernanceEvents(cards) {
+  if (state.governanceEvents.length) return;
+  for (const card of cards) {
+    const lifecycle = (card && card.lifecycle) || {};
+    if (lifecycle.published_by) {
+      state.governanceEvents.push({
+        event: "card_published",
+        card_id: card.id,
+        actor_id: lifecycle.published_by,
+        ts: lifecycle.published_at || "",
+      });
+    }
+    if (lifecycle.approved_by) {
+      state.governanceEvents.push({
+        event: "card_approved",
+        card_id: card.id,
+        actor_id: lifecycle.approved_by,
+        ts: lifecycle.approved_at || "",
+      });
+    }
+    if (lifecycle.deprecated_by) {
+      state.governanceEvents.push({
+        event: "card_deprecated",
+        card_id: card.id,
+        actor_id: lifecycle.deprecated_by,
+        ts: lifecycle.deprecated_at || "",
+      });
+    }
+  }
+  state.governanceEvents = state.governanceEvents
+    .filter((event) => event.card_id && event.actor_id)
+    .slice(-24);
+}
+
+function recordGovernanceEvent(payload) {
+  const card = payload.card || {};
+  const lifecycle = payload.lifecycle || card.lifecycle || {};
+  state.governanceEvents.push({
+    event: payload.event,
+    card_id: card.id || "",
+    actor_id: payload.actor_id || actorForLifecycleEvent(payload.event, lifecycle),
+    ts: lifecycleTsForEvent(payload.event, lifecycle),
+  });
+  state.governanceEvents = state.governanceEvents.slice(-24);
+}
+
+function actorForLifecycleEvent(event, lifecycle) {
+  if (event === "card_published") return lifecycle.published_by || "";
+  if (event === "card_approved") return lifecycle.approved_by || "";
+  if (event === "card_deprecated") return lifecycle.deprecated_by || "";
+  return "";
+}
+
+function lifecycleTsForEvent(event, lifecycle) {
+  if (event === "card_published") return lifecycle.published_at || "";
+  if (event === "card_approved") return lifecycle.approved_at || "";
+  if (event === "card_deprecated") return lifecycle.deprecated_at || "";
+  return "";
+}
+
+function renderGovernanceEvents() {
+  const list = $("governance-list");
+  if (!list) return;
+  list.innerHTML = "";
+  const events = [...state.governanceEvents].reverse().slice(0, 8);
+  if (!events.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = "No lifecycle events yet.";
+    list.appendChild(li);
+    return;
+  }
+  for (const event of events) {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span class="gov-event">${escapeHtml(event.event.replace("card_", ""))}</span>
+      <button type="button" class="actor-chip" data-actor-id="${escapeHtml(event.actor_id)}">${escapeHtml(shortActor(event.actor_id))}</button>
+      <span class="gov-card">${escapeHtml(event.card_id)}</span>
+    `;
+    const actor = li.querySelector("[data-actor-id]");
+    if (actor) {
+      actor.addEventListener("click", () => selectGovernanceActor(event.actor_id, event.card_id));
+    }
+    list.appendChild(li);
+  }
+}
+
+function selectGovernanceActor(actorId, cardId = "") {
+  state.selectedCapability = null;
+  state.selectedWikiNode = null;
+  renderRegistry();
+  $("detail-title").textContent = "Governance actor";
+  const events = state.governanceEvents.filter((event) => event.actor_id === actorId);
+  setDetailJson({
+    actor_id: actorId,
+    selected_card: cardId,
+    recent_events: events,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +295,8 @@ function appendTraceRow(record) {
     const markdown = pickMarkdown(record);
     if (markdown) details.appendChild(renderMarkdown(markdown));
     const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(body, null, 2);
+    pre.className = "json-view";
+    pre.innerHTML = highlightJson(body);
     details.appendChild(pre);
   }
 
@@ -516,13 +649,13 @@ function selectWikiNode(id) {
   const edges = (state.wikiGraph.edges || []).filter(
     (edge) => edge.source === id || edge.target === id,
   );
-  $("card-body").textContent = JSON.stringify({
+  setDetailJson({
     id: node.id,
     type: node.type,
     label: node.label,
     details: node.details || {},
     edges,
-  }, null, 2);
+  });
 }
 
 function svgEl(name, attrs) {
@@ -629,7 +762,7 @@ function renderResponsibilityWalk() {
     if (payload !== null) {
       const details = document.createElement("details");
       details.className = "compact-details trace-payload";
-      details.innerHTML = `<summary>Payload</summary><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+      details.innerHTML = `<summary>Payload</summary><pre class="json-view">${highlightJson(payload)}</pre>`;
       li.appendChild(details);
     }
     list.appendChild(li);
@@ -824,7 +957,7 @@ function renderPlanner(life) {
   if (life.proposal) {
     const details = document.createElement("details");
     details.className = "compact-details";
-    details.innerHTML = `<summary>Planner JSON</summary><pre>${escapeHtml(JSON.stringify(life.proposal, null, 2))}</pre>`;
+    details.innerHTML = `<summary>Planner JSON</summary><pre class="json-view">${highlightJson(life.proposal)}</pre>`;
     body.appendChild(details);
   }
 }
@@ -853,7 +986,7 @@ function renderTasks(life) {
     `;
     const details = document.createElement("details");
     details.className = "compact-details";
-    details.innerHTML = `<summary>Details</summary><pre>${escapeHtml(JSON.stringify(taskDetail(task), null, 2))}</pre>`;
+    details.innerHTML = `<summary>Details</summary><pre class="json-view">${highlightJson(taskDetail(task))}</pre>`;
     li.appendChild(details);
     list.appendChild(li);
   }
@@ -886,7 +1019,8 @@ function renderResult(life) {
     body.appendChild(renderMarkdown(markdown));
   } else {
     const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(life.result, null, 2);
+    pre.className = "json-view";
+    pre.innerHTML = highlightJson(life.result);
     body.appendChild(pre);
   }
 }
@@ -1013,6 +1147,42 @@ function renderMarkdown(markdown) {
 
 function renderInlineMarkdown(text) {
   return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function setDetailText(text) {
+  const body = $("card-body");
+  body.classList.remove("json-view");
+  body.textContent = text;
+}
+
+function setDetailJson(value) {
+  const body = $("card-body");
+  body.classList.add("json-view");
+  body.innerHTML = highlightJson(value);
+}
+
+function highlightJson(value) {
+  const json = JSON.stringify(value, null, 2);
+  return json.replace(
+    /("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"\s*:|"(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+    (token) => {
+      const trimmed = token.trimEnd();
+      const suffix = token.slice(trimmed.length);
+      if (trimmed.endsWith(":")) {
+        return `<span class="json-key">${escapeHtml(trimmed.slice(0, -1))}</span>:${suffix}`;
+      }
+      if (trimmed.startsWith('"')) {
+        return `<span class="json-string">${escapeHtml(trimmed)}</span>${suffix}`;
+      }
+      if (trimmed === "true" || trimmed === "false") {
+        return `<span class="json-boolean">${trimmed}</span>${suffix}`;
+      }
+      if (trimmed === "null") {
+        return `<span class="json-null">${trimmed}</span>${suffix}`;
+      }
+      return `<span class="json-number">${trimmed}</span>${suffix}`;
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

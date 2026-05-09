@@ -14,4 +14,4 @@ fi
 exec "${compose[@]}" \
   -f system/docker-compose.yml \
   --profile session4 \
-  up --build -d "$@"
+  up --build -d --remove-orphans "$@"

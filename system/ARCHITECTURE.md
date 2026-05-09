@@ -2,8 +2,11 @@
 
 A small, container-shaped, readable AOA system. This is a reference
 implementation for learning the shape of AOA, not a deployment platform. It
-keeps the moving parts explicit: three workflows, three agent codebases, ten AU
-capabilities, three deterministic tools, and three plumbing services. AU-to-AU
+keeps the moving parts explicit: three workflows, three agent codebases, nine AU
+capabilities, three deterministic tools, and three plumbing services. The
+parser codebase is deployed as separate governed parser runtimes so Session 4
+can show that new Agent IDs plus new capability contracts and `skills.md` files
+create materially different agents without changing the parser code. AU-to-AU
 orchestration uses A2A Agent Cards and JSON-RPC `message/send`; deterministic
 tools expose MCP tools behind small registered AOA bridges.
 
@@ -54,20 +57,21 @@ Each is something you can see on screen as you build:
 
 1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
 2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
-3. **One agent can back many capabilities.** Each Session 2 agent gains extra Session 4 capabilities: `parser-notes`, `parser-query`, `evaluator-promote`, `evaluator-wiki-query`, `reporter-ingest-summary`, and `reporter-answer`. The studio shows them as separate rows even though the codebases are reused.
-4. **Identity and behaviour are separate.** `agent_id` is the stable governed actor shown in the registry and trace. `skills.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation. Edit a mounted `skills.md` while the system is running and you'll see that one entry's `skills_hash` change while the Agent ID stays still.
+3. **One codebase can become more than one governed agent.** `cv-parser` and `wiki-parser` run the same parser image, same `agent.py`, same model, and same document-text tool. Different Agent IDs, capability cards, and `skills.md` files make them different governed agents with different contracts.
+4. **Identity and behaviour are separate.** `agent_id` is the stable governed runtime actor shown in the registry and trace. Registry lifecycle actors such as `published_by` and `approved_by` show who moved a card through governance. `skills.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
 6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
 
 ## The agent set
 
-Three agent codebases:
+Three agent codebases, deployed as distinct governed runtimes:
 
-| Codebase | Session 2 capabilities | Session 4 capabilities |
+| Runtime | Codebase | Capabilities |
 |---|---|---|
-| `parser` | `parser-cv` | `parser-notes`, `parser-query` |
-| `evaluator` | `evaluator-cv` | `evaluator-query`, `evaluator-promote`, `evaluator-wiki-query` |
-| `reporter` | `reporter-cv-fit` | `reporter-answer`, `reporter-ingest-summary` |
+| `cv-parser` | `parser` | `parser-cv` |
+| `wiki-parser` | `parser` | `parser-notes`, `parser-query` |
+| `evaluator` | `evaluator` | `evaluator-cv`, `evaluator-promote`, `evaluator-wiki-query` |
+| `reporter` | `reporter` | `reporter-cv-fit`, `reporter-answer`, `reporter-ingest-summary` |
 
 Plus, in `tools/`:
 
@@ -88,7 +92,8 @@ Every AU has four addressable parts plus a stamped runtime identity:
 
 At boot the shared scaffold stamps each card with `agent_id` and `identity`
 from the container environment. In this course compose file those are stable
-URNs such as `urn:aoa:agent:parser`.
+URNs such as `urn:aoa:agent:cv-parser` and
+`urn:aoa:agent:wiki-parser`.
 
 When a single codebase backs more than one capability, the capability-specific files live in `capabilities/<name>/` subfolders; the code lives at the agent root. Every agent uses this pattern even when it has only one capability.
 
@@ -96,7 +101,7 @@ When a single codebase backs more than one capability, the capability-specific f
 
 | Service | Job |
 |---|---|
-| **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
+| **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Stamps demo governance lifecycle actors (`published_by`, `approved_by`, reviewer/deprecation fields). Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
 | **planner** | Receives intents from the studio. Gives the planner model compact registry context, validates the proposed plan, falls back if needed, sequences AU invocations with A2A `message/send`, and calls registered tool bridges for deterministic MCP-backed tools. Records each step to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
 
@@ -110,7 +115,8 @@ docker-compose.yml services:
   registry             FastAPI    7100
   planner              FastAPI    7200
   studio               FastAPI    8080
-  parser               FastAPI    8888 (host: 7301)
+  cv-parser            FastAPI    8888 (host: 7301)
+  wiki-parser          FastAPI    8888 (host: 7304)
   evaluator            FastAPI    8888 (host: 7302)
   reporter             FastAPI    8888 (host: 7303)
   tool-filesystem      MCP        7401
@@ -120,8 +126,9 @@ docker-compose.yml services:
 ```
 
 Session 2 starts the CV-only subset: registry, planner, studio,
-tool-document-text, and the three agent containers. Session 4 starts the full
-set above. Optional Ollama runs only when the `local` profile is enabled.
+tool-document-text, `cv-parser`, evaluator, and reporter. Session 4 starts the
+full set above, including `wiki-parser`. Optional Ollama runs only when the
+`local` profile is enabled.
 
 Every agent container has the same shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
@@ -134,8 +141,8 @@ you've read them all.
 Each AU process publishes a genuine A2A Agent Card at
 `/.well-known/agent-card.json`. Inside the Docker network these resolve to
 container-local addresses such as
-`http://parser:8888/.well-known/agent-card.json`, and the card's `url` points
-at `http://parser:8888/a2a`. The card includes standard A2A fields such as
+`http://cv-parser:8888/.well-known/agent-card.json`, and the card's `url`
+points at `http://cv-parser:8888/a2a`. The card includes standard A2A fields such as
 `protocolVersion`, `url`, `preferredTransport`, default input/output modes, and
 `skills`. The A2A core card identifies the service surface, but this course
 also needs a governed actor identity for policy and audit. The scaffold exposes
@@ -145,12 +152,13 @@ intentionally lighter than AOA capability cards, so the full capability-card
 contracts are advertised through a second A2A extension.
 
 The planner still uses the AOA registry to ground concrete capabilities. In
-this small course registry it sends compact AU capability summaries to the
-planner model and asks for a JSON task plan. The runtime validates that the
-plan uses registered capabilities, maps required inputs, references only
-available prior outputs, and ends in a markdown-producing result. If validation
-fails, the deterministic course plan is used. When a registered card includes
-`a2a_endpoint`, the planner sends a JSON-RPC 2.0 request to that endpoint:
+this small course registry only approved cards are discoverable. The planner
+sends compact AU capability summaries to the planner model and asks for a JSON
+task plan. The runtime validates that the plan uses registered capabilities,
+maps required inputs, references only available prior outputs, and ends in a
+markdown-producing result. If validation fails, the deterministic course plan
+is used. When a registered card includes `a2a_endpoint`, the planner sends a
+JSON-RPC 2.0 request to that endpoint:
 
 ```json
 {
@@ -186,29 +194,32 @@ surface used by deterministic MCP-backed tools.
 ## Capability card schema
 
 ```yaml
-id: evaluator-query
+id: evaluator-wiki-query
 version: 0.1.0
 kind: au                            # or "tool" for non-AU registered capabilities
 purpose: |
-  Rank candidate passages against a question and return a scored shortlist
-  with reasons.
+  Search wiki passages for a user question and return a cited evidence
+  evaluation.
 inputs:
   - name: question
     type: string
     required: true
-  - name: candidates
-    type: array<passage>
+  - name: query
+    type: object
     required: true
 outputs:
-  - name: ranked
-    type: array<scored_passage>
+  - name: parsed_note
+    type: structured-note
+  - name: ranked_passages
+    type: array
+  - name: direct_answer_possible
+    type: boolean
 constraints:
-  - Each scored passage must include a citation back to its source path.
-  - Scores must be in [0, 1].
-  - Reasons must be one sentence each.
+  - ranked_passages cite passage ids returned by tool-wiki-store.
+  - parsed_note includes passages so reporter-answer can cite evidence.
 evaluation_signals:
-  - all_passages_have_citation
-  - score_distribution_not_degenerate
+  - valid_output_shape
+  - passages_have_citations
   - latency_p95_under(8s)
 provenance:
   model: ${MODEL}
@@ -219,12 +230,18 @@ identity:
   agent_name: evaluator
   runtime: docker-compose
   principal: urn:aoa:agent:evaluator
+lifecycle:
+  status: approved
+  published_by: urn:aoa:role:platform-team-publisher
+  approved_by: urn:aoa:role:risk-curator-approver
+  deprecated_by: ""
+  replaced_by: ""
 endpoint: http://evaluator:8888/invoke
 agent_card_url: http://evaluator:8888/.well-known/agent-card.json
 a2a_endpoint: http://evaluator:8888/a2a
 ```
 
-The three evaluator capability cards differ in `purpose`, `inputs`, `outputs`,
+The evaluator capability cards differ in `purpose`, `inputs`, `outputs`,
 `constraints`, `evaluation_signals`, `skills.md`, and the registered
 endpoints. They share `agent.py` and `model`. Pure tools have `kind: tool` and
 `provenance.model: none`; they register `endpoint` only.
@@ -240,8 +257,9 @@ A browser surface at `localhost:8080` with two roles:
 **Observation:**
 
 - **Registry pane.** Live listing of every registered capability — capability
-  id, Agent ID, version, kind (`au` or `tool`), and current `skills_hash`.
-  Updates as capabilities register, deregister, or change.
+  id, Agent ID, lifecycle status, publisher/approver actors, version, kind
+  (`au` or `tool`), and current `skills_hash`. Updates as capabilities
+  register, deregister, or change.
 - **Intent Studio pane.** The currently-running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, task plan, work status, and rendered result. Raw event payloads are still available in an expandable details section.
 - **Right detail pane.** Click any registry entry to see its capability card, or
   click a wiki graph node to inspect that document, concept, passage, or open
@@ -271,7 +289,7 @@ docker compose --env-file .env \
   -f system/docker-compose.yml \
   -f system/docker-compose.session2.yml \
   --profile session2 \
-  up --build -d
+  up --build -d --remove-orphans
 ```
 
 Session 4 starts the full knowledge-management path:
@@ -280,7 +298,7 @@ Session 4 starts the full knowledge-management path:
 docker compose --env-file .env \
   -f system/docker-compose.yml \
   --profile session4 \
-  up --build -d
+  up --build -d --remove-orphans
 ```
 
 Open `http://localhost:8080` and you'll see the registry pane populate as

@@ -107,6 +107,12 @@ main {
   color: var(--muted);
   margin-top: 2px;
 }
+#registry-list .cap-governance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
 #registry-list .cap-kind {
   display: inline-block;
   padding: 1px 6px;
@@ -120,6 +126,67 @@ main {
 #registry-list .cap-kind.tool {
   background: #fdf3d4;
   color: #7c5e00;
+}
+.life-status,
+.actor-chip,
+.gov-event {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fafaf8;
+  color: var(--muted);
+  padding: 1px 6px;
+  font: 10px/1.5 var(--mono);
+}
+.life-status {
+  color: var(--ok);
+  border-color: #b7dfc6;
+  background: #edf8f1;
+}
+.actor-chip {
+  cursor: pointer;
+}
+.actor-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.governance-log {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.governance-log h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.governance-log ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.governance-log li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.governance-log li.muted {
+  font-style: normal;
+}
+.gov-card {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
 }
 
 .intent {
@@ -794,6 +861,27 @@ button.secondary.danger {
   margin: 0;
   flex: 1;
   overflow: auto;
+}
+.json-view {
+  color: #3b3a35;
+}
+.json-key {
+  color: #8a4b08;
+  font-weight: 600;
+}
+.json-string {
+  color: #256f5b;
+}
+.json-number {
+  color: #6f56a6;
+}
+.json-boolean {
+  color: #1d5fa7;
+  font-weight: 600;
+}
+.json-null {
+  color: #7a7770;
+  font-style: italic;
 }
 
 @media (max-width: 1200px) {

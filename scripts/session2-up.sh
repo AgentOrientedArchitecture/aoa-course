@@ -15,4 +15,4 @@ exec "${compose[@]}" \
   -f system/docker-compose.yml \
   -f system/docker-compose.session2.yml \
   --profile session2 \
-  up --build -d "$@"
+  up --build -d --remove-orphans "$@"

@@ -12,8 +12,9 @@ For Session 2 there is one workflow:
 cv-fit:  parse-cv → evaluate-cv-fit → write-cv-fit-report
 ```
 
-Session 4 adds ingest and access workflows on the same registry and the same
-three agent codebases:
+Session 4 adds ingest and access workflows on the same registry. The parser
+codebase is now deployed twice: `cv-parser` for CV parsing and `wiki-parser`
+for wiki parsing/query shaping.
 
 ```
 knowledge-ingest:  parse-note → promote-note → write-wiki-ingest
@@ -72,15 +73,14 @@ selection, orchestration, and final output:
 Agents also post boundary records while the orchestrator is waiting:
 
 ```json
-{"ts": "...", "trace_id": "...", "step": "au-start", "capability": "parser-cv", "agent_id": "urn:aoa:agent:parser", "inputs_shape": {...}}
+{"ts": "...", "trace_id": "...", "step": "au-start", "capability": "parser-cv", "agent_id": "urn:aoa:agent:cv-parser", "inputs_shape": {...}}
 {"ts": "...", "trace_id": "...", "step": "tool-invoke", "parent_capability": "parser-cv", "capability": "tool-document-text", "inputs_shape": {...}}
 {"ts": "...", "trace_id": "...", "step": "tool-response", "capability": "tool-document-text", "outputs_shape": {...}, "signals": {...}}
-{"ts": "...", "trace_id": "...", "step": "au-finish", "capability": "parser-cv", "agent_id": "urn:aoa:agent:parser", "outputs_shape": {...}, "signals": {...}}
+{"ts": "...", "trace_id": "...", "step": "au-finish", "capability": "parser-cv", "agent_id": "urn:aoa:agent:cv-parser", "outputs_shape": {...}, "signals": {...}}
 ```
 
-Traces persist under `/data/traces/` in the planner container, mounted from
-`system/services/planner/traces/` on the host. They're plain text — open them in
-any editor.
+Traces persist under `/data/traces/` in the planner container, backed by the
+named Docker volume `planner-traces`. They're plain text JSONL records.
 
 ## Running locally
 

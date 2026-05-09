@@ -7,8 +7,10 @@ The studio has two roles in this system:
 **Observation** — three live panes:
 
 - **Registry.** Every registered capability — capability id, Agent ID,
-  version, kind, and current `skills_hash`. Updates as capabilities register,
-  deregister, or change.
+  lifecycle status, publisher/approver actors, version, kind, and current
+  `skills_hash`. Updates as capabilities register, deregister, or change.
+  The governance log shows recent `card_published`, `card_approved`, and
+  `card_deprecated` events.
 - **Intent Studio.** The centre pane shows the selected intent, supplied
   inputs, lifecycle rail, trace summary, responsibility walk, planner summary,
   task cards, and final result. Raw event payloads remain available behind an
@@ -28,7 +30,7 @@ The studio has two roles in this system:
 The studio drives the demo workflows and shows the trace. The responsibility
 walk is the Session 2 teaching surface: it follows intent, planner proposal,
 registry selection, AU invocation, inward tool calls, AU responses, signals,
-timings, Agent ID, and the final artefact. For the cut-down
+timings, Agent ID, registry governance actors, and the final artefact. For the cut-down
 knowledge-management system, ingest returns a stored wiki summary and query
 returns a grounded answer. The graph mode is read-only and refreshes the wiki
 graph without submitting a planner intent.

@@ -13,11 +13,22 @@ This repo holds two things:
 
 Across two hands-on sessions you'll build an AOA system, starting from a single model call and ending with a small multi-capability platform.
 
-In **Session 2** you build a system that evaluates a CV against a job description. By the end of the session you have three agents — parser, evaluator, reporter — co-operating through a small browser studio to produce a structured fit verdict.
+In **Session 2** you build a system that evaluates a CV against a job
+description. By the end of the session you have three governed agent runtimes
+— CV parser, evaluator, reporter — co-operating through a small browser studio
+to produce a structured fit verdict.
 
-In **Session 4** you open the same repo and discover the three-agent chain you built is general. By adding new `skills.md` files to the same agents, you turn it into a cut-down knowledge-management system that parses research notes, ranks passages against a question, and writes a grounded answer.
+In **Session 4** you open the same repo and discover the pattern is general. A
+new wiki parser container runs the same parser code, model, and document-text
+tool as the CV parser, but with a different capability contract, `skills.md`,
+and Agent ID. The system becomes a cut-down knowledge-management workflow that
+parses research notes, ranks passages against a question, and writes a grounded
+answer.
 
-The point of the course is in that move: the same agents back different capabilities depending on which `skills.md` is mounted. The architecture changes shape without you rewriting the agents.
+The point of the course is in that move: the same codebase can become a
+different governed agent when it is deployed with a different Agent ID,
+capability card, and `skills.md`. The architecture changes shape without
+rewriting the parser.
 
 ## Run it
 
@@ -41,7 +52,7 @@ docker compose --env-file .env \
   -f system/docker-compose.yml \
   -f system/docker-compose.session2.yml \
   --profile session2 \
-  up --build -d
+  up --build -d --remove-orphans
 ```
 
 Session 4 starts the full knowledge-management workflow:
@@ -50,7 +61,7 @@ Session 4 starts the full knowledge-management workflow:
 docker compose --env-file .env \
   -f system/docker-compose.yml \
   --profile session4 \
-  up --build -d
+  up --build -d --remove-orphans
 ```
 
 If you want Compose to start the included Ollama container as well, add
@@ -65,8 +76,17 @@ There are also thin helper scripts for the common paths:
 ./scripts/down.sh
 ```
 
+On Windows Command Prompt, use the matching batch files:
+
+```bat
+scripts\session2-up.bat
+scripts\session4-up.bat
+scripts\logs.bat
+scripts\down.bat
+```
+
 For the included Ollama container with a helper script, prefix it with
-`AOA_LOCAL=1`.
+`AOA_LOCAL=1` on macOS/Linux, or run `set AOA_LOCAL=1` first on Windows.
 
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 2 shows only the CV intent. Session 4 shows CV fit, ingest, graph, and

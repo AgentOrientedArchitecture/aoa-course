@@ -16,9 +16,9 @@ agents/<name>/
       tools.yaml           # 3. tool dependencies (capability ids)
 ```
 
-**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. At runtime the shared scaffold also stamps the card with `agent_id`/`identity`. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only and exposed at `/cards/<id>`.
+**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. At runtime the shared scaffold stamps the card with `agent_id`/`identity`; the registry then stamps lifecycle governance actors such as `published_by` and `approved_by`. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only and exposed at `/cards/<id>`.
 
-**2. `skills.md`** — practical know-how for fulfilling this capability: prompt structure, judgement rubric, examples, edge-case guidance. This shapes the capability's working behaviour. Two capabilities backed by the same code differ here, and edits show up as a changed `skills_hash`; the Agent ID stays stable.
+**2. `skills.md`** — practical know-how for fulfilling this capability: prompt structure, judgement rubric, examples, edge-case guidance. This shapes the capability's working behaviour. Two governed agents can run the same code and tools but behave differently because their capability card and `skills.md` are different. Edits show up as a changed `skills_hash`; the Agent ID stays stable.
 
 It's mounted read-only and **hot-reloaded**: a watcher inside the container re-reads `skills.md` when it changes. Editing `skills.md` on disk changes the capability's behaviour without a restart.
 
@@ -38,9 +38,16 @@ The agent resolves these at boot through the registry and the resulting handles 
 
 **4. `agent.py`** — wiring between the three above and a model. Built on the shared FastAPI scaffold in `agents/_base/`. A typical agent file is short — most of the agent is its `skills.md`.
 
-## One codebase, many capabilities
+## One codebase, many agents
 
 When an agent codebase backs more than one capability, the capability-specific files live in `capabilities/<name>/` subfolders. The `agent.py` at the agent root is shared.
+
+The parser demonstrates the main course pattern. `cv-parser` and `wiki-parser`
+are different Docker services with different Agent IDs, but both are built from
+the same `agents/parser/Dockerfile`, run the same `agent.py`, use the same
+model, and call the same document-text tool for document parsing. Their
+different capability cards and `skills.md` files give them different contracts
+and behaviour.
 
 The evaluator at the end of Session 4:
 
@@ -52,10 +59,6 @@ agents/evaluator/
       capability-card.yaml      # id: evaluator-cv
       skills.md                 # rubric for CV-vs-JD fit
       tools.yaml
-    query/
-      capability-card.yaml      # id: evaluator-query
-      skills.md                 # rubric for passage relevance
-      tools.yaml
     promote/
       capability-card.yaml      # id: evaluator-promote
       skills.md                 # rubric for wiki promotion
@@ -66,9 +69,10 @@ agents/evaluator/
       tools.yaml
 ```
 
-The container registers multiple capabilities at boot. The registry lists
-separate rows. The studio shows separate cards. One Python process serves them
-all.
+Each container registers the capabilities allowed for that runtime at boot. The
+registry lists separate rows. The studio shows separate cards. A single
+codebase can therefore produce multiple governed agents when Compose supplies
+different `AGENT_ID` and `CAPABILITY_ALLOWLIST` values.
 
 Every agent uses the `capabilities/<name>/` pattern even when there's only one capability — it makes adding a second capability a structural copy rather than a refactor.
 
@@ -80,7 +84,7 @@ At container boot, `agent.py` (via `_base`) does:
 2. Compute `skills_hash` for each by SHA-ing the matching `skills.md`.
 3. Stamp `agent_id` and `identity` onto each card from the container environment.
 4. Resolve listed `tools.yaml` capabilities through the registry, retrying until they're up.
-5. POST each card to the registry's `/register` endpoint with `provenance.skills_hash` filled in.
+5. POST each card to the registry's `/register` endpoint with `provenance.skills_hash` filled in. The registry adds lifecycle fields for publisher, approver, reviewer, and status.
 6. Start the FastAPI server on the standard in-container agent port `8888`.
    Expose A2A at `/a2a`, publish an Agent Card at
    `/.well-known/agent-card.json`, and keep `/invoke?capability=<id>` plus
@@ -126,14 +130,14 @@ Content-Type: application/json
           "data": {
             "inputs": {
               "question": "Why does observed behaviour matter?",
-              "parsed_note": { "passages": [] }
+              "query": { "terms": ["observed behaviour", "registry"] }
             }
           }
         }
       ],
       "metadata": {
         "trace_id": "...",
-        "aoa_capability": "evaluator-query"
+        "aoa_capability": "evaluator-wiki-query"
       }
     }
   }
@@ -179,8 +183,9 @@ point is visible in the registry card: AUs advertise `endpoint`,
 `agent_card_url`, and `a2a_endpoint`; tools advertise only `endpoint`.
 
 The Docker-internal Agent Card URLs use service names, for example
-`http://parser:8888/.well-known/agent-card.json`. Host ports are mapped only so
-you can inspect agents from the laptop, such as `http://localhost:7301/`.
+`http://cv-parser:8888/.well-known/agent-card.json`. Host ports are mapped only
+so you can inspect agents from the laptop, such as `http://localhost:7301/` for
+`cv-parser` and `http://localhost:7304/` for `wiki-parser`.
 
 ## Adding a new capability to an existing agent
 

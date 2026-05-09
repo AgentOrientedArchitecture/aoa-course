@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -35,6 +36,19 @@ CARD_ALLOWLIST = {
     for item in os.environ.get("REGISTRY_CARD_ALLOWLIST", "").split(",")
     if item.strip()
 }
+DEFAULT_PUBLISHER_AGENT_ID = os.environ.get(
+    "REGISTRY_PUBLISHER_AGENT_ID",
+    "urn:aoa:role:platform-team-publisher",
+)
+DEFAULT_APPROVER_AGENT_ID = os.environ.get(
+    "REGISTRY_APPROVER_AGENT_ID",
+    "urn:aoa:role:risk-curator-approver",
+)
+DEFAULT_REVIEWER_AGENT_ID = os.environ.get(
+    "REGISTRY_REVIEWER_AGENT_ID",
+    "urn:aoa:role:registry-reviewer",
+)
+DEFAULT_LIFECYCLE_STATUS = os.environ.get("REGISTRY_DEFAULT_LIFECYCLE_STATUS", "approved")
 
 
 # ----------------------------------------------------------------------
@@ -49,8 +63,19 @@ class State:
         self.lock = asyncio.Lock()
         self.subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 
-    async def broadcast(self, event: str, card: dict[str, Any]) -> None:
+    async def broadcast(
+        self,
+        event: str,
+        card: dict[str, Any],
+        *,
+        actor_id: str | None = None,
+        lifecycle: dict[str, Any] | None = None,
+    ) -> None:
         message = {"event": event, "card": card}
+        if actor_id:
+            message["actor_id"] = actor_id
+        if lifecycle:
+            message["lifecycle"] = lifecycle
         for q in list(self.subscribers):
             try:
                 q.put_nowait(message)
@@ -114,6 +139,59 @@ def _filter_allowed_cards(cards: dict[str, dict[str, Any]]) -> dict[str, dict[st
     }
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _lifecycle(card: dict[str, Any]) -> dict[str, Any]:
+    lifecycle = card.get("lifecycle")
+    if not isinstance(lifecycle, dict):
+        lifecycle = {}
+        card["lifecycle"] = lifecycle
+    return lifecycle
+
+
+def _stamp_lifecycle(card: dict[str, Any], event: str) -> list[tuple[str, str]]:
+    """Attach demo governance actors and return lifecycle events to emit.
+
+    This is intentionally a lightweight course surface, not a full approval
+    workflow. It makes the governance actors visible so the registry lifecycle
+    can be inspected in Studio.
+    """
+    lifecycle = _lifecycle(card)
+    now = _now_iso()
+    emitted: list[tuple[str, str]] = []
+
+    had_publisher = bool(lifecycle.get("published_by"))
+    if not lifecycle.get("published_by"):
+        lifecycle["published_by"] = DEFAULT_PUBLISHER_AGENT_ID or card.get("agent_id", "")
+    lifecycle.setdefault("published_at", now)
+    if not had_publisher:
+        emitted.append(("card_published", str(lifecycle.get("published_by") or "")))
+
+    lifecycle.setdefault("status", DEFAULT_LIFECYCLE_STATUS)
+    had_approver = bool(lifecycle.get("approved_by"))
+    if lifecycle.get("status") == "approved" and not lifecycle.get("approved_by"):
+        lifecycle["approved_by"] = DEFAULT_APPROVER_AGENT_ID
+        lifecycle.setdefault("approved_at", now)
+    if lifecycle.get("status") == "approved" and not had_approver:
+        emitted.append(("card_approved", str(lifecycle.get("approved_by") or "")))
+
+    lifecycle.setdefault("deprecated_by", "")
+    lifecycle.setdefault("deprecated_at", "")
+    lifecycle.setdefault("reviewed_by", DEFAULT_REVIEWER_AGENT_ID)
+    lifecycle.setdefault("replaced_by", "")
+
+    had_deprecator = bool(lifecycle.get("deprecated_by"))
+    if lifecycle.get("status") == "deprecated":
+        if not lifecycle.get("deprecated_by"):
+            lifecycle["deprecated_by"] = DEFAULT_REVIEWER_AGENT_ID
+            lifecycle["deprecated_at"] = now
+        if event == "updated" and not had_deprecator:
+            emitted.append(("card_deprecated", str(lifecycle.get("deprecated_by") or "")))
+    return emitted
+
+
 # ----------------------------------------------------------------------
 # File watcher
 # ----------------------------------------------------------------------
@@ -126,19 +204,46 @@ async def _watch_cards_file() -> None:
         async for _changes in awatch(str(CARDS_PATH)):
             on_disk = _filter_allowed_cards(_read_cards_file())
             async with state.lock:
-                old_ids = set(state.cards)
+                old_cards = state.cards
+                old_ids = set(old_cards)
                 new_ids = set(on_disk)
                 added = new_ids - old_ids
                 removed = old_ids - new_ids
                 changed = {
-                    cid for cid in old_ids & new_ids if state.cards[cid] != on_disk[cid]
+                    cid for cid in old_ids & new_ids if old_cards[cid] != on_disk[cid]
                 }
+                lifecycle_events: dict[str, list[tuple[str, str]]] = {}
+                for cid in added:
+                    lifecycle_events[cid] = _stamp_lifecycle(on_disk[cid], "registered")
+                for cid in changed:
+                    existing = old_cards[cid]
+                    if "lifecycle" not in on_disk[cid] and isinstance(existing.get("lifecycle"), dict):
+                        on_disk[cid]["lifecycle"] = dict(existing["lifecycle"])
+                    lifecycle_events[cid] = _stamp_lifecycle(on_disk[cid], "updated")
                 state.cards = on_disk
+                if added or changed:
+                    _write_cards_file(state.cards)
 
             for cid in added:
                 await state.broadcast("registered", on_disk[cid])
+                lifecycle = _lifecycle(on_disk[cid])
+                for lifecycle_event, actor_id in lifecycle_events.get(cid, []):
+                    await state.broadcast(
+                        lifecycle_event,
+                        on_disk[cid],
+                        actor_id=actor_id,
+                        lifecycle=lifecycle,
+                    )
             for cid in changed:
                 await state.broadcast("updated", on_disk[cid])
+                lifecycle = _lifecycle(on_disk[cid])
+                for lifecycle_event, actor_id in lifecycle_events.get(cid, []):
+                    await state.broadcast(
+                        lifecycle_event,
+                        on_disk[cid],
+                        actor_id=actor_id,
+                        lifecycle=lifecycle,
+                    )
             for cid in removed:
                 await state.broadcast("deregistered", {"id": cid})
             if added or changed or removed:
@@ -201,6 +306,11 @@ def _tokens(text: str) -> set[str]:
 
 
 def _score_card(card: dict[str, Any], query: dict[str, Any]) -> tuple[float, list[str]]:
+    lifecycle = card.get("lifecycle") if isinstance(card.get("lifecycle"), dict) else {}
+    status = str(lifecycle.get("status") or "approved")
+    if status != "approved":
+        return 0.0, [f"lifecycle status is {status}"]
+
     kind = query.get("kind")
     if kind and card.get("kind") != kind:
         return 0.0, [f"kind mismatch: wanted {kind}, got {card.get('kind')}"]
@@ -249,16 +359,30 @@ async def _store(card: dict[str, Any], event: str) -> None:
         logger.info("ignored %s; not in REGISTRY_CARD_ALLOWLIST", card["id"])
         return
     async with state.lock:
+        existing = state.cards.get(card["id"])
+        if existing and "lifecycle" not in card and isinstance(existing.get("lifecycle"), dict):
+            card["lifecycle"] = dict(existing["lifecycle"])
+        lifecycle_events = _stamp_lifecycle(card, event)
         state.cards[card["id"]] = card
         _write_cards_file(state.cards)
     await state.broadcast(event, card)
+    lifecycle = _lifecycle(card)
+    for lifecycle_event, actor_id in lifecycle_events:
+        await state.broadcast(
+            lifecycle_event,
+            card,
+            actor_id=actor_id,
+            lifecycle=lifecycle,
+        )
 
 
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_data_dir()
     state.cards = _filter_allowed_cards(_read_cards_file())
-    if CARD_ALLOWLIST:
+    for card in state.cards.values():
+        _stamp_lifecycle(card, "registered")
+    if CARD_ALLOWLIST or state.cards:
         _write_cards_file(state.cards)
     logger.info("loaded %d cards from %s", len(state.cards), CARDS_PATH)
     asyncio.create_task(_watch_cards_file())

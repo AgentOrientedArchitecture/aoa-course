@@ -1,10 +1,10 @@
 # Course system. Run directly with Docker Compose from the repo root.
 #
 # Session 2 starts only the CV-fit workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d --remove-orphans
 #
 # Session 4 starts the full knowledge-management workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml --profile session4 up --build -d
+#   docker compose --env-file .env -f system/docker-compose.yml --profile session4 up --build -d --remove-orphans
 
 services:
 
@@ -23,6 +23,15 @@ services:
       - registry-data:/data
     environment:
       REGISTRY_DATA_DIR: /data
+      REGISTRY_CARD_ALLOWLIST: >-
+        tool-filesystem,tool-document-text,tool-wiki-store,
+        parser-cv,parser-notes,parser-query,
+        evaluator-cv,evaluator-promote,evaluator-wiki-query,
+        reporter-cv-fit,reporter-ingest-summary,reporter-answer
+      REGISTRY_PUBLISHER_AGENT_ID: ${REGISTRY_PUBLISHER_AGENT_ID:-urn:aoa:role:platform-team-publisher}
+      REGISTRY_APPROVER_AGENT_ID: ${REGISTRY_APPROVER_AGENT_ID:-urn:aoa:role:risk-curator-approver}
+      REGISTRY_REVIEWER_AGENT_ID: ${REGISTRY_REVIEWER_AGENT_ID:-urn:aoa:role:registry-reviewer}
+      REGISTRY_DEFAULT_LIFECYCLE_STATUS: ${REGISTRY_DEFAULT_LIFECYCLE_STATUS:-approved}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7100/healthz', timeout=2).status == 200 else 1)"]
       interval: 5s
@@ -146,13 +155,13 @@ services:
   # ------------------------------------------------------------------
   # Agents
   # ------------------------------------------------------------------
-  parser:
+  cv-parser:
     profiles: ["session2", "session4"]
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
-    container_name: aoa-parser
+    container_name: aoa-cv-parser
     ports:
       - "7301:8888"
     volumes:
@@ -163,11 +172,51 @@ services:
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
-      AGENT_ID: urn:aoa:agent:parser
-      AGENT_NAME: parser
-      AGENT_HOST: parser
+      AGENT_ID: urn:aoa:agent:cv-parser
+      AGENT_NAME: cv-parser
+      AGENT_HOST: cv-parser
       AGENT_PORT: 8888
-      CAPABILITY_ALLOWLIST: ${PARSER_CAPABILITY_ALLOWLIST:-}
+      CAPABILITY_ALLOWLIST: parser-cv
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-document-text:
+        condition: service_started
+
+  wiki-parser:
+    profiles: ["session4"]
+    build:
+      context: ./agents
+      dockerfile: parser/Dockerfile
+    image: aoa-course/parser:latest
+    container_name: aoa-wiki-parser
+    ports:
+      - "7304:8888"
+    volumes:
+      # Same parser code and mounted capability tree as cv-parser; the
+      # allowlist plus AGENT_ID make this a separate governed runtime.
+      - ./agents/parser/capabilities:/app/capabilities:ro
+      - inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:wiki-parser
+      AGENT_NAME: wiki-parser
+      AGENT_HOST: wiki-parser
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: parser-notes,parser-query
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
       OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
