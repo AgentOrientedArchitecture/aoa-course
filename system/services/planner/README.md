@@ -79,8 +79,8 @@ Agents also post boundary records while the orchestrator is waiting:
 {"ts": "...", "trace_id": "...", "step": "au-finish", "capability": "parser-cv", "agent_id": "urn:aoa:agent:cv-parser", "outputs_shape": {...}, "signals": {...}}
 ```
 
-Traces persist under `/data/traces/` in the planner container, backed by the
-named Docker volume `planner-traces`. They're plain text JSONL records.
+Traces persist under `/data/traces/` in the planner container, bind-mounted to
+`system/services/planner/traces/` in the repo. They're plain text JSONL records.
 
 ## Running locally
 

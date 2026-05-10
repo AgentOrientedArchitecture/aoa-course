@@ -20,7 +20,7 @@ services:
     ports:
       - "7100:7100"
     volumes:
-      - registry-data:/data
+      - ./services/registry/data:/data
     environment:
       REGISTRY_DATA_DIR: /data
       REGISTRY_CARD_ALLOWLIST: >-
@@ -47,7 +47,7 @@ services:
     ports:
       - "7200:7200"
     volumes:
-      - planner-traces:/data/traces
+      - ./services/planner/traces:/data/traces
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_TRACES_DIR: /data/traces
@@ -77,7 +77,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - inbox:/data/inbox
+      - ./inbox:/data/inbox
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -102,7 +102,7 @@ services:
     ports:
       - "7401:7401"
     volumes:
-      - inbox:/data/inbox:ro
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-filesystem
@@ -121,7 +121,7 @@ services:
     ports:
       - "7402:7402"
     volumes:
-      - inbox:/data/inbox:ro
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-document-text
@@ -140,8 +140,8 @@ services:
     ports:
       - "7403:7403"
     volumes:
-      - wiki-data:/data/wiki
-      - inbox:/data/inbox:ro
+      - ./wiki:/data/wiki
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-wiki-store
@@ -168,7 +168,7 @@ services:
       # capabilities/ is mounted (not COPYed) so editing skills.md on the
       # host triggers the in-container hot reload.
       - ./agents/parser/capabilities:/app/capabilities:ro
-      - inbox:/data/inbox:ro
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -208,7 +208,7 @@ services:
       # Same parser code and mounted capability tree as cv-parser; the
       # allowlist plus AGENT_ID make this a separate governed runtime.
       - ./agents/parser/capabilities:/app/capabilities:ro
-      - inbox:/data/inbox:ro
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -246,7 +246,7 @@ services:
       - "7302:8888"
     volumes:
       - ./agents/evaluator/capabilities:/app/capabilities:ro
-      - inbox:/data/inbox:ro
+      - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -321,8 +321,4 @@ services:
       - ollama-models:/root/.ollama
 
 volumes:
-  registry-data:
-  planner-traces:
-  inbox:
   ollama-models:
-  wiki-data:

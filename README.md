@@ -102,7 +102,8 @@ system/
   agents/
   services/
   tools/
-  inbox/
+  inbox/     # Studio uploads and pasted demo inputs
+  wiki/      # Generated wiki raw/promoted/index files
   docker-compose.yml
   docker-compose.session2.yml
 .env.example

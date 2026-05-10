@@ -20,12 +20,14 @@ The studio has two roles in this system:
 - **Wiki graph.** A typed graph view of the Session 4 wiki store: documents,
   concepts, passages, and open questions use different shapes and colours. The
   reset button clears the local wiki store so the ingest demo can be replayed.
+  The underlying files are visible in `system/wiki/`.
 
 **Intent** — two ways to drive the system:
 
 - A mode switch for `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
   `knowledge-query`.
 - Text boxes and file drops that forward course inputs to the planner.
+  Submitted inputs are written to `system/inbox/`.
 
 The studio drives the demo workflows and shows the trace. The responsibility
 walk is the Session 2 teaching surface: it follows intent, planner proposal,

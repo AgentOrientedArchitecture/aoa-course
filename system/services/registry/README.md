@@ -34,7 +34,7 @@ you won't touch it — agents push their cards in.
 
 The registry runs in the `registry` service of `docker-compose.yml`. Listens on
 port 7100. `cards.json` is persisted at `/data/cards.json` inside the container,
-backed by the named Docker volume `registry-data`.
+bind-mounted to `system/services/registry/data/cards.json` in the repo.
 
 Governance demo actors are configured with:
 

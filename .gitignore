@@ -25,3 +25,7 @@ __pycache__/
 # (kept out of git so a stray local run never clutters PRs).
 system/services/registry/data/cards.json
 system/services/planner/traces/*.jsonl
+system/inbox/*
+!system/inbox/.gitkeep
+system/wiki/*
+!system/wiki/.gitkeep

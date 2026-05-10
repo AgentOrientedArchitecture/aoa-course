@@ -275,7 +275,7 @@ A browser surface at `localhost:8080` with two roles:
   passages, and open questions use different shapes and colours. The graph is
   its own mode, not part of the CV workflow.
 
-The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs.
+The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs. Runtime data is bind-mounted into the repo for inspection: `system/inbox/` holds submitted inputs, `system/wiki/` holds the wiki `raw/`, `promoted/`, and `index.json` layers, `system/services/planner/traces/` holds JSONL traces, and `system/services/registry/data/cards.json` holds the live registry state.
 
 ## Running locally
 
