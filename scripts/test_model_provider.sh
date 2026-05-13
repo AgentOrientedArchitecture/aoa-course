@@ -15,8 +15,8 @@ set +a
 BASE="${OPENAI_BASE_URL%/}"
 KEY="${AOA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 MODEL_NAME="${MODEL:-}"
-REASONING="${OPENAI_REASONING_EFFORT:-low}"
-FORMAT="${OPENAI_RESPONSE_FORMAT:-json_object}"
+REASONING="${OPENAI_REASONING_EFFORT-}"
+FORMAT="${OPENAI_RESPONSE_FORMAT-}"
 
 if [ -z "$BASE" ] || [ -z "$KEY" ] || [ -z "$MODEL_NAME" ]; then
   echo "OPENAI_BASE_URL, AOA_OPENAI_API_KEY, and MODEL must be set"
@@ -24,6 +24,14 @@ if [ -z "$BASE" ] || [ -z "$KEY" ] || [ -z "$MODEL_NAME" ]; then
 fi
 
 BODY="$(mktemp)"
+EXTRA_REASONING=""
+if [ -n "$REASONING" ]; then
+  EXTRA_REASONING=", \"reasoning_effort\":\"${REASONING}\""
+fi
+EXTRA_FORMAT=""
+if [ -n "$FORMAT" ]; then
+  EXTRA_FORMAT=", \"response_format\":{\"type\":\"${FORMAT}\"}"
+fi
 STATUS="$(
   curl -sS -o "$BODY" -w "%{http_code}" \
     -H "Authorization: Bearer ${KEY}" \
@@ -35,9 +43,7 @@ STATUS="$(
         {\"role\":\"user\",\"content\":\"Return exactly {\\\"ok\\\":true}.\"}
       ],
       \"max_tokens\":256,
-      \"temperature\":0,
-      \"reasoning_effort\":\"${REASONING}\",
-      \"response_format\":{\"type\":\"${FORMAT}\"}
+      \"temperature\":0${EXTRA_REASONING}${EXTRA_FORMAT}
     }" \
     "${BASE}/chat/completions"
 )"

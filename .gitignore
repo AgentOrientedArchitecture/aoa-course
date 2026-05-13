@@ -1,6 +1,5 @@
 # Local environment — never check this in.
 .env
-.env.*
 !.env.example
 
 # Local dependency caches and generated build output
