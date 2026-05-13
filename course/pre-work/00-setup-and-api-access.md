@@ -1,204 +1,202 @@
-# AoA Course — Pre-Work: Getting Access to an LLM API
+# AoA Course Pre-Work: Model Access
 
-Welcome to the pre-course setup guide. Before the first session, every participant needs working API access to at least one LLM provider. A core principle of the **Architecture of Agents (AoA)** course is favouring **smaller, efficient models** over frontier heavyweights — they're faster, cheaper, and often more than sufficient for well-designed agentic systems.
+Before the first hands-on session, set up one working model provider and verify
+that the course stack can call it. The runtime supports local Ollama and
+OpenAI-compatible hosted APIs through `.env` files in the repo root.
 
-This guide will get you set up with free-tier API access in under 30 minutes. **No credit card is required for any provider listed here.**
+This course currently provides three tested environment examples:
 
----
+- `.env.sambanova` - SambaNova Cloud
+- `.env.nvidia` - NVIDIA NIM
+- `.env.ollama` - Ollama running locally on your host machine
 
-## Why Multiple Providers?
-
-Different providers have different rate limits, models, and speeds. By signing up to several, you avoid hitting a wall mid-exercise. The code pattern is identical across all of them — you just swap a URL and a key.
-
----
-
-## Step 1: The Core Providers
-
-Sign up to **at least two** from this list before the course begins. We recommend signing up to all of them — it only takes a few minutes each.
-
-### 🟢 NVIDIA NIM *(Highest Priority)*
-
-**The home of `gpt-oss-120b`** — the primary model used throughout this course.
-
-- **Sign up:** [build.nvidia.com](https://build.nvidia.com)
-- Requires a free NVIDIA Developer Program account — phone number verification takes ~1 minute
-- **Generate your key:** [build.nvidia.com/settings/api-keys](https://build.nvidia.com/settings/api-keys)
-- Your key will start with `nvapi-`
-- **Base URL:** `https://integrate.api.nvidia.com/v1`
-- **Free tier:** 1,000 credits on signup, up to 5,000 requestable, 40 RPM
-- **100+ models available** including Llama 3.3 70B, Qwen3 235B, and more
-
-### 🟢 Cerebras *(Speed Champion)*
-
-Ultra-fast inference — often 1,000+ tokens/second. Excellent for agent loops.
-
-- **Sign up:** [cloud.cerebras.ai](https://cloud.cerebras.ai)
-- Navigate to **API Keys** in your dashboard after signup
-- **Free tier:** 1M tokens/day, 30 RPM, 14,400 requests/day
-- **Key models:** `gpt-oss-120b`, Llama 3.3 70B, Qwen3 235B
-
-### 🟢 SambaNova Cloud *(Speed Champion #2)*
-
-Another speed-optimised inference platform, excellent for rapid iteration.
-
-- **Sign up:** [cloud.sambanova.ai](https://cloud.sambanova.ai)
-- After signup, go to **API Keys and URLs** in the dashboard
-- Save your key immediately — it cannot be retrieved again
-- **Key models:** Llama 3.3 70B, DeepSeek models, Qwen3 family
-
-### 🟢 Groq
-
-Extremely fast LPU-powered inference. Great for exercises requiring real-time responsiveness.
-
-- **Sign up:** [console.groq.com](https://console.groq.com)
-- Sign up with email or GitHub — no credit card required
-- Generate your key under **API Keys** in the console
-- **Free tier:** All models available, rate-limited per model, refreshes daily
-- **Key models:** Llama 3.3 70B, Llama 4 Scout, Kimi K2
-
-### 🟡 OpenRouter *(The Aggregator — Optional but Recommended)*
-
-One API key that routes to 30+ free models. Ideal if you want a single key for everything.
-
-- **Sign up:** [openrouter.ai](https://openrouter.ai)
-- Create your API key from the dashboard — no card required
-- **Free tier:** 20 RPM, 200 requests/day per model
-- Use model IDs ending in `:free` e.g. `meta-llama/llama-3.3-70b-instruct:free`
-- **Bonus:** Routes to NVIDIA NIM models too, so one key covers both
-
-### 🟡 Google AI Studio *(Best Backup — Optional)*
-
-Most generous daily limits of any provider. Good safety net for intensive exercises.
-
-- **Sign up:** [aistudio.google.com](https://aistudio.google.com)
-- Sign in with any Google account, then click **Get API Key → Create API Key**
-- **Free tier:** 1,500 requests/day, 1M token context window
-- **Base URL:** `https://generativelanguage.googleapis.com/v1beta/openai/` (OpenAI-compatible)
-
-### 🟡 Mistral AI *(EU-Hosted — Optional)*
-
-Excellent for participants who prefer EU-hosted infrastructure.
-
-- **Sign up:** [console.mistral.ai](https://console.mistral.ai)
-- The free **Experiment** tier requires no credit card
-- **Free tier:** ~1 req/s, 30 RPM, access to all Mistral models
-- **Key models:** Mistral Large 3, Mistral Small 3.1, Ministral 8B
+Use one of these as your starting point, copy it to `.env`, add any required
+API key, then run the provider test.
 
 ---
 
-## Step 2: Store Your Keys Safely
+## Option 1: SambaNova Cloud
 
-Never hardcode API keys in your scripts. Set them as environment variables.
+SambaNova is the first hosted provider path for the course.
 
-A `.env.example` file is included at the root of this repo — copy it to `.env` and fill in your keys:
+1. Sign up at [cloud.sambanova.ai](https://cloud.sambanova.ai).
+2. Open **API Keys and URLs** in the SambaNova dashboard.
+3. Create an API key and save it immediately.
+4. Copy the course example:
 
 ```bash
-cp .env.example .env
+cp .env.sambanova .env
 ```
 
-Or add them to your shell profile:
+5. Edit `.env` and set:
+
+```env
+PROVIDER=openai
+MODEL=gpt-oss-120b
+AOA_OPENAI_API_KEY=your-sambanova-key
+OPENAI_BASE_URL=https://api.sambanova.ai/v1/
+```
+
+Then verify it:
 
 ```bash
-# Add to your ~/.bashrc or ~/.zshrc
-export NVIDIA_API_KEY="nvapi-xxxxxxxxxxxx"
-export CEREBRAS_API_KEY="csk-xxxxxxxxxxxx"
-export SAMBANOVA_API_KEY="xxxxxxxxxxxxxxxx"
-export GROQ_API_KEY="gsk_xxxxxxxxxxxx"
-export OPENROUTER_API_KEY="sk-or-xxxxxxxxxxxx"
-export GEMINI_API_KEY="AIzaxxxxxxxxxxxxxxxx"
-export MISTRAL_API_KEY="xxxxxxxxxxxxxxxx"
+bash scripts/test_model_provider.sh
 ```
 
-Then reload: `source ~/.bashrc`
+Expected result: `status=200` and a short JSON response containing
+`{"ok":true}`.
 
 ---
 
-## Step 3: Validate Your Setup
+## Option 2: NVIDIA NIM
 
-All providers use the **OpenAI-compatible API format**. This means the same Python code works everywhere — you only change two values: the `base_url` and the `api_key`.
+NVIDIA NIM is the second hosted provider path for the course.
 
-Run this test snippet for each provider you've signed up to:
+1. Sign up at [build.nvidia.com](https://build.nvidia.com).
+2. Create an API key at
+   [build.nvidia.com/settings/api-keys](https://build.nvidia.com/settings/api-keys).
+3. Copy the course example:
 
-```python
-from openai import OpenAI
-import os
-
-# Swap these two lines per provider — everything else stays the same
-BASE_URL = "https://integrate.api.nvidia.com/v1"   # NVIDIA NIM
-API_KEY  = os.environ["NVIDIA_API_KEY"]
-
-client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
-
-response = client.chat.completions.create(
-    model="nvidia/gpt-oss-120b",   # change model ID per provider
-    messages=[{"role": "user", "content": "Hello! Reply in one sentence."}],
-    max_tokens=64
-)
-
-print(response.choices[0].message.content)
+```bash
+cp .env.nvidia .env
 ```
 
-### Provider Quick-Reference
+4. Edit `.env` and set:
 
-| Provider | `base_url` | Example Model ID | Env Var |
-|---|---|---|---|
-| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | `nvidia/gpt-oss-120b` | `NVIDIA_API_KEY` |
-| Cerebras | `https://api.cerebras.ai/v1` | `gpt-oss-120b` | `CEREBRAS_API_KEY` |
-| SambaNova | `https://api.sambanova.ai/v1` | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` |
-| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` |
-| OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct:free` | `OPENROUTER_API_KEY` |
-| Google AI Studio | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-2.0-flash` | `GEMINI_API_KEY` |
-| Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` | `MISTRAL_API_KEY` |
-
----
-
-## Step 4: Handle Rate Limits Gracefully
-
-You will hit `429 Too Many Requests` during the course — this is expected and is actually **your first lesson in agentic resilience**. Add this pattern to your scripts:
-
-```python
-import time
-
-def call_with_retry(client, model, messages, retries=3):
-    for attempt in range(retries):
-        try:
-            return client.chat.completions.create(
-                model=model, messages=messages, max_tokens=256
-            )
-        except Exception as e:
-            if "429" in str(e) and attempt < retries - 1:
-                wait = 2 ** attempt   # exponential backoff: 1s, 2s, 4s
-                print(f"Rate limited. Waiting {wait}s...")
-                time.sleep(wait)
-            else:
-                raise
+```env
+PROVIDER=openai
+MODEL=openai/gpt-oss-120b
+AOA_OPENAI_API_KEY=your-nvidia-key
+OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1
 ```
 
-If you consistently hit limits on one provider, simply switch to another — the code change is two lines.
+NVIDIA model IDs are provider-prefixed. For this course, use
+`openai/gpt-oss-120b`, not `gpt-oss:120b` or `gpt-oss-120b`.
+
+Then verify it:
+
+```bash
+bash scripts/test_model_provider.sh
+```
+
+Expected result: `status=200` and a short JSON response containing
+`{"ok":true}`.
 
 ---
 
-## ✅ Pre-Work Checklist
+## Option 3: Local Ollama On Your Host
 
-Before Session 1, confirm you can tick these off:
+Use this path if you want to run the model on your own machine instead of using
+a hosted API. The provided `.env.ollama` file points Docker containers at an
+Ollama server running on the host via `http://host.docker.internal:11434`.
 
-- [ ] Signed up to **NVIDIA NIM** and have an `nvapi-` key
-- [ ] Signed up to **at least one** speed provider (Cerebras or SambaNova)
-- [ ] Signed up to **Groq**
-- [ ] All keys stored as environment variables (not hardcoded in scripts)
-- [ ] Successfully ran the validation snippet and got a response back
-- [ ] *(Optional)* OpenRouter key set up for single-key convenience
+1. Install Ollama from [ollama.com](https://ollama.com).
+2. Pull the model used by the course example:
 
-If you hit any issues during setup, bring them to the start of Session 1 — troubleshooting environment setup together is a valuable shared experience.
+```bash
+ollama pull gpt-oss:20b
+```
+
+3. Confirm Ollama is running on your host:
+
+```bash
+ollama list
+```
+
+4. Copy the course example:
+
+```bash
+cp .env.ollama .env
+```
+
+The important values are:
+
+```env
+PROVIDER=ollama
+MODEL=gpt-oss:20b
+OLLAMA_HOST=http://host.docker.internal:11434
+```
+
+Then verify Ollama by starting the stack and checking the service logs:
+
+```bash
+./scripts/session2-up.sh
+./scripts/logs.sh
+```
 
 ---
 
-## Why Not Just Use GPT-4 or Claude?
+## Run The Course Stack
 
-A core AoA principle is that **model choice should match task complexity**. Reaching for the most powerful frontier model by default is an antipattern — it's slower, more expensive, and trains you to paper over weak architecture with raw capability. Throughout this course you'll develop the instinct for when a 7B model is enough, when 70B is appropriate, and when (rarely) a frontier model is genuinely warranted.
+After `.env` is configured, start the session you are working on:
 
-`gpt-oss-120b` is our default recommendation — it's capable, fast on the right hardware, open-weight, and available free via multiple providers above.
+```bash
+./scripts/session2-up.sh
+```
+
+or:
+
+```bash
+./scripts/session4-up.sh
+```
+
+Open [http://localhost:8080](http://localhost:8080) after the containers start.
+
+If you change `.env`, restart the stack:
+
+```bash
+./scripts/down.sh
+./scripts/session2-up.sh
+```
 
 ---
 
-*This guide will be updated as provider free tiers evolve. Last verified: April 2026.*
+## Common Configuration Checks
+
+For hosted providers:
+
+- `PROVIDER` should be `openai`.
+- `AOA_OPENAI_API_KEY` should contain the hosted provider key.
+- `OPENAI_BASE_URL` should be the API root ending in `/v1`, not the full
+  `/chat/completions` endpoint.
+- `MODEL` must use the provider's exact model ID.
+
+For local Ollama on the host:
+
+- `PROVIDER` should be `ollama`.
+- `MODEL` should be an Ollama model name that exists in `ollama list`.
+- `OLLAMA_HOST` should be `http://host.docker.internal:11434`.
+- `AOA_OPENAI_API_KEY` and `OPENAI_BASE_URL` can be blank.
+
+---
+
+## Providers Not Tested In This Course Stack
+
+The providers below may work because they offer OpenAI-compatible APIs, but the
+course does not currently provide checked `.env` examples for them:
+
+| Provider | Typical base URL | Notes |
+|---|---|---|
+| Groq | `https://api.groq.com/openai/v1` | Model IDs and rate limits vary by account. |
+| OpenRouter | `https://openrouter.ai/api/v1` | Aggregates many providers; use exact model IDs from OpenRouter. |
+| Google AI Studio | `https://generativelanguage.googleapis.com/v1beta/openai/` | OpenAI compatibility differs from standard OpenAI behavior. |
+| Mistral AI | `https://api.mistral.ai/v1` | Should be tested with the course payload before relying on it. |
+
+If you use one of these, create your own `.env` from `.env.example`, set
+`PROVIDER=openai`, set the provider base URL and key, then run:
+
+```bash
+bash scripts/test_model_provider.sh
+```
+
+---
+
+## Pre-Work Checklist
+
+- [ ] Choose SambaNova, NVIDIA, or local Ollama on the host.
+- [ ] Copy the matching example file to `.env`.
+- [ ] Add your hosted API key if using SambaNova or NVIDIA.
+- [ ] Run `bash scripts/test_model_provider.sh` if using SambaNova or NVIDIA.
+- [ ] Start Session 2 or Session 4 and open the studio.
+
+Last verified: May 2026.

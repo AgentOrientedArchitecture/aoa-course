@@ -33,16 +33,17 @@ rewriting the parser.
 ## Run it
 
 You'll need [Docker](https://docs.docker.com/get-docker/) and either a local
-[Ollama](https://ollama.com) install or an API key for a model provider. The
-course is designed around smaller, swappable models such as `gpt-oss:120b` or
-Qwen-family models, whether you run them locally or through an
-OpenAI-compatible hosted endpoint.
+[Ollama](https://ollama.com) install or an API key for a model provider. Start
+with the setup guide in
+[`course/pre-work/00-setup-and-api-access.md`](course/pre-work/00-setup-and-api-access.md);
+it covers the tested `.env` paths for SambaNova, NVIDIA NIM, and local Ollama
+running on your host.
 
 ```bash
 git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
-cp .env.example .env
-# edit .env — set PROVIDER and MODEL
+cp .env.sambanova .env     # or .env.nvidia / .env.ollama
+# edit .env - add your API key if using a hosted provider
 ```
 
 Session 2 only needs the CV-fit workflow:
@@ -64,8 +65,10 @@ docker compose --env-file .env \
   up --build -d --remove-orphans
 ```
 
-If you want Compose to start the included Ollama container as well, add
-`--profile local` to either command.
+The provided `.env.ollama` example assumes Ollama is already running on your
+host machine. If you want Compose to start the included Ollama container
+instead, add `--profile local` to either command and set
+`OLLAMA_HOST=http://ollama:11434`.
 
 There are also thin helper scripts for the common paths:
 
@@ -86,7 +89,8 @@ scripts\down.bat
 ```
 
 For the included Ollama container with a helper script, prefix it with
-`AOA_LOCAL=1` on macOS/Linux, or run `set AOA_LOCAL=1` first on Windows.
+`AOA_LOCAL=1` on macOS/Linux, or run `set AOA_LOCAL=1` first on Windows. The
+host-machine Ollama path does not need `AOA_LOCAL=1`.
 
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 2 shows only the CV intent. Session 4 shows CV fit, ingest, graph, and
@@ -107,6 +111,9 @@ system/
   docker-compose.yml
   docker-compose.session2.yml
 .env.example
+.env.ollama
+.env.sambanova
+.env.nvidia
 scripts/
 ```
 
