@@ -105,6 +105,31 @@ async def _report_ingest_summary(inputs: dict, ctx: Context) -> dict:
         return error_envelope("promotion (object) is required")
     if not isinstance(source_path, str) or not source_path.strip():
         return error_envelope("source_path is required")
+
+    if promotion.get("promote") is False:
+        stored = {
+            "document_id": "",
+            "raw_path": "",
+            "promoted_path": "",
+            "passage_count": 0,
+            "skipped": True,
+            "reason": str(promotion.get("rejection_reason") or "Not promoted").strip(),
+        }
+        markdown = _ingest_markdown(promotion, source_path, stored)
+        return {
+            "outputs": {
+                "stored": stored,
+                "ingest_markdown": markdown,
+            },
+            "signals": {
+                "valid_output_shape": True,
+                "stored_document": False,
+                "has_markdown": bool(markdown),
+                "passage_count": 0,
+                "latency_seconds": 0,
+            },
+        }
+
     wiki_store = ctx.tools.get("tool-wiki-store")
     if wiki_store is None:
         return error_envelope("tool-wiki-store is not available")
@@ -275,6 +300,7 @@ def _string_list(value: object) -> list[str]:
 def _ingest_markdown(promotion: dict, source_path: str, stored: dict) -> str:
     title = str(promotion.get("title") or "Wiki ingest").strip()
     summary = str(promotion.get("summary") or "").strip()
+    rejection_reason = str(promotion.get("rejection_reason") or stored.get("reason") or "").strip()
     concepts = promotion.get("concepts") if isinstance(promotion.get("concepts"), list) else []
     open_questions = (
         promotion.get("open_questions")
@@ -286,6 +312,14 @@ def _ingest_markdown(promotion: dict, source_path: str, stored: dict) -> str:
         if isinstance(promotion.get("promoted_passages"), list)
         else []
     )
+
+    if stored.get("skipped"):
+        lines = [f"# Not ingested: {title}", "", f"**Source:** `{source_path}`", ""]
+        if rejection_reason:
+            lines += [f"**Reason:** {rejection_reason}", ""]
+        if summary:
+            lines += [summary, ""]
+        return "\n".join(lines).strip()
 
     lines = [f"# Ingested: {title}", "", f"**Source:** `{source_path}`", ""]
     if summary:

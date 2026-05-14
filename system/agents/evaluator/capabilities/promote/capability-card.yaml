@@ -17,11 +17,14 @@ outputs:
     type: object
 constraints:
   - The output is a single JSON object.
-  - promotion includes title, summary, concepts, promoted_passages,
-    relationships, and open_questions.
+  - promotion includes promote, rejection_reason, title, summary, concepts,
+    promoted_passages, relationships, and open_questions.
+  - promote is false when the parsed note is not useful for the course wiki.
+  - rejection_reason is populated when promote is false.
   - promoted_passages include passage_id, quote, and why_it_matters.
 evaluation_signals:
   - valid_output_shape
+  - promote_decision
   - has_concepts
   - has_promoted_passages
   - latency_p95_under(8s)

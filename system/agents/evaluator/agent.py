@@ -108,10 +108,12 @@ async def _promote_note(inputs: dict, ctx: Context) -> dict:
 
     concepts = promotion.get("concepts")
     passages = promotion.get("promoted_passages")
+    promote = promotion.get("promote", True)
     return {
         "outputs": {"promotion": promotion},
         "signals": {
             "valid_output_shape": True,
+            "promote_decision": isinstance(promote, bool),
             "has_concepts": isinstance(concepts, list) and len(concepts) > 0,
             "has_promoted_passages": isinstance(passages, list) and len(passages) > 0,
             "latency_seconds": completion.latency_seconds,

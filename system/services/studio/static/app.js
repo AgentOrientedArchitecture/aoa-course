@@ -41,12 +41,28 @@ function emptyLifecycle() {
     proposal: null,
     validation: null,
     fallbackReason: "",
+    fallbackDetail: "",
     tasks: [],
     taskById: new Map(),
     plan: [],
     result: null,
     error: "",
   };
+}
+
+function plannerFallbackText(reason) {
+  const text = String(reason || "");
+  if (!text) return "";
+  if (/task \d+ must be an object/.test(text) || text.includes("plan.tasks")) {
+    return "Planner model returned an invalid plan; using the deterministic workflow.";
+  }
+  if (text.includes("Client error") || text.includes("HTTPStatusError")) {
+    return "Planner model request failed; using the deterministic workflow.";
+  }
+  if (text.includes("Name or service not known")) {
+    return "Planner model request failed; using the deterministic workflow.";
+  }
+  return text;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +356,11 @@ function applyLifecycleEvent(record) {
     life.source = record.source || life.source;
     life.proposal = record.proposal || null;
     life.validation = record.validation || null;
-    life.fallbackReason = record.fallback_reason || "";
+    life.fallbackReason = plannerFallbackText(record.fallback_reason);
+    life.fallbackDetail = record.fallback_detail || "";
+    if (!life.fallbackDetail && life.fallbackReason !== (record.fallback_reason || "")) {
+      life.fallbackDetail = record.fallback_reason || "";
+    }
     return;
   }
   if (record.step === "discover") {
@@ -950,8 +970,15 @@ function renderPlanner(life) {
   if (life.fallbackReason) {
     const fallback = document.createElement("p");
     fallback.className = "fallback-note";
-    fallback.textContent = `Fallback: ${life.fallbackReason}`;
+    fallback.textContent = life.fallbackReason;
     body.appendChild(fallback);
+
+    if (life.fallbackDetail && life.fallbackDetail !== life.fallbackReason) {
+      const details = document.createElement("details");
+      details.className = "compact-details";
+      details.innerHTML = `<summary>Planner fallback detail</summary><pre class="json-view">${escapeHtml(life.fallbackDetail)}</pre>`;
+      body.appendChild(details);
+    }
   }
 
   if (life.proposal) {
@@ -1035,7 +1062,8 @@ function pickPayload(record) {
       source: record.source,
       proposal: record.proposal,
       validation: record.validation,
-      fallback_reason: record.fallback_reason,
+      fallback_reason: plannerFallbackText(record.fallback_reason),
+      fallback_detail: record.fallback_detail || record.fallback_reason,
     };
   }
   if (record.step === "discover") {

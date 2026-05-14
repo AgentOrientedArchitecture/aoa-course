@@ -77,6 +77,7 @@ class PlanBuildResult:
     proposal: dict[str, Any] | None = None
     validation: dict[str, Any] | None = None
     error: str | None = None
+    error_detail: str | None = None
 
 
 WORKFLOWS: dict[str, Workflow] = {
@@ -422,12 +423,19 @@ def _build_planner_prompt(
                 }
             ],
         },
+        "requirements": [
+            "tasks must be an array of objects, never strings",
+            "each task object must include id, purpose, capability, and input_map",
+            "input_map must be an object",
+            "do not add markdown, comments, or prose outside the JSON object",
+        ],
     }
     return (
         "You are the planner in a small Agent-oriented Architecture demo.\n"
         "Generate a valid task plan for the requested workflow.\n"
         "Use only capability ids from available_capabilities.\n"
         "Use only input references that are available from intent inputs or earlier tasks.\n"
+        "The tasks field must be an array of task objects, not an array of strings.\n"
         "Return a single JSON object and no commentary.\n\n"
         f"{json.dumps(body, indent=2)}"
     )
@@ -506,8 +514,28 @@ async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]
     return message.get("content") or message.get("reasoning") or "", raw
 
 
-def _fallback_plan(workflow: Workflow, reason: str | None = None) -> PlanBuildResult:
-    return PlanBuildResult(tasks=workflow.tasks, source="deterministic", error=reason)
+def _fallback_plan(
+    workflow: Workflow,
+    reason: str | None = None,
+    detail: str | None = None,
+) -> PlanBuildResult:
+    return PlanBuildResult(
+        tasks=workflow.tasks,
+        source="deterministic",
+        error=reason,
+        error_detail=detail,
+    )
+
+
+def _planner_fallback_message(error: Exception) -> str:
+    if isinstance(error, ValueError):
+        return "Planner model returned an invalid plan; using the deterministic workflow."
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        return f"Planner model request failed with HTTP {status}; using the deterministic workflow."
+    if isinstance(error, httpx.HTTPError):
+        return "Planner model request failed; using the deterministic workflow."
+    return "Planner model failed; using the deterministic workflow."
 
 
 def _validate_plan(
@@ -625,7 +653,7 @@ async def _build_plan(
         if PLANNER_STRATEGY == "llm":
             raise
         logger.warning("planner model failed; falling back to deterministic plan: %r", e)
-        return _fallback_plan(workflow, reason=str(e))
+        return _fallback_plan(workflow, reason=_planner_fallback_message(e), detail=str(e))
 
 
 # ----------------------------------------------------------------------
@@ -785,6 +813,7 @@ async def _run_workflow(
             "proposal": plan_result.proposal,
             "validation": plan_result.validation,
             "fallback_reason": plan_result.error,
+            "fallback_detail": plan_result.error_detail,
         })
 
         cards_by_id = {card["id"]: card for card in capability_cards if card.get("id")}
