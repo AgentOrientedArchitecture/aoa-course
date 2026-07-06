@@ -6,7 +6,13 @@
 
 const $ = (id) => document.getElementById(id);
 
-const WORKFLOWS = ["cv-fit", "knowledge-ingest", "wiki-graph", "knowledge-query"];
+const WORKFLOWS = ["cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query"];
+
+// cv-fit-interview reuses the CV + JD form panel of cv-fit; it only differs in the
+// workflow the planner runs (it adds the EVE interviewer as a final step).
+function panelForMode(mode) {
+  return mode === "cv-fit-interview" ? "cv-fit" : mode;
+}
 const studioConfig = window.STUDIO_CONFIG || {};
 const configuredWorkflows = Array.isArray(studioConfig.workflows)
   ? studioConfig.workflows.filter((mode) => WORKFLOWS.includes(mode))
@@ -694,6 +700,7 @@ function truncate(value, max) {
 function lifecycleIntentTitle(life) {
   const kind = (life.intent && life.intent.kind) || life.workflow || state.mode;
   if (kind === "cv-fit") return "Evaluate a CV against a job description";
+  if (kind === "cv-fit-interview") return "Evaluate a CV, then generate interview questions";
   if (kind === "knowledge-ingest") return "Ingest source material into the AOA wiki";
   if (kind === "wiki-graph") return "Inspect the AOA wiki graph";
   if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
@@ -1280,7 +1287,7 @@ async function submitIntent() {
 }
 
 function buildIntentPayload(status) {
-  if (state.mode === "cv-fit") {
+  if (state.mode === "cv-fit" || state.mode === "cv-fit-interview") {
     const cv = $("intent-cv").value.trim();
     const jd = $("intent-jd").value.trim();
     if ((!cv && !state.cvFile) || (!jd && !state.jdFile)) {
@@ -1288,7 +1295,7 @@ function buildIntentPayload(status) {
       return null;
     }
     return {
-      kind: "cv-fit",
+      kind: state.mode,
       cv_text: cv,
       jd_text: jd,
       cv_name: state.cvName || "cv.txt",
@@ -1413,11 +1420,12 @@ function setMode(mode) {
     btn.classList.toggle("active", btn.dataset.mode === mode);
   }
   for (const panel of document.querySelectorAll("[data-mode-panel]")) {
-    panel.classList.toggle("hidden", panel.dataset.modePanel !== mode);
+    panel.classList.toggle("hidden", panel.dataset.modePanel !== panelForMode(mode));
   }
   $("lifecycle").classList.toggle("hidden", mode === "wiki-graph");
   const labels = {
     "cv-fit": "Run cv-fit",
+    "cv-fit-interview": "Run cv-fit + interview",
     "knowledge-ingest": "Run ingest",
     "wiki-graph": "Refresh graph",
     "knowledge-query": "Run query",

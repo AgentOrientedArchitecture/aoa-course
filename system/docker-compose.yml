@@ -1,10 +1,13 @@
 # Course system. Run directly with Docker Compose from the repo root.
 #
-# Session 2 starts only the CV-fit workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session2.yml --profile session2 up --build -d --remove-orphans
+# Session 1 starts only the CV-fit workflow:
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session1.yml --profile session1 up --build -d --remove-orphans
 #
-# Session 4 starts the full knowledge-management workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml --profile session4 up --build -d --remove-orphans
+# Session 2 starts the full knowledge-management workflow:
+#   docker compose --env-file .env -f system/docker-compose.yml --profile session2 up --build -d --remove-orphans
+#
+# Session 3 starts the CV-fit workflow plus the EVE-authored interviewer agent:
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session3.yml --profile session3 up --build -d --remove-orphans
 
 services:
 
@@ -12,7 +15,7 @@ services:
   # Services
   # ------------------------------------------------------------------
   registry:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./services/registry
     image: aoa-course/registry:latest
@@ -39,7 +42,7 @@ services:
       retries: 20
 
   planner:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./services/planner
     image: aoa-course/planner:latest
@@ -69,7 +72,7 @@ services:
         condition: service_healthy
 
   studio:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./services/studio
     image: aoa-course/studio:latest
@@ -94,7 +97,7 @@ services:
   # Tools
   # ------------------------------------------------------------------
   tool-filesystem:
-    profiles: ["session4"]
+    profiles: ["session2"]
     build:
       context: ./tools/filesystem
     image: aoa-course/tool-filesystem:latest
@@ -113,7 +116,7 @@ services:
         condition: service_healthy
 
   tool-document-text:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./tools/document-text
     image: aoa-course/tool-document-text:latest
@@ -132,7 +135,7 @@ services:
         condition: service_healthy
 
   tool-wiki-store:
-    profiles: ["session4"]
+    profiles: ["session2"]
     build:
       context: ./tools/wiki-store
     image: aoa-course/tool-wiki-store:latest
@@ -156,7 +159,7 @@ services:
   # Agents
   # ------------------------------------------------------------------
   cv-parser:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
@@ -165,7 +168,7 @@ services:
     ports:
       - "7301:8888"
     volumes:
-      # capabilities/ is mounted (not COPYed) so editing skills.md on the
+      # capabilities/ is mounted (not COPYed) so editing instructions.md on the
       # host triggers the in-container hot reload.
       - ./agents/parser/capabilities:/app/capabilities:ro
       - ./inbox:/data/inbox:ro
@@ -196,7 +199,7 @@ services:
         condition: service_started
 
   wiki-parser:
-    profiles: ["session4"]
+    profiles: ["session2"]
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
@@ -236,7 +239,7 @@ services:
         condition: service_started
 
   evaluator:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./agents
       dockerfile: evaluator/Dockerfile
@@ -274,7 +277,7 @@ services:
         condition: service_started
 
   reporter:
-    profiles: ["session2", "session4"]
+    profiles: ["session1", "session2", "session3"]
     build:
       context: ./agents
       dockerfile: reporter/Dockerfile
@@ -307,6 +310,51 @@ services:
     depends_on:
       registry:
         condition: service_healthy
+
+  # ------------------------------------------------------------------
+  # EVE-authored agent (Session 3)
+  # ------------------------------------------------------------------
+  # A genuine Vercel EVE (TypeScript) agent, governed as a first-class AU by the
+  # same registry/planner/studio. The aoa-eve adapter gives it a capability card,
+  # registers it, and exposes the AOA HTTP + A2A surface every other agent has.
+  eve-interviewer:
+    profiles: ["session3"]
+    build:
+      context: ./agents-eve/interviewer
+      dockerfile: Dockerfile
+    image: aoa-course/eve-interviewer:latest
+    container_name: aoa-eve-interviewer
+    ports:
+      - "7305:8888"
+    volumes:
+      # The EVE agent/ dir and the co-located capability card are mounted so
+      # editing instructions.md hot-reloads behaviour, just like the Python AUs.
+      - ./agents-eve/interviewer/agent:/app/agent:ro
+      - ./agents-eve/interviewer/capability-card.yaml:/app/capability-card.yaml:ro
+      - ./inbox:/data/inbox:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:eve-interviewer
+      AGENT_NAME: eve-interviewer
+      AGENT_HOST: eve-interviewer
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: interviewer-questions
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      # EVE compaction needs a context window for local/unlisted model ids.
+      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-document-text:
+        condition: service_started
 
   # ------------------------------------------------------------------
   # Optional: local model server (only started under `local` profile)

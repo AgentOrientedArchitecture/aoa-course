@@ -12,7 +12,6 @@ if /I "%AOA_LOCAL%"=="true" set "LOCAL_ARGS=--profile local"
 
 docker compose %ENV_ARGS% %LOCAL_ARGS% ^
   -f system/docker-compose.yml ^
-  -f system/docker-compose.session2.yml ^
   --profile session2 ^
   up --build -d --remove-orphans %*
 
