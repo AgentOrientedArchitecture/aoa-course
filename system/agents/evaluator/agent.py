@@ -1,13 +1,13 @@
 """evaluator agent.
 
-Backs ``evaluator-cv`` for Session 2, plus wiki promotion and wiki-query
-evidence evaluation for Session 4. The same Python process serves each through
+Backs ``evaluator-cv`` for Session 1, plus wiki promotion and wiki-query
+evidence evaluation for Session 2. The same Python process serves each through
 capability-id dispatch in ``handle``.
 
 For ``evaluator-cv`` we receive a parsed CV (the parser's output) and a path
 to a job description on the shared inbox volume. We read the JD through
 ``tool-document-text`` so the call shows up in the trace, hand both to the
-model with the rubric in ``skills.md``, and return a JSON evaluation.
+model with the rubric in ``instructions.md``, and return a JSON evaluation.
 """
 from __future__ import annotations
 
@@ -183,7 +183,7 @@ async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
 def _rank_wiki_passages(passages: object) -> list[dict]:
     """Convert wiki-store retrieval scores into evaluator output.
 
-    The Session 4 query path is a grounding demo, so this capability keeps the
+    The Session 2 query path is a grounding demo, so this capability keeps the
     ranking deterministic and citation-preserving instead of asking the model to
     judge sparse evidence.
     """

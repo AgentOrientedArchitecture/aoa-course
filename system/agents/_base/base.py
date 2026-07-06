@@ -14,10 +14,10 @@ A concrete agent does roughly this::
 The scaffold takes care of the shared jobs every agent does the same way:
 
 1. Discover capability cards under ``capabilities/<name>/``.
-2. Compute ``skills_hash`` for each by SHA-ing the matching ``skills.md``.
+2. Compute ``skills_hash`` for each by SHA-ing the matching ``instructions.md``.
 3. Stamp ``agent_id``/``identity`` onto each registered card.
 4. Register each capability with the registry on boot.
-5. Watch each ``skills.md`` for changes and re-register on edit.
+5. Watch each ``instructions.md`` for changes and re-register on edit.
 
 It also exposes the standard agent HTTP surface: ``/a2a``,
 ``/.well-known/agent-card.json``, ``/invoke``, ``/cards/<id>``, and
@@ -60,8 +60,8 @@ class Capability:
 
     id: str
     card: dict[str, Any]            # the full capability card, with skills_hash filled in
-    skills_text: str                # current contents of skills.md
-    skills_path: Path               # path to skills.md (for hot reload)
+    skills_text: str                # current contents of instructions.md
+    skills_path: Path               # path to instructions.md (for hot reload)
     card_path: Path                 # path to capability-card.yaml
     tools_needs: list[str] = field(default_factory=list)
 
@@ -230,12 +230,29 @@ def _capability_allowlist() -> set[str]:
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
+def _instructions_path(child: Path) -> Path:
+    """Return the behaviour file for a capability folder.
+
+    The EVE-friendly layout names it ``instructions.md`` (matching EVE's
+    always-on system-prompt file). ``skills.md`` is still accepted as a
+    fallback so older capability folders keep working.
+    """
+    primary = child / "instructions.md"
+    if primary.exists():
+        return primary
+    legacy = child / "skills.md"
+    if legacy.exists():
+        return legacy
+    return primary
+
+
 def discover_capabilities() -> list[Capability]:
     """Walk ``capabilities/<name>/`` and load every capability card.
 
-    A capability folder must contain ``capability-card.yaml``. ``skills.md``
-    is required for AU capabilities and absent for tool capabilities (tools
-    are deterministic; their behaviour is in their code).
+    A capability folder must contain ``capability-card.yaml``.
+    ``instructions.md`` (or legacy ``skills.md``) is required for AU
+    capabilities and absent for tool capabilities (tools are deterministic;
+    their behaviour is in their code).
     """
     root = _capabilities_root()
     if not root.exists():
@@ -259,7 +276,7 @@ def discover_capabilities() -> list[Capability]:
         if allowed and cap_id not in allowed:
             continue
 
-        skills_path = child / "skills.md"
+        skills_path = _instructions_path(child)
         if skills_path.exists():
             skills_text = skills_path.read_text()
             card.setdefault("provenance", {})["skills_hash"] = _sha256(skills_text)
@@ -315,7 +332,7 @@ async def _watch_skills(
     capabilities: list[Capability],
     registry: RegistryClient,
 ) -> None:
-    """Watch every skills.md file and re-register the affected capability on change.
+    """Watch every instructions.md file and re-register the affected capability on change.
 
     This runs as a background asyncio task started during FastAPI startup.
     """
@@ -326,7 +343,7 @@ async def _watch_skills(
         return
 
     by_path = {str(c.skills_path): c for c in capabilities}
-    logger.info("watching %d skills.md file(s) for hot reload", len(paths))
+    logger.info("watching %d instructions.md file(s) for hot reload", len(paths))
 
     async for changes in awatch(*paths):
         touched: set[str] = set()

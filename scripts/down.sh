@@ -10,7 +10,8 @@ fi
 
 exec "${compose[@]}" \
   -f system/docker-compose.yml \
-  -f system/docker-compose.session2.yml \
+  -f system/docker-compose.session1.yml \
+  --profile session1 \
   --profile session2 \
-  --profile session4 \
+  --profile session3 \
   down --remove-orphans "$@"

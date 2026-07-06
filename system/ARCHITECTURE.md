@@ -2,19 +2,25 @@
 
 A small, container-shaped, readable AOA system. This is a reference
 implementation for learning the shape of AOA, not a deployment platform. It
-keeps the moving parts explicit: three workflows, three agent codebases, nine AU
-capabilities, three deterministic tools, and three plumbing services. The
-parser codebase is deployed as separate governed parser runtimes so Session 4
-can show that new Agent IDs plus new capability contracts and `skills.md` files
+keeps the moving parts explicit: for Sessions 1 and 2, three workflows, three
+agent codebases, nine AU capabilities, three deterministic tools, and three
+plumbing services. The
+parser codebase is deployed as separate governed parser runtimes so Session 2
+can show that new Agent IDs plus new capability contracts and `instructions.md` files
 create materially different agents without changing the parser code. AU-to-AU
 orchestration uses A2A Agent Cards and JSON-RPC `message/send`; deterministic
 tools expose MCP tools behind small registered AOA bridges.
+
+Session 3 adds a fourth workflow and a fourth agent codebase authored with
+[Vercel EVE](https://github.com/vercel/eve) — a TypeScript agent running on Node
+rather than the Python scaffold, but governed as an ordinary AU through the same
+registry, A2A surface, and studio. See [`EVE.md`](EVE.md).
 
 ## What the system does
 
 Three workflows run through one registry:
 
-**CV evaluation** (Session 2):
+**CV evaluation** (Session 1):
 
 ```
 parser-cv → evaluator-cv → reporter-cv-fit
@@ -27,7 +33,7 @@ parsed CV and the job description; the evaluator returns scores and a verdict.
 Finally the planner starts `reporter-cv-fit`, which produces a structured
 fit-verdict report. Every step is visible in the studio's trace pane.
 
-**Knowledge ingest** (Session 4) starts the wiki-management loop:
+**Knowledge ingest** (Session 2) starts the wiki-management loop:
 
 ```
 parser-notes → evaluator-promote → reporter-ingest-summary
@@ -38,7 +44,7 @@ passages and concepts. The evaluator decides which material should be promoted
 into the course wiki. The reporter writes the promoted layer through
 `tool-wiki-store` and returns a Markdown ingest summary.
 
-**Knowledge query** (Session 4) then uses the stored wiki:
+**Knowledge query** (Session 2) then uses the stored wiki:
 
 ```
 parser-query → evaluator-wiki-query → reporter-answer
@@ -55,10 +61,10 @@ grounding rather than a model free-writing from prior knowledge.
 
 Each is something you can see on screen as you build:
 
-1. **An Agentic Unit is `model + capability + skills.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
+1. **An Agentic Unit is `model + capability + instructions.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
 2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
-3. **One codebase can become more than one governed agent.** `cv-parser` and `wiki-parser` run the same parser image, same `agent.py`, same model, and same document-text tool. Different Agent IDs, capability cards, and `skills.md` files make them different governed agents with different contracts.
-4. **Identity and behaviour are separate.** `agent_id` is the stable governed runtime actor shown in the registry and trace. Registry lifecycle actors such as `published_by` and `approved_by` show who moved a card through governance. `skills.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation.
+3. **One codebase can become more than one governed agent.** `cv-parser` and `wiki-parser` run the same parser image, same `agent.py`, same model, and same document-text tool. Different Agent IDs, capability cards, and `instructions.md` files make them different governed agents with different contracts.
+4. **Identity and behaviour are separate.** `agent_id` is the stable governed runtime actor shown in the registry and trace. Registry lifecycle actors such as `published_by` and `approved_by` show who moved a card through governance. `instructions.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
 6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
 
@@ -73,6 +79,17 @@ Three agent codebases, deployed as distinct governed runtimes:
 | `evaluator` | `evaluator` | `evaluator-cv`, `evaluator-promote`, `evaluator-wiki-query` |
 | `reporter` | `reporter` | `reporter-cv-fit`, `reporter-answer`, `reporter-ingest-summary` |
 
+Session 3 adds one more governed runtime, authored with EVE (TypeScript/Node)
+instead of the Python scaffold:
+
+| Runtime | Codebase | Capabilities |
+|---|---|---|
+| `eve-interviewer` | `agents-eve/interviewer` (EVE) | `interviewer-questions` |
+
+It extends the CV-fit workflow with a fourth step,
+`parse-cv → evaluate-cv-fit → interviewer-questions`, and registers through the
+same registry and A2A surface as the Python agents. See [`EVE.md`](EVE.md).
+
 Plus, in `tools/`:
 
 | Tool | Registered as | Type |
@@ -86,7 +103,7 @@ Plus, in `tools/`:
 Every AU has four addressable parts plus a stamped runtime identity:
 
 1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only and exposed at `/cards/<id>`.
-2. **`skills.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
+2. **`instructions.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
 3. **`tools.yaml`** — the capability ids this agent will call. May reference other AUs or pure tools. May be empty.
 4. **`agent.py`** — the wiring. Built on the shared FastAPI scaffold in `agents/_base/`.
 
@@ -125,15 +142,15 @@ docker-compose.yml services:
   ollama               profile: local, optional
 ```
 
-Session 2 starts the CV-only subset: registry, planner, studio,
-tool-document-text, `cv-parser`, evaluator, and reporter. Session 4 starts the
+Session 1 starts the CV-only subset: registry, planner, studio,
+tool-document-text, `cv-parser`, evaluator, and reporter. Session 2 starts the
 full set above, including `wiki-parser`. Optional Ollama runs only when the
 `local` profile is enabled.
 
 Every agent container has the same shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
 exposes `/a2a`, `/.well-known/agent-card.json`, `/invoke`, and `/cards/<id>`,
-and watches mounted `skills.md` files for hot reload. Read one agent and
+and watches mounted `instructions.md` files for hot reload. Read one agent and
 you've read them all.
 
 ## A2A surface
@@ -223,7 +240,7 @@ evaluation_signals:
   - latency_p95_under(8s)
 provenance:
   model: ${MODEL}
-  skills_hash: <sha of skills.md>
+  skills_hash: <sha of instructions.md>
 agent_id: urn:aoa:agent:evaluator
 identity:
   agent_id: urn:aoa:agent:evaluator
@@ -242,7 +259,7 @@ a2a_endpoint: http://evaluator:8888/a2a
 ```
 
 The evaluator capability cards differ in `purpose`, `inputs`, `outputs`,
-`constraints`, `evaluation_signals`, `skills.md`, and the registered
+`constraints`, `evaluation_signals`, `instructions.md`, and the registered
 endpoints. They share `agent.py` and `model`. Pure tools have `kind: tool` and
 `provenance.model: none`; they register `endpoint` only.
 
@@ -268,9 +285,9 @@ A browser surface at `localhost:8080` with two roles:
 **Intent:**
 
 - **Submit an intent.** Free-form text, sent to the planner.
-- **Choose a mode.** CV fit for Session 2; ingest, graph, and wiki query for Session 4.
+- **Choose a mode.** CV fit for Session 1; ingest, graph, and wiki query for Session 2.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
-- **Inspect the wiki graph.** The Session 4 wiki store projects its raw,
+- **Inspect the wiki graph.** The Session 2 wiki store projects its raw,
   promoted, and indexed knowledge into typed graph nodes. Documents, concepts,
   passages, and open questions use different shapes and colours. The graph is
   its own mode, not part of the CV workflow.
@@ -282,22 +299,22 @@ The studio is for observing and driving the system. In the cut-down knowledge-ma
 Use Docker Compose profiles to start the part of the system needed for the
 session.
 
-Session 2 starts only the CV-fit path:
+Session 1 starts only the CV-fit path:
 
 ```bash
 docker compose --env-file .env \
   -f system/docker-compose.yml \
-  -f system/docker-compose.session2.yml \
-  --profile session2 \
+  -f system/docker-compose.session1.yml \
+  --profile session1 \
   up --build -d --remove-orphans
 ```
 
-Session 4 starts the full knowledge-management path:
+Session 2 starts the full knowledge-management path:
 
 ```bash
 docker compose --env-file .env \
   -f system/docker-compose.yml \
-  --profile session4 \
+  --profile session2 \
   up --build -d --remove-orphans
 ```
 

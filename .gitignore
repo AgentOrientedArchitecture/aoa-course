@@ -28,3 +28,6 @@ system/inbox/*
 !system/inbox/.gitkeep
 system/wiki/*
 !system/wiki/.gitkeep
+
+# Local cogs index database
+.cogs/

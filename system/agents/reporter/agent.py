@@ -1,6 +1,6 @@
 """reporter agent.
 
-Backs ``reporter-cv-fit`` for Session 2, plus Session 4 answer and ingest
+Backs ``reporter-cv-fit`` for Session 1, plus Session 2 answer and ingest
 reporting. Some reporter capabilities only consume structured data; others
 use a declared tool to store the finished result.
 """
@@ -198,7 +198,7 @@ def _grounded_wiki_answer(question: str, parsed_note: dict, evaluation: dict) ->
     """Build the wiki answer from retrieved passages only.
 
     This is stricter than the CV reporter path on purpose: it prevents the
-    model's prior knowledge from leaking into the Session 4 knowledge-base
+    model's prior knowledge from leaking into the Session 2 knowledge-base
     answer and makes citation behaviour easy to inspect.
     """
     passages = parsed_note.get("passages") if isinstance(parsed_note.get("passages"), list) else []

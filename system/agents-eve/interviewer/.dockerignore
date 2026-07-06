@@ -1,0 +1,10 @@
+node_modules
+.eve
+.output
+.nitro
+.vercel
+.workflow-data
+.env*
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store

@@ -4,7 +4,7 @@ Backs ``parser-cv`` for the ``cv-parser`` runtime, plus ``parser-notes`` and
 ``parser-query`` for the ``wiki-parser`` runtime.
 The shared scaffold in ``_base`` does the discovery, registration, and hot
 reload work; this file is just the agent-specific wiring: build a prompt from
-the loaded ``skills.md`` plus the inputs, call the model, parse the JSON
+the loaded ``instructions.md`` plus the inputs, call the model, parse the JSON
 response, return it.
 """
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Helpers for the prompt-then-parse pattern every Session 2 agent uses.
+"""Helpers for the prompt-then-parse pattern every Session 1 agent uses.
 
 Agents ask the model to reply with JSON. The model usually obliges, sometimes
 inside a ```json``` code fence, sometimes with prose around it. ``parse_json``

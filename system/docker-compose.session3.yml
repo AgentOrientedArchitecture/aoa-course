@@ -1,0 +1,29 @@
+# Session 3 narrows the system to the CV-fit workflow and adds the EVE-authored
+# interviewer agent, which turns the fit verdict into interview questions.
+#
+# Use with:
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session3.yml --profile session3 up --build -d --remove-orphans
+
+services:
+  registry:
+    environment:
+      REGISTRY_CARD_ALLOWLIST: tool-document-text,parser-cv,evaluator-cv,reporter-cv-fit,interviewer-questions
+
+  planner:
+    environment:
+      # Deterministic keeps the Session 3 demo reliable: the planner runs the
+      # fixed cv-fit-interview workflow instead of asking a small local model to
+      # rediscover the four-step plan each time.
+      PLANNER_STRATEGY: deterministic
+
+  studio:
+    environment:
+      STUDIO_WORKFLOWS: cv-fit,cv-fit-interview
+
+  evaluator:
+    environment:
+      CAPABILITY_ALLOWLIST: evaluator-cv
+
+  reporter:
+    environment:
+      CAPABILITY_ALLOWLIST: reporter-cv-fit

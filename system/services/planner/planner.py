@@ -2,7 +2,7 @@
 
 The planner receives intents from the studio, asks the registry for the
 capabilities it needs, sequences the agent invocations, and records the trace.
-Session 2 starts with one workflow (`cv-fit`). Session 4 reuses the same
+Session 1 starts with one workflow (`cv-fit`). Session 2 reuses the same
 parser/evaluator/reporter shape for cut-down knowledge-management workflows:
 ingest material into a wiki store, then answer questions from that store.
 """
@@ -98,7 +98,7 @@ WORKFLOWS: dict[str, Workflow] = {
                 input_map={"cv_path": "inputs.cv_path"},
             ),
             # The evaluator extracts the JD text via tool-document-text too; this is
-            # how Session 2 shows that tools.yaml is honest about what each
+            # how Session 1 shows that tools.yaml is honest about what each
             # agent actually reaches for.
             TaskSpec(
                 id="evaluate-cv-fit",
@@ -136,6 +136,66 @@ WORKFLOWS: dict[str, Workflow] = {
                     "cv": "parse-cv.outputs.parsed",
                     "evaluation": "evaluate-cv-fit.outputs",
                 },
+            ),
+        ],
+    ),
+    "cv-fit-interview": Workflow(
+        name="cv-fit-interview",
+        tasks=[
+            # Session 3 reuses the CV-fit parse + evaluate steps, then hands the
+            # verdict to the EVE-authored interviewer AU. The interviewer is a
+            # genuine Vercel EVE agent, governed through the same registry and
+            # A2A surface as the Python agents — the planner cannot tell the
+            # difference. It is pinned with ``selected_capability`` so the demo
+            # is deterministic.
+            TaskSpec(
+                id="parse-cv",
+                purpose="Extract structured CV data from a document path.",
+                discovery={
+                    "kind": "au",
+                    "text": "read parse extract structured cv data from document",
+                    "required_inputs": [{"name": "cv_path", "type": "string"}],
+                    "required_outputs": [{"type": "structured-cv"}],
+                },
+                input_map={"cv_path": "inputs.cv_path"},
+            ),
+            TaskSpec(
+                id="evaluate-cv-fit",
+                purpose="Score a structured CV against a job description.",
+                discovery={
+                    "kind": "au",
+                    "text": "score evaluate cv against job description verdict strengths gaps",
+                    "required_inputs": [
+                        {"name": "cv", "type": "structured-cv"},
+                        {"name": "jd_path", "type": "string"},
+                    ],
+                    "required_outputs": [
+                        {"name": "scores"},
+                        {"name": "verdict"},
+                    ],
+                },
+                input_map={
+                    "cv": "parse-cv.outputs.parsed",
+                    "jd_path": "inputs.jd_path",
+                },
+            ),
+            TaskSpec(
+                id="generate-interview-questions",
+                purpose="Turn a CV-fit verdict into targeted interview questions.",
+                discovery={
+                    "kind": "au",
+                    "text": "interview questions from cv fit verdict probe strengths gaps",
+                    "required_inputs": [{"name": "evaluation", "type": "object"}],
+                    "required_outputs": [
+                        {"name": "questions"},
+                        {"name": "report_markdown"},
+                    ],
+                },
+                input_map={
+                    "evaluation": "evaluate-cv-fit.outputs",
+                    "cv": "parse-cv.outputs.parsed",
+                },
+                selected_capability="interviewer-questions",
             ),
         ],
     ),

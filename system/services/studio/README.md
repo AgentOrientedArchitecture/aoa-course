@@ -17,7 +17,7 @@ The studio has two roles in this system:
   expandable details section.
 - **Details.** Click a registry row to read its card, or click a wiki graph
   node to inspect that node.
-- **Wiki graph.** A typed graph view of the Session 4 wiki store: documents,
+- **Wiki graph.** A typed graph view of the Session 2 wiki store: documents,
   concepts, passages, and open questions use different shapes and colours. The
   reset button clears the local wiki store so the ingest demo can be replayed.
   The underlying files are visible in `system/wiki/`.
@@ -30,7 +30,7 @@ The studio has two roles in this system:
   Submitted inputs are written to `system/inbox/`.
 
 The studio drives the demo workflows and shows the trace. The responsibility
-walk is the Session 2 teaching surface: it follows intent, planner proposal,
+walk is the Session 1 teaching surface: it follows intent, planner proposal,
 registry selection, AU invocation, inward tool calls, AU responses, signals,
 timings, Agent ID, registry governance actors, and the final artefact. For the cut-down
 knowledge-management system, ingest returns a stored wiki summary and query
@@ -39,7 +39,7 @@ graph without submitting a planner intent.
 
 The visible workflow modes are controlled by `STUDIO_WORKFLOWS`, a comma
 separated list of `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
-`knowledge-query`. The Session 2 compose override sets it to `cv-fit`; Session
+`knowledge-query`. The Session 1 compose override sets it to `cv-fit`; Session
 4 uses all modes.
 
 ## Internals

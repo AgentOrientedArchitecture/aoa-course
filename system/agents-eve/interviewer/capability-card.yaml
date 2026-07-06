@@ -1,0 +1,30 @@
+id: interviewer-questions
+version: 0.1.0
+kind: au
+purpose: |
+  Turn a CV-fit evaluation (scores, verdict, strengths, gaps) into a short set
+  of targeted interview questions. The questions probe the candidate's claimed
+  strengths and, especially, the gaps the evaluator flagged, so a human
+  interviewer can test the fit verdict in the room.
+inputs:
+  - name: evaluation
+    type: object
+    required: true
+  - name: cv
+    type: structured-cv
+    required: false
+outputs:
+  - name: questions
+    type: array
+  - name: report_markdown
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - questions is a non-empty array; each item has area, question, and why.
+  - report_markdown presents the questions grouped by area for a human reader.
+evaluation_signals:
+  - valid_output_shape
+  - has_questions
+  - latency_p95_under(12s)
+provenance:
+  model: ${MODEL}

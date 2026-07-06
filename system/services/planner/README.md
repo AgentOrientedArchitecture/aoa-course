@@ -6,13 +6,13 @@ By default it uses a hybrid strategy: a small-registry planner model sees the
 available AU capability cards and proposes the plan, then deterministic
 validation either accepts that plan or falls back to the built-in course plan.
 
-For Session 2 there is one workflow:
+For Session 1 there is one workflow:
 
 ```
 cv-fit:  parse-cv → evaluate-cv-fit → write-cv-fit-report
 ```
 
-Session 4 adds ingest and access workflows on the same registry. The parser
+Session 2 adds ingest and access workflows on the same registry. The parser
 codebase is now deployed twice: `cv-parser` for CV parsing and `wiki-parser`
 for wiki parsing/query shaping.
 

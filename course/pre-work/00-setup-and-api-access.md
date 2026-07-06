@@ -120,7 +120,7 @@ OLLAMA_HOST=http://host.docker.internal:11434
 Then verify Ollama by starting the stack and checking the service logs:
 
 ```bash
-./scripts/session2-up.sh
+./scripts/session1-up.sh
 ./scripts/logs.sh
 ```
 
@@ -131,13 +131,13 @@ Then verify Ollama by starting the stack and checking the service logs:
 After `.env` is configured, start the session you are working on:
 
 ```bash
-./scripts/session2-up.sh
+./scripts/session1-up.sh
 ```
 
 or:
 
 ```bash
-./scripts/session4-up.sh
+./scripts/session2-up.sh
 ```
 
 Open [http://localhost:8080](http://localhost:8080) after the containers start.
@@ -146,7 +146,7 @@ If you change `.env`, restart the stack:
 
 ```bash
 ./scripts/down.sh
-./scripts/session2-up.sh
+./scripts/session1-up.sh
 ```
 
 ---
@@ -197,6 +197,6 @@ bash scripts/test_model_provider.sh
 - [ ] Copy the matching example file to `.env`.
 - [ ] Add your hosted API key if using SambaNova or NVIDIA.
 - [ ] Run `bash scripts/test_model_provider.sh` if using SambaNova or NVIDIA.
-- [ ] Start Session 2 or Session 4 and open the studio.
+- [ ] Start Session 1, 2, or 3 and open the studio.
 
 Last verified: May 2026.

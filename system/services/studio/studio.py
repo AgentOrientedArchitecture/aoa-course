@@ -31,7 +31,7 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
-SUPPORTED_WORKFLOWS = ("cv-fit", "knowledge-ingest", "wiki-graph", "knowledge-query")
+SUPPORTED_WORKFLOWS = ("cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query")
 
 
 def _configured_workflows() -> list[str]:
@@ -234,7 +234,7 @@ async def get_wiki_graph() -> JSONResponse:
 
 @app.post("/api/wiki/reset")
 async def reset_wiki() -> JSONResponse:
-    """Clear the local wiki store so Session 4 can be replayed."""
+    """Clear the local wiki store so Session 2 can be replayed."""
     if "wiki-graph" not in ENABLED_WORKFLOWS:
         raise HTTPException(status_code=404, detail="wiki graph workflow is not enabled")
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -305,13 +305,18 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind == "knowledge-query":
         return await _submit_knowledge_query(inputs, files)
 
-    if kind != "cv-fit":
+    # cv-fit and cv-fit-interview take the same CV + JD inputs; they differ only
+    # in the workflow the planner runs (the interview variant adds the
+    # EVE-authored interviewer AU as a final step).
+    if kind not in ("cv-fit", "cv-fit-interview"):
         return JSONResponse({"error": f"unknown intent kind: {kind}"}, status_code=400)
 
-    return await _submit_cv_fit(inputs, files)
+    return await _submit_cv_fit(inputs, files, kind=kind)
 
 
-async def _submit_cv_fit(inputs: dict[str, Any], files: dict[str, Any] | None = None) -> JSONResponse:
+async def _submit_cv_fit(
+    inputs: dict[str, Any], files: dict[str, Any] | None = None, kind: str = "cv-fit"
+) -> JSONResponse:
     files = files or {}
     cv_text = inputs.get("cv_text") or ""
     jd_text = inputs.get("jd_text") or ""
@@ -337,7 +342,7 @@ async def _submit_cv_fit(inputs: dict[str, Any], files: dict[str, Any] | None = 
         jd_path = _write_inbox(jd_text, jd_name)
 
     planner_body = {
-        "kind": "cv-fit",
+        "kind": kind,
         "inputs": {"cv_path": str(cv_path), "jd_path": str(jd_path)},
     }
     result = await _post_planner_intent(planner_body)
