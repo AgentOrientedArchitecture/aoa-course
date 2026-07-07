@@ -11,7 +11,13 @@ This repo holds two things:
 
 ## What you'll build
 
-Across three hands-on sessions you'll build an AOA system, starting from a single model call and ending with a small multi-capability platform that mixes agent runtimes.
+Across four hands-on sessions you'll build an AOA system, starting from a
+single model call and ending with a small multi-capability platform that mixes
+agent runtimes — and then checks its own governance against a real regulation.
+
+> Note on numbering: the repo's session profiles are the **hands-on** sequence.
+> If you are following a live course, the mapping table under
+> [Sessions](#sessions) shows which course session uses which profile.
 
 In **Session 1** you build a system that evaluates a CV against a job
 description. By the end of the session you have three governed agent runtimes
@@ -39,6 +45,17 @@ planner, and studio as the Python agents. The workflow becomes
 `parse-cv → evaluate-cv-fit → interviewer-questions`, and the planner cannot tell
 that the last step runs on a different runtime. See
 [`system/EVE.md`](system/EVE.md).
+
+In **Session 4** the estate checks itself. An `estate-check` workflow scans the
+registry's capability cards, governance lifecycle, and planner traces against
+the EU AI Act's high-risk obligations, citing the regulation verbatim from a
+corpus loaded through the Session 2 wiki pipeline. Findings and evidence only —
+never a compliance verdict. The CV-fit agents you built in Session 1 turn out
+to be Annex III high-risk (candidate evaluation), and you close two of their
+findings live: add an oversight constraint to a capability card, approve the
+card through the registry lifecycle, re-scan, and watch the findings clear —
+because the estate changed, not the checker. See
+[`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md).
 
 ## Run it
 
@@ -85,6 +102,13 @@ docker compose --env-file .env \
   up --build -d --remove-orphans
 ```
 
+Session 4 starts the full estate — CV-fit, wiki, and the estate-check scanner —
+then seeds the regulations corpus:
+
+```bash
+./scripts/session4-up.sh && ./scripts/session4-seed.sh
+```
+
 Session 3's agent is built and run entirely inside its container, so you still
 only need Docker to run it. You need Node/npm on your host only if you want to
 scaffold a brand-new EVE agent with `npx eve@latest init` (the Session 3
@@ -101,6 +125,7 @@ There are also thin helper scripts for the common paths:
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
 ./scripts/session3-up.sh
+./scripts/session4-up.sh    # + session4-seed.sh / session4-reset.sh / session4-approve.sh
 ./scripts/logs.sh
 ./scripts/down.sh
 ```
@@ -122,19 +147,10 @@ host-machine Ollama path does not need `AOA_LOCAL=1`.
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and
 ask modes. Session 3 shows CV fit plus a "CV fit + interview" mode that runs the
-EVE-authored interviewer agent.
+EVE-authored interviewer agent. Session 4 shows everything plus the "Estate
+check" mode.
 
-## Session 4 — the estate checks itself
-
-Session 4 turns the system inward: an `estate-check` workflow scans the
-registry's cards, lifecycle state, and planner traces against the EU AI Act's
-high-risk obligations, citing the regulation verbatim from a corpus loaded
-through the Session 2 wiki pipeline. Findings and evidence only — never a
-compliance verdict. See `course/data/session-04-compliance/README.md`.
-
-```bash
-./scripts/session4-up.sh && ./scripts/session4-seed.sh
-```
+If something misbehaves, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Repo layout
 
@@ -150,8 +166,9 @@ system/
   inbox/        # Studio uploads and pasted demo inputs
   wiki/         # Generated wiki raw/promoted/index files
   docker-compose.yml
-  docker-compose.session1.yml
+  docker-compose.session1.yml   # session overlays; session 2 uses the base file
   docker-compose.session3.yml
+  docker-compose.session4.yml
 .env.example
 .env.ollama
 .env.sambanova
@@ -163,9 +180,12 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 
 ## Sessions
 
-- **Session 1 — Anatomy of AOA** — CV-fit data in [`course/data/session-01-cv-fit/`](course/data/session-01-cv-fit/)
-- **Session 2 — Let's build** — wiki seed data in [`course/data/session-02-wiki/`](course/data/session-02-wiki/)
-- **Session 3 — Authoring AUs with EVE** — see [`system/EVE.md`](system/EVE.md); reuses the CV-fit data, notes in [`course/data/session-03-eve/`](course/data/session-03-eve/). Capstone lab: build your own EVE agent and meet AOA's edges — [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md)
+| Repo profile | What you do | Walkthrough / data | Used by course session |
+|---|---|---|---|
+| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Session 2 — "Name the shape" (lab: modify your agent) |
+| `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Course Session 4 — "Apply the shape" (demo) |
+| `session3` (EVE) | Author an AU with Vercel EVE, then wrap and register your own | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: scaffold-and-wrap) |
+| `session4` (estate check) | The estate scans itself against the EU AI Act and you fix findings live | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 extension / standalone demo |
 
 ## License
 

@@ -34,6 +34,7 @@ below, run each session script once and shut down again:
 ./scripts/session1-up.sh && ./scripts/down.sh
 ./scripts/session2-up.sh && ./scripts/down.sh
 ./scripts/session3-up.sh && ./scripts/down.sh
+./scripts/session4-up.sh && ./scripts/down.sh
 ```
 
 This course currently provides three tested environment examples:
@@ -233,6 +234,6 @@ bash scripts/test_model_provider.sh
 - [ ] Run `bash scripts/test_model_provider.sh` if using SambaNova or NVIDIA.
 - [ ] Run each session script once at home to build the containers, then
       `./scripts/down.sh`.
-- [ ] Start Session 1, 2, or 3 and open the studio.
+- [ ] Start any session stack and open the studio.
 
 Last verified: July 2026.
