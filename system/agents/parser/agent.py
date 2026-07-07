@@ -181,9 +181,11 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
         purpose_l = str(card.get("purpose") or "").lower()
         oversight_in_purpose = any(m in purpose_l for m in _OVERSIGHT_MARKERS)
         lifecycle = card.get("lifecycle") or {}
+        # Match the acting-capability key precisely: findings and context
+        # records may mention other capability ids without invoking them.
         evidence_lines = [
             line for line in trace_lines
-            if f'"{cap_id}"' in line and '"capability-context"' not in line
+            if f'"capability": "{cap_id}"' in line
         ]
         inventory.append({
             "capability_id": cap_id,

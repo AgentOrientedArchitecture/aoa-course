@@ -338,35 +338,76 @@ async def _watch_skills(
     """
     from watchfiles import awatch
 
-    paths = [str(c.skills_path) for c in capabilities if c.skills_path.exists()]
-    if not paths:
+    skills_by_path = {str(c.skills_path): c for c in capabilities if c.skills_path.exists()}
+    cards_by_path = {str(c.card_path): c for c in capabilities if c.card_path.exists()}
+    if not skills_by_path and not cards_by_path:
         return
 
-    by_path = {str(c.skills_path): c for c in capabilities}
-    logger.info("watching %d instructions.md file(s) for hot reload", len(paths))
+    # Watch the capability directories rather than the files themselves:
+    # editors and git replace files by rename, which silently drops a
+    # file-level watch after the first swap.
+    watch_dirs = sorted({str(c.card_path.parent) for c in capabilities if c.card_path.parent.exists()})
 
-    async for changes in awatch(*paths):
+    logger.info(
+        "watching %d capability folder(s) for hot reload (%d instructions, %d cards)",
+        len(watch_dirs), len(skills_by_path), len(cards_by_path),
+    )
+
+    async for changes in awatch(*watch_dirs):
         touched: set[str] = set()
         for _change_type, changed_path in changes:
-            if changed_path in by_path:
+            if changed_path in skills_by_path or changed_path in cards_by_path:
                 touched.add(changed_path)
         for changed_path in touched:
-            cap = by_path[changed_path]
-            try:
-                new_text = cap.skills_path.read_text()
-            except FileNotFoundError:
-                continue
-            new_hash = _sha256(new_text)
-            old_hash = cap.card.get("provenance", {}).get("skills_hash")
-            if new_hash == old_hash:
-                continue
-            cap.skills_text = new_text
-            cap.card.setdefault("provenance", {})["skills_hash"] = new_hash
-            try:
-                registry.update(cap.card)
-                logger.info("reloaded %s (skills_hash %s)", cap.id, new_hash[:8])
-            except Exception:  # noqa: BLE001
-                logger.exception("failed to update %s on registry", cap.id)
+            if changed_path in skills_by_path:
+                cap = skills_by_path[changed_path]
+                try:
+                    new_text = cap.skills_path.read_text()
+                except FileNotFoundError:
+                    continue
+                new_hash = _sha256(new_text)
+                old_hash = cap.card.get("provenance", {}).get("skills_hash")
+                if new_hash == old_hash:
+                    continue
+                cap.skills_text = new_text
+                cap.card.setdefault("provenance", {})["skills_hash"] = new_hash
+                try:
+                    registry.update(cap.card)
+                    logger.info("reloaded %s (skills_hash %s)", cap.id, new_hash[:8])
+                except Exception:  # noqa: BLE001
+                    logger.exception("failed to update %s on registry", cap.id)
+            else:
+                # Card edits are governance events too: re-read the public
+                # promise, re-stamp the scaffold-owned fields, re-register.
+                cap = cards_by_path[changed_path]
+                try:
+                    with cap.card_path.open() as f:
+                        new_card = yaml.safe_load(f) or {}
+                except (FileNotFoundError, yaml.YAMLError):
+                    logger.exception("card edit for %s did not parse; keeping the old card", cap.id)
+                    continue
+                if new_card.get("id") != cap.id:
+                    logger.warning("card edit for %s changed its id; ignoring", cap.id)
+                    continue
+                new_card.setdefault("provenance", {})["skills_hash"] = (
+                    _sha256(cap.skills_text) if cap.skills_text else ""
+                )
+                prov = new_card.setdefault("provenance", {})
+                if prov.get("model") in (None, "${MODEL}"):
+                    prov["model"] = os.environ.get("MODEL", "${MODEL}")
+                identity = _agent_identity()
+                new_card["agent_id"] = identity["agent_id"]
+                new_card.setdefault("identity", {}).update(identity)
+                new_card["endpoint"] = _agent_endpoint()
+                if new_card.get("kind") == "au":
+                    new_card["agent_card_url"] = _agent_card_url()
+                    new_card["a2a_endpoint"] = _agent_a2a_endpoint()
+                cap.card = new_card
+                try:
+                    registry.update(cap.card)
+                    logger.info("reloaded %s (capability card edited)", cap.id)
+                except Exception:  # noqa: BLE001
+                    logger.exception("failed to update %s on registry", cap.id)
 
 
 # ----------------------------------------------------------------------
