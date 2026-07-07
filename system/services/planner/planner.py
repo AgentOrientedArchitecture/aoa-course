@@ -307,6 +307,56 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "estate-check": Workflow(
+        name="estate-check",
+        tasks=[
+            # Session 4: the estate scans itself. The parser reads the
+            # registry's persisted cards and the planner's traces through
+            # tool-filesystem — governance artefacts as ordinary files.
+            TaskSpec(
+                id="scan-estate",
+                purpose="Inventory registered capability cards, lifecycle state, and trace evidence.",
+                discovery={
+                    "kind": "au",
+                    "text": "scan estate inventory capability cards lifecycle traces governance",
+                    "required_inputs": [{"name": "estate_root", "type": "string"}],
+                    "required_outputs": [{"name": "inventory"}],
+                },
+                input_map={"estate_root": "inputs.estate_root"},
+            ),
+            TaskSpec(
+                id="evaluate-compliance",
+                purpose="Check the estate inventory against EU AI Act high-risk obligations with regulation citations.",
+                discovery={
+                    "kind": "au",
+                    "text": "evaluate compliance obligations eu ai act findings citations risk tier",
+                    "required_inputs": [{"name": "inventory", "type": "array"}],
+                    "required_outputs": [
+                        {"name": "findings"},
+                        {"name": "summary"},
+                    ],
+                },
+                input_map={"inventory": "scan-estate.outputs.inventory"},
+            ),
+            TaskSpec(
+                id="write-findings-report",
+                purpose="Render the estate-check findings report with evidence and citations.",
+                discovery={
+                    "kind": "au",
+                    "text": "write findings report markdown posture evidence regulation citations",
+                    "required_inputs": [
+                        {"name": "inventory", "type": "array"},
+                        {"name": "findings", "type": "object"},
+                    ],
+                    "required_outputs": [{"name": "findings_markdown"}],
+                },
+                input_map={
+                    "inventory": "scan-estate.outputs.inventory",
+                    "findings": "evaluate-compliance.outputs",
+                },
+            ),
+        ],
+    ),
 }
 
 
@@ -321,6 +371,8 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
         return WORKFLOWS["knowledge-ingest"]
     if kind is None and {"question"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["knowledge-query"]
+    if kind is None and {"estate_root"} <= set(intent.get("inputs", {})):
+        return WORKFLOWS["estate-check"]
     raise HTTPException(status_code=400, detail=f"no workflow for intent kind={kind!r}")
 
 
@@ -436,6 +488,9 @@ def _deterministic_capability_for_task(task: TaskSpec) -> str:
         "parse-query": "parser-query",
         "evaluate-wiki-query": "evaluator-wiki-query",
         "write-grounded-answer": "reporter-answer",
+        "scan-estate": "parser-estate",
+        "evaluate-compliance": "evaluator-compliance",
+        "write-findings-report": "reporter-findings",
     }
     return matches.get(task.id, "")
 
@@ -663,9 +718,9 @@ def _validate_plan(
         })
 
     final_outputs = prior_outputs.get(planned_tasks[-1].id, set())
-    final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown"}
+    final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown", "findings_markdown"}
     if not final_markdown_outputs.intersection(final_outputs):
-        raise ValueError("final task must produce report_markdown, answer_markdown, or ingest_markdown")
+        raise ValueError("final task must produce report_markdown, answer_markdown, ingest_markdown, or findings_markdown")
     return planned_tasks, {"valid": True, "checks": checks}
 
 

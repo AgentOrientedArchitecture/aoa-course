@@ -6,7 +6,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-const WORKFLOWS = ["cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query"];
+const WORKFLOWS = ["cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query", "estate-check"];
 
 // cv-fit-interview reuses the CV + JD form panel of cv-fit; it only differs in the
 // workflow the planner runs (it adds the EVE interviewer as a final step).
@@ -1046,7 +1046,7 @@ function renderResult(life) {
     body.textContent = "No result yet.";
     return;
   }
-  const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || "";
+  const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || life.result.findings_markdown || "";
   resultState.textContent = life.result.error ? "error" : "complete";
   body.className = "result-body";
   if (markdown) {
@@ -1132,7 +1132,7 @@ function pickPayload(record) {
 function pickMarkdown(record) {
   const outputs = record.outputs || {};
   if (record.step === "response" || record.step === "finish") {
-    return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || "";
+    return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || outputs.findings_markdown || "";
   }
   return "";
 }
@@ -1317,6 +1317,11 @@ function buildIntentPayload(status) {
       note_name: state.noteName || "source-note.txt",
       note_file: state.noteFile,
     };
+  }
+
+  if (state.mode === "estate-check") {
+    // No inputs: the scan reads the estate's own governance artefacts.
+    return { kind: "estate-check" };
   }
 
   const question = $("intent-question").value.trim();

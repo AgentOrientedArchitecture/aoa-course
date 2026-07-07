@@ -124,6 +124,18 @@ Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and
 ask modes. Session 3 shows CV fit plus a "CV fit + interview" mode that runs the
 EVE-authored interviewer agent.
 
+## Session 4 — the estate checks itself
+
+Session 4 turns the system inward: an `estate-check` workflow scans the
+registry's cards, lifecycle state, and planner traces against the EU AI Act's
+high-risk obligations, citing the regulation verbatim from a corpus loaded
+through the Session 2 wiki pipeline. Findings and evidence only — never a
+compliance verdict. See `course/data/session-04-compliance/README.md`.
+
+```bash
+./scripts/session4-up.sh && ./scripts/session4-seed.sh
+```
+
 ## Repo layout
 
 ```

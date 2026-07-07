@@ -1,0 +1,39 @@
+{
+ "promotion": {
+  "title": "EU AI Act - Article 9: Risk management system",
+  "summary": "Article 9 of Regulation (EU) 2024/1689 sets the risk management system obligation for high-risk AI systems.",
+  "concepts": [
+   "EU AI Act - Article 9"
+  ],
+  "relationships": [],
+  "open_questions": [],
+  "promoted_passages": [
+   {
+    "passage_id": "p1",
+    "quote": "1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.",
+    "why_it_matters": "Article 9 obligation (risk management system) - verbatim operative text."
+   },
+   {
+    "passage_id": "p2",
+    "quote": "2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating.",
+    "why_it_matters": "Article 9 obligation (risk management system) - verbatim operative text."
+   },
+   {
+    "passage_id": "p3",
+    "quote": "3. The risks referred to in this Article shall concern only those which may be reasonably mitigated or eliminated through the development or design of the high-risk AI system, or the provision of adequate technical information.",
+    "why_it_matters": "Article 9 obligation (risk management system) - verbatim operative text."
+   },
+   {
+    "passage_id": "p4",
+    "quote": "4. The risk management measures referred to in paragraph 2, point (d), shall give due consideration to the effects and possible interaction resulting from the combined application of the requirements set out in this Section, with a view to minimising risks more effectively while achieving an appropriate balance in implementing the measures to fulfil those requirements.",
+    "why_it_matters": "Article 9 obligation (risk management system) - verbatim operative text."
+   },
+   {
+    "passage_id": "p5",
+    "quote": "5. The risk management measures referred to in paragraph 2, point (d), shall be such that the relevant residual risk associated with each hazard, as well as the overall residual risk of the high-risk AI systems is judged to be acceptable.",
+    "why_it_matters": "Article 9 obligation (risk management system) - verbatim operative text."
+   }
+  ]
+ },
+ "source_file": "03-aia-art9-risk-management-system.md"
+}

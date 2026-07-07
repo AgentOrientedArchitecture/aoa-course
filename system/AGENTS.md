@@ -243,3 +243,26 @@ The filesystem, document text extractor, and wiki store are MCP-backed examples.
 [`tools/filesystem/`](tools/filesystem/) and
 [`tools/document-text/`](tools/document-text/) plus
 [`tools/wiki-store/`](tools/wiki-store/).
+
+## Session 4 — estate-check (compliance findings)
+
+The `estate-check` workflow (`parser-estate` → `evaluator-compliance` →
+`reporter-findings`) scans the estate's own governance artefacts against the
+EU AI Act. Conventions it adds:
+
+- `parser-estate` consumes `tool-filesystem` over two read-only mounts
+  (`/data/estate/registry`, `/data/estate/traces`) declared in
+  `docker-compose.session4.yml` — governance artefacts read as ordinary files.
+- `evaluator-compliance` treats severities as evidence statements: green =
+  evidence present (never "obligation satisfied"), amber = partial, red =
+  absent, unknown = the regulations corpus is silent (abstain, never
+  paraphrase the law from model memory).
+- `reporter-findings` is deterministic and machine-checks its own language
+  rule via the `no_compliance_verdict` signal.
+- The regulations corpus lives in the wiki store; seed with
+  `scripts/session4-seed.sh`, reset the demo state with
+  `scripts/session4-reset.sh`, approve the staged card with
+  `scripts/session4-approve.sh`.
+- Capability-card edits now hot-reload exactly like `instructions.md` edits:
+  the `_base` watcher observes each capability folder and re-registers on
+  change, preserving registry lifecycle.

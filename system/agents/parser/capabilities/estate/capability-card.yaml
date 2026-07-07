@@ -1,0 +1,30 @@
+id: parser-estate
+version: 0.1.0
+kind: au
+purpose: |
+  Inventory the AOA estate's own governance artefacts: registered capability
+  cards, registry lifecycle state, and planner trace evidence. Produces a
+  typed estate inventory for downstream obligation checking.
+inputs:
+  - name: estate_root
+    type: string
+    required: true
+outputs:
+  - name: inventory
+    type: array
+  - name: scanned_at
+    type: string
+  - name: trace_files_scanned
+    type: number
+constraints:
+  - The output is a single JSON object.
+  - Reads only via tool-filesystem under its configured root; never mutates the estate.
+  - Every inventory row names the capability_id and agent_id it describes.
+  - Deterministic; no model call is made.
+evaluation_signals:
+  - valid_output_shape
+  - cards_read
+  - traces_scanned
+  - latency_p95_under(5s)
+provenance:
+  model: none

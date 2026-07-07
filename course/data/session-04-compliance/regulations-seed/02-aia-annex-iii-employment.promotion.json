@@ -1,0 +1,24 @@
+{
+ "promotion": {
+  "title": "EU AI Act - Annex III point 4: employment, workers management and access to self-employment (high-risk)",
+  "summary": "Annex III lists the use cases classified high-risk under Article 6(2). Point 4 covers employment: recruitment, selection, candidate evaluation, and work-related decisions.",
+  "concepts": [
+   "EU AI Act - Annex III point 4"
+  ],
+  "relationships": [],
+  "open_questions": [],
+  "promoted_passages": [
+   {
+    "passage_id": "p1",
+    "quote": "AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates;",
+    "why_it_matters": "Annex III point 4 is what makes recruitment and candidate-evaluation systems high-risk."
+   },
+   {
+    "passage_id": "p2",
+    "quote": "4. Employment, workers\u2019 management and access to self-employment: (a) AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates; (b) AI systems intended to be used to make decisions affecting terms of work-related relationships, the promotion or termination of work-related contractual relationships, to allocate tasks based on individual behaviour or personal traits or characteristics or to monitor and evaluate the performance and behaviour of persons in such relationships.",
+    "why_it_matters": "Annex III point 4 is what makes recruitment and candidate-evaluation systems high-risk."
+   }
+  ]
+ },
+ "source_file": "02-aia-annex-iii-employment.md"
+}

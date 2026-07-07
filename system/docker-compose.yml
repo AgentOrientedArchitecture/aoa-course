@@ -15,7 +15,7 @@ services:
   # Services
   # ------------------------------------------------------------------
   registry:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./services/registry
     image: aoa-course/registry:latest
@@ -42,7 +42,7 @@ services:
       retries: 20
 
   planner:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./services/planner
     image: aoa-course/planner:latest
@@ -72,7 +72,7 @@ services:
         condition: service_healthy
 
   studio:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./services/studio
     image: aoa-course/studio:latest
@@ -97,7 +97,7 @@ services:
   # Tools
   # ------------------------------------------------------------------
   tool-filesystem:
-    profiles: ["session2"]
+    profiles: ["session2", "session4"]
     build:
       context: ./tools/filesystem
     image: aoa-course/tool-filesystem:latest
@@ -116,7 +116,7 @@ services:
         condition: service_healthy
 
   tool-document-text:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./tools/document-text
     image: aoa-course/tool-document-text:latest
@@ -135,7 +135,7 @@ services:
         condition: service_healthy
 
   tool-wiki-store:
-    profiles: ["session2"]
+    profiles: ["session2", "session4"]
     build:
       context: ./tools/wiki-store
     image: aoa-course/tool-wiki-store:latest
@@ -159,7 +159,7 @@ services:
   # Agents
   # ------------------------------------------------------------------
   cv-parser:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
@@ -199,7 +199,7 @@ services:
         condition: service_started
 
   wiki-parser:
-    profiles: ["session2"]
+    profiles: ["session2", "session4"]
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
@@ -238,8 +238,48 @@ services:
       tool-document-text:
         condition: service_started
 
+  estate-parser:
+    profiles: ["session4"]
+    build:
+      context: ./agents
+      dockerfile: parser/Dockerfile
+    image: aoa-course/parser:latest
+    container_name: aoa-estate-parser
+    ports:
+      - "7306:8888"
+    volumes:
+      # Same parser code and capability tree as cv-parser / wiki-parser; the
+      # allowlist plus AGENT_ID make this a separate governed runtime that
+      # inventories the estate's own governance artefacts.
+      - ./agents/parser/capabilities:/app/capabilities:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:estate-parser
+      AGENT_NAME: estate-parser
+      AGENT_HOST: estate-parser
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: parser-estate
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-filesystem:
+        condition: service_started
+
   evaluator:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./agents
       dockerfile: evaluator/Dockerfile
@@ -277,7 +317,7 @@ services:
         condition: service_started
 
   reporter:
-    profiles: ["session1", "session2", "session3"]
+    profiles: ["session1", "session2", "session3", "session4"]
     build:
       context: ./agents
       dockerfile: reporter/Dockerfile

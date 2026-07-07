@@ -1,0 +1,29 @@
+id: reporter-findings
+version: 0.1.0
+kind: au
+purpose: |
+  Render an estate-check findings report for a human reader: posture summary
+  table, per-finding detail with evidence pointers and regulation citations,
+  and corpus gaps. Findings and evidence only - never a compliance verdict.
+inputs:
+  - name: inventory
+    type: array
+    required: true
+  - name: findings
+    type: object
+    required: true
+outputs:
+  - name: findings_markdown
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - The report opens with the fixed scope banner and closes with the evidence-by-construction footer.
+  - The report never contains the words compliant, complies, or certified.
+  - Deterministic template; no model call is made.
+evaluation_signals:
+  - valid_output_shape
+  - has_markdown
+  - no_compliance_verdict
+  - all_findings_rendered
+provenance:
+  model: none

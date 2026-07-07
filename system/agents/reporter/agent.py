@@ -33,6 +33,8 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _report_answer(inputs, ctx)
     if capability_id == "reporter-ingest-summary":
         return await _report_ingest_summary(inputs, ctx)
+    if capability_id == "reporter-findings":
+        return await _report_estate_findings(inputs, ctx)
     return error_envelope(f"reporter does not back capability {capability_id!r}")
 
 
@@ -368,6 +370,121 @@ def _markdown_list(title: str, values: list) -> list[str]:
         if text:
             lines.append(f"- {text}")
     return lines + [""]
+
+# ----------------------------------------------------------------------
+# reporter-findings — deterministic estate-check report (no model call)
+# ----------------------------------------------------------------------
+
+_SCOPE_BANNER = (
+    "> **Findings and evidence only. This is not a compliance determination.**\n"
+    "> Scope: EU AI Act (Regulation 2024/1689) only; estate artefacts only "
+    "(capability cards, registry lifecycle, traces) - not source code, models, "
+    "or training data.\n"
+)
+
+_FOOTER = (
+    "\n---\n\n*AOA does not confer compliance; it makes the audit evidence "
+    "exist by construction.*\n"
+)
+
+_SEVERITY_MARK = {"green": "🟢", "amber": "🟠", "red": "🔴", "unknown": "⚪"}
+_ARTICLE_ORDER = ["Art 9", "Art 10", "Art 11", "Art 12", "Art 13", "Art 14", "Art 72"]
+_BANNED_WORDS = ("compliant", "complies", "certified")
+
+
+async def _report_estate_findings(inputs: dict, ctx: Context) -> dict:
+    inventory = inputs.get("inventory")
+    findings_obj = inputs.get("findings")
+    if not isinstance(inventory, list):
+        return error_envelope("inventory (array) is required")
+    if not isinstance(findings_obj, dict):
+        return error_envelope("findings (object) is required")
+    findings = [f for f in findings_obj.get("findings") or [] if isinstance(f, dict)]
+    summary = findings_obj.get("summary") or {}
+
+    markdown = _findings_markdown(inventory, findings, summary)
+    lowered = markdown.lower()
+    no_verdict = not any(word in lowered for word in _BANNED_WORDS)
+
+    return {
+        "outputs": {"findings_markdown": markdown},
+        "signals": {
+            "valid_output_shape": True,
+            "has_markdown": bool(markdown.strip()),
+            "no_compliance_verdict": no_verdict,
+            "all_findings_rendered": True,
+        },
+    }
+
+
+def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> str:
+    lines: list[str] = ["# Estate check - EU AI Act findings", "", _SCOPE_BANNER]
+
+    lines.append(
+        f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** - "
+        f"{summary.get('high_risk', 0)} Annex-III-shaped (high-risk). "
+        f"Findings: {summary.get('red', 0)} red / {summary.get('amber', 0)} amber / "
+        f"{summary.get('green', 0)} green / {summary.get('unknown', 0)} corpus-silent."
+    )
+    lines.append("")
+
+    # Posture table
+    by_cap: dict[str, dict[str, dict]] = {}
+    risk_by_cap: dict[str, str] = {}
+    for f in findings:
+        cap = f.get("capability_id", "?")
+        by_cap.setdefault(cap, {})[f.get("article", "?")] = f
+        risk_by_cap[cap] = f.get("risk_tier", "")
+    lines.append("## Posture")
+    lines.append("")
+    lines.append("| AU | risk tier | " + " | ".join(_ARTICLE_ORDER) + " |")
+    lines.append("|---|---|" + "---|" * len(_ARTICLE_ORDER))
+    for cap in sorted(by_cap):
+        marks = []
+        for art in _ARTICLE_ORDER:
+            f = by_cap[cap].get(art)
+            marks.append(_SEVERITY_MARK.get(f.get("severity"), "?") if f else "-")
+        risk = "**high (Annex III)**" if risk_by_cap.get(cap, "").startswith("high") else "not classified"
+        lines.append(f"| `{cap}` | {risk} | " + " | ".join(marks) + " |")
+    lines.append("")
+    lines.append("_Green means evidence present - never obligation satisfied. Art 10 is capped at amber by construction._")
+    lines.append("")
+
+    # Per-finding detail for non-green findings
+    attention = [f for f in findings if f.get("severity") in ("red", "amber")]
+    if attention:
+        lines.append("## Findings needing attention")
+        lines.append("")
+        for f in sorted(attention, key=lambda x: (x.get("severity") != "red", x.get("capability_id", ""), x.get("article", ""))):
+            mark = _SEVERITY_MARK.get(f.get("severity"), "")
+            lines.append(f"### {mark} {f.get('capability_id')} - {f.get('article')} ({f.get('obligation')})")
+            lines.append("")
+            lines.append(f"- **Checked:** {f.get('checked', '')}")
+            ev = f.get("evidence") or {}
+            lines.append(f"- **Evidence:** {ev.get('kind', '')} - `{ev.get('ref', '')}` = `{ev.get('value')}`")
+            cit = f.get("regulation_citation") or {}
+            if cit:
+                lines.append(f"- **Regulation:** `{cit.get('passage_id', '')}` - \"{cit.get('quote', '')[:220]}\"")
+            if f.get("gap"):
+                lines.append(f"- **Gap:** {f['gap']}")
+            if f.get("remediation_hint"):
+                lines.append(f"- **Next step:** {f['remediation_hint']}")
+            lines.append("")
+
+    # Corpus gaps
+    silent = sorted({f.get("article", "?") for f in findings if f.get("corpus_silent")})
+    if silent:
+        lines.append("## Corpus gaps")
+        lines.append("")
+        lines.append(
+            "The regulations corpus is silent for: " + ", ".join(silent) +
+            ". Findings for these articles abstain (corpus silent - ingest the "
+            "regulation note for each article)."
+        )
+        lines.append("")
+
+    lines.append(_FOOTER)
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

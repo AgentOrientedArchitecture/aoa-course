@@ -60,6 +60,9 @@ class McpClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=sys.stderr.buffer,
             env=env,
+            # JSON-RPC responses are single lines; large file reads exceed
+            # asyncio's default 64 KiB readline limit once JSON-escaped.
+            limit=8 * 1024 * 1024,
         )
         await self.request("initialize", {})
         tools = (await self.request("tools/list", {})).get("tools", [])

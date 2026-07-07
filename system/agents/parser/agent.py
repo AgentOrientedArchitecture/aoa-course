@@ -38,6 +38,8 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _parse_notes(inputs, ctx)
     if capability_id == "parser-query":
         return await _parse_query(inputs, ctx)
+    if capability_id == "parser-estate":
+        return await _parse_estate(inputs, ctx)
     return error_envelope(f"parser does not back capability {capability_id!r}")
 
 
@@ -127,6 +129,138 @@ async def _parse_query(inputs: dict, ctx: Context) -> dict:
             "latency_seconds": completion.latency_seconds,
         },
     }
+
+# ----------------------------------------------------------------------
+# parser-estate — deterministic estate inventory (no model call)
+# ----------------------------------------------------------------------
+
+import json as _json
+import time as _time
+
+_OVERSIGHT_MARKERS = ("escalat", "human review", "human oversight", "approval", "judgement boundary", "judgment boundary")
+
+
+async def _parse_estate(inputs: dict, ctx: Context) -> dict:
+    """Inventory registered cards, lifecycle state, and trace evidence.
+
+    Deliberately deterministic: the estate scan is a read of governance
+    artefacts, not a judgement. Reads go through tool-filesystem so the trace
+    shows the boundary.
+    """
+    started = _time.monotonic()
+    estate_root = inputs.get("estate_root")
+    if not estate_root:
+        return error_envelope("estate_root is required")
+
+    fs = ctx.tools.get("tool-filesystem")
+    if fs is None:
+        return error_envelope("tool-filesystem is not available")
+
+    cards_path = f"{estate_root}/registry/cards.json"
+    cards_outputs = await fs({"op": "read_file", "path": cards_path})
+    try:
+        cards = _json.loads(cards_outputs.get("text") or "{}")
+    except _json.JSONDecodeError:
+        return error_envelope(f"could not parse {cards_path} as JSON")
+    if isinstance(cards, list):
+        cards = {c.get("id", f"card-{i}"): c for i, c in enumerate(cards)}
+    if not isinstance(cards, dict):
+        return error_envelope("cards.json did not contain a card mapping")
+
+    trace_lines, trace_files = await _read_trace_lines(fs, estate_root)
+
+    inventory = []
+    for cap_id, card in sorted(cards.items()):
+        if not isinstance(card, dict) or card.get("kind") != "au":
+            continue
+        constraints = [str(c) for c in card.get("constraints") or []]
+        oversight = [
+            c for c in constraints
+            if any(marker in c.lower() for marker in _OVERSIGHT_MARKERS)
+        ]
+        purpose_l = str(card.get("purpose") or "").lower()
+        oversight_in_purpose = any(m in purpose_l for m in _OVERSIGHT_MARKERS)
+        lifecycle = card.get("lifecycle") or {}
+        # Match the acting-capability key precisely: findings and context
+        # records may mention other capability ids without invoking them.
+        evidence_lines = [
+            line for line in trace_lines
+            if f'"capability": "{cap_id}"' in line
+        ]
+        inventory.append({
+            "capability_id": cap_id,
+            "kind": "au",
+            "agent_id": card.get("agent_id", ""),
+            "purpose": str(card.get("purpose") or "").strip(),
+            "version": card.get("version", ""),
+            "card_fields": {
+                "has_purpose": bool(str(card.get("purpose") or "").strip()),
+                "has_inputs": bool(card.get("inputs")),
+                "has_outputs": bool(card.get("outputs")),
+                "has_constraints": bool(constraints),
+                "has_version": bool(card.get("version")),
+            },
+            "lifecycle": {
+                "status": lifecycle.get("status", ""),
+                "published_by": lifecycle.get("published_by", ""),
+                "approved_by": lifecycle.get("approved_by", ""),
+                "reviewed_by": lifecycle.get("reviewed_by", ""),
+                "replaced_by": lifecycle.get("replaced_by", ""),
+                "deprecated_by": lifecycle.get("deprecated_by", ""),
+            },
+            "evaluation_signals": [str(sig) for sig in card.get("evaluation_signals") or []],
+            "declared_tools": [
+                item.get("name") if isinstance(item, dict) else str(item)
+                for item in card.get("inputs") or []
+            ],
+            "oversight_declared": bool(oversight) or oversight_in_purpose,
+            "oversight_evidence": oversight[:2],
+            "trace_evidence": {
+                "invocations": len(evidence_lines),
+                "trace_files_scanned": trace_files,
+            },
+        })
+
+    outputs = {
+        "inventory": inventory,
+        "scanned_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "trace_files_scanned": trace_files,
+    }
+    return {
+        "outputs": outputs,
+        "signals": {
+            "valid_output_shape": True,
+            "cards_read": len(inventory),
+            "traces_scanned": trace_files,
+            "latency_seconds": round(_time.monotonic() - started, 2),
+        },
+    }
+
+
+async def _read_trace_lines(fs, estate_root: str, cap: int = 20) -> tuple[list[str], int]:
+    """Read the most recent trace files (by name) and return their lines."""
+    traces_dir = f"{estate_root}/traces"
+    try:
+        listing = await fs({"op": "list_directory", "path": traces_dir})
+    except Exception as exc:  # visible, not silent: the scan is evidence
+        return [f'__trace_read_error__ {exc!r}'], 0
+    entries = listing.get("entries") or []
+    names = sorted(
+        e.get("name") for e in entries
+        if isinstance(e, dict) and str(e.get("name", "")).endswith(".jsonl")
+    )[-cap:]
+    lines: list[str] = []
+    count = 0
+    for name in names:
+        try:
+            read = await fs({"op": "read_file", "path": f"{traces_dir}/{name}"})
+        except Exception:
+            continue
+        text = read.get("text") or ""
+        if text:
+            lines.extend(text.splitlines())
+            count += 1
+    return lines, count
 
 
 if __name__ == "__main__":
