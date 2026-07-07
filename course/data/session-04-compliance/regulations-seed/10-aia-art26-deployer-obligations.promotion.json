@@ -1,0 +1,34 @@
+{
+ "promotion": {
+  "title": "EU AI Act - Article 26: obligations of deployers of high-risk AI systems",
+  "summary": "Article 26 places obligations on deployers (users) of high-risk AI systems, including use per instructions, human oversight assignment, input data control, monitoring, and log retention.",
+  "concepts": [
+   "EU AI Act - Article 26"
+  ],
+  "relationships": [],
+  "open_questions": [],
+  "promoted_passages": [
+   {
+    "passage_id": "p1",
+    "quote": "1. Deployers of high-risk AI systems shall take appropriate technical and organisational measures to ensure they use such systems in accordance with the instructions for use accompanying the systems, pursuant to paragraphs 3 and 6.",
+    "why_it_matters": "Article 26 - the deployer-side obligations; relevant when the estate consumes rather than provides a high-risk system."
+   },
+   {
+    "passage_id": "p2",
+    "quote": "2. Deployers shall assign human oversight to natural persons who have the necessary competence, training and authority, as well as the necessary support.",
+    "why_it_matters": "Article 26 - the deployer-side obligations; relevant when the estate consumes rather than provides a high-risk system."
+   },
+   {
+    "passage_id": "p3",
+    "quote": "3. The obligations set out in paragraphs 1 and 2, are without prejudice to other deployer obligations under Union or national law and to the deployer\u2019s freedom to organise its own resources and activities for the purpose of implementing the human oversight measures indicated by the provider.",
+    "why_it_matters": "Article 26 - the deployer-side obligations; relevant when the estate consumes rather than provides a high-risk system."
+   },
+   {
+    "passage_id": "p4",
+    "quote": "4. Without prejudice to paragraphs 1 and 2, to the extent the deployer exercises control over the input data, that deployer shall ensure that input data is relevant and sufficiently representative in view of the intended purpose of the high-risk AI system.",
+    "why_it_matters": "Article 26 - the deployer-side obligations; relevant when the estate consumes rather than provides a high-risk system."
+   }
+  ]
+ },
+ "source_file": "10-aia-art26-deployer-obligations.md"
+}

@@ -240,8 +240,8 @@ async def _read_trace_lines(fs, estate_root: str, cap: int = 20) -> tuple[list[s
     traces_dir = f"{estate_root}/traces"
     try:
         listing = await fs({"op": "list_directory", "path": traces_dir})
-    except Exception:
-        return [], 0
+    except Exception as exc:  # visible, not silent: the scan is evidence
+        return [f'__trace_read_error__ {exc!r}'], 0
     entries = listing.get("entries") or []
     names = sorted(
         e.get("name") for e in entries
