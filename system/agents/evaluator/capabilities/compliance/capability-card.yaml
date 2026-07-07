@@ -1,0 +1,30 @@
+id: evaluator-compliance
+version: 0.1.0
+kind: au
+purpose: |
+  Evaluate an estate inventory against the EU AI Act's high-risk obligations
+  (Articles 9-14 and 72) plus Annex III risk-tier classification, citing
+  regulation passages retrieved from the course wiki store. Emits findings and
+  evidence only - never a compliance verdict.
+inputs:
+  - name: inventory
+    type: array
+    required: true
+outputs:
+  - name: findings
+    type: array
+  - name: summary
+    type: object
+constraints:
+  - The output is a single JSON object.
+  - Findings carry evidence pointers and regulation citations (passage ids); a finding with no retrievable regulation passage is marked corpus_silent with severity unknown, never invented from model memory.
+  - Severity green means evidence present, never obligation satisfied; Article 10 findings are capped at amber by construction.
+  - No output may state or imply a compliance determination.
+evaluation_signals:
+  - valid_output_shape
+  - risk_tier_assigned
+  - all_findings_cited
+  - corpus_present
+  - latency_p95_under(20s)
+provenance:
+  model: ${MODEL}

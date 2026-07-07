@@ -1,0 +1,39 @@
+# Session 4 runs the full estate — CV-fit + wiki + estate-check — so the
+# compliance scanner has something real to scan: registered cards, governance
+# lifecycle, and traces from workflows the audience just ran. The wiki store
+# doubles as the regulations corpus (seed it with scripts/session4-seed.sh).
+#
+# Use with:
+#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session4.yml --profile session4 up --build -d --remove-orphans
+
+services:
+  registry:
+    environment:
+      REGISTRY_CARD_ALLOWLIST: tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,evaluator-cv,reporter-cv-fit,parser-notes,parser-query,evaluator-promote,evaluator-wiki-query,reporter-ingest-summary,reporter-answer,parser-estate,evaluator-compliance,reporter-findings
+
+  planner:
+    environment:
+      # Deterministic keeps the demo reliable: the planner runs the fixed
+      # estate-check workflow instead of asking a small local model to
+      # rediscover the three-step plan each time.
+      PLANNER_STRATEGY: deterministic
+
+  studio:
+    environment:
+      STUDIO_WORKFLOWS: cv-fit,estate-check,knowledge-ingest,wiki-graph,knowledge-query
+
+  tool-filesystem:
+    volumes:
+      # The estate's own governance artefacts, read-only: the registry's
+      # persisted card record and the planner's traces. The estate scanner
+      # reads governance as ordinary files under /data/estate.
+      - ./services/registry/data:/data/estate/registry:ro
+      - ./services/planner/traces:/data/estate/traces:ro
+
+  evaluator:
+    environment:
+      CAPABILITY_ALLOWLIST: evaluator-cv,evaluator-promote,evaluator-wiki-query,evaluator-compliance
+
+  reporter:
+    environment:
+      CAPABILITY_ALLOWLIST: reporter-cv-fit,reporter-ingest-summary,reporter-answer,reporter-findings

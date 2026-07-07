@@ -31,7 +31,7 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
-SUPPORTED_WORKFLOWS = ("cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query")
+SUPPORTED_WORKFLOWS = ("cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query", "estate-check")
 
 
 def _configured_workflows() -> list[str]:
@@ -305,6 +305,9 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind == "knowledge-query":
         return await _submit_knowledge_query(inputs, files)
 
+    if kind == "estate-check":
+        return await _submit_estate_check()
+
     # cv-fit and cv-fit-interview take the same CV + JD inputs; they differ only
     # in the workflow the planner runs (the interview variant adds the
     # EVE-authored interviewer AU as a final step).
@@ -389,6 +392,19 @@ async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] 
     planner_body = {
         "kind": "knowledge-query",
         "inputs": {"question": question},
+    }
+    result = await _post_planner_intent(planner_body)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(result)
+
+
+async def _submit_estate_check() -> JSONResponse:
+    """Run the estate scan. No upload: the scan reads the estate's own
+    governance artefacts (cards, lifecycle, traces) via tool-filesystem."""
+    planner_body = {
+        "kind": "estate-check",
+        "inputs": {"estate_root": "/data/estate"},
     }
     result = await _post_planner_intent(planner_body)
     if isinstance(result, JSONResponse):

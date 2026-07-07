@@ -42,6 +42,8 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _promote_note(inputs, ctx)
     if capability_id == "evaluator-wiki-query":
         return await _evaluate_wiki_query(inputs, ctx)
+    if capability_id == "evaluator-compliance":
+        return await _evaluate_compliance(inputs, ctx)
     return error_envelope(f"evaluator does not back capability {capability_id!r}")
 
 
@@ -208,6 +210,230 @@ def _rank_wiki_passages(passages: object) -> list[dict]:
         })
     ranked.sort(key=lambda item: (-item["relevance"], item["passage_id"]))
     return ranked
+
+# ----------------------------------------------------------------------
+# evaluator-compliance — EU AI Act obligation checks over an estate
+# inventory. Deterministic checks + wiki-store retrieval for citations.
+# Findings and evidence only; never a verdict.
+# ----------------------------------------------------------------------
+
+import time as _time
+
+_ANNEX_III_MARKERS = (
+    "recruit", "candidates", "candidate evaluation", " cv", "cv ",
+    "curriculum vitae", "job description", "job applications", "interview",
+    "employment", "hiring",
+)
+
+_ARTICLE_QUERIES = {
+    "Annex III": "annex iii high-risk employment recruitment selection evaluate candidates",
+    "Art 9": "article 9 risk management system identify evaluate risks",
+    "Art 10": "article 10 data and data governance training validation testing",
+    "Art 11": "article 11 technical documentation",
+    "Art 12": "article 12 record-keeping automatic recording of events logs",
+    "Art 13": "article 13 transparency and provision of information to deployers",
+    "Art 14": "article 14 human oversight natural persons effectively overseen",
+    "Art 72": "article 72 post-market monitoring plan providers",
+}
+
+_OBLIGATIONS = {
+    "Art 9": "risk management system",
+    "Art 10": "data and data governance",
+    "Art 11": "technical documentation",
+    "Art 12": "record-keeping",
+    "Art 13": "transparency to deployers",
+    "Art 14": "human oversight",
+    "Art 72": "post-market monitoring",
+}
+
+
+async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
+    inventory = inputs.get("inventory")
+    if not isinstance(inventory, list):
+        return error_envelope("inventory (array) is required")
+
+    wiki = ctx.tools.get("tool-wiki-store")
+    if wiki is None:
+        return error_envelope("tool-wiki-store is not available")
+
+    # One retrieval per article, shared across every AU — the citation cache.
+    citations: dict[str, dict | None] = {}
+    for key, query in _ARTICLE_QUERIES.items():
+        try:
+            found = await wiki({"op": "search", "query": query, "limit": 3})
+            passages = [
+                p for p in found.get("passages") or []
+                if isinstance(p, dict) and p.get("passage_id") and int(p.get("score") or 0) >= 2
+            ]
+        except Exception:
+            passages = []
+        citations[key] = (
+            {
+                "passage_id": passages[0]["passage_id"],
+                "quote": str(passages[0].get("quote") or "")[:400],
+                "source_path": passages[0].get("source_path", ""),
+            }
+            if passages
+            else None
+        )
+
+    findings: list[dict] = []
+    counts = {"red": 0, "amber": 0, "green": 0, "unknown": 0}
+    high_risk = 0
+
+    for item in inventory:
+        if not isinstance(item, dict):
+            continue
+        cap_id = item.get("capability_id", "unknown")
+        purpose = str(item.get("purpose") or "").lower()
+        annex_shaped = any(marker in f" {purpose} " for marker in _ANNEX_III_MARKERS)
+        if annex_shaped:
+            high_risk += 1
+        risk_tier = (
+            "high (Annex III pt 4 - employment)" if annex_shaped
+            else "not classified high-risk by this check"
+        )
+        for article, obligation in _OBLIGATIONS.items():
+            checked, present, evidence = _obligation_check(article, item)
+            severity = "green" if present else "red"
+            gap = "" if present else _gap_for(article, cap_id)
+            if article == "Art 10" and severity == "green":
+                severity = "amber"
+                gap = (
+                    "Declared access boundary only; training-data governance is "
+                    "outside the architecture's scope."
+                )
+            citation = citations.get(article)
+            corpus_silent = citation is None
+            if corpus_silent:
+                severity = "unknown"
+                gap = (
+                    f"The regulations corpus has no passage for {article} - "
+                    "ingest the regulation note before this check can cite the obligation."
+                )
+            counts[severity] += 1
+            findings.append({
+                "finding_id": f"{cap_id}/{article.lower().replace(' ', '')}",
+                "capability_id": cap_id,
+                "risk_tier": risk_tier,
+                "article": article,
+                "obligation": obligation,
+                "severity": severity,
+                "checked": checked,
+                "evidence": evidence,
+                "regulation_citation": citation,
+                "corpus_silent": corpus_silent,
+                "annex_citation": citations.get("Annex III") if annex_shaped else None,
+                "gap": gap,
+                "remediation_hint": _remediation_for(article),
+            })
+
+    summary = {
+        "aus_scanned": len([i for i in inventory if isinstance(i, dict)]),
+        "high_risk": high_risk,
+        **counts,
+        "corpus_present": all(citations.get(a) for a in _OBLIGATIONS),
+    }
+    return {
+        "outputs": {"findings": findings, "summary": summary},
+        "signals": {
+            "valid_output_shape": True,
+            "risk_tier_assigned": True,
+            "all_findings_cited": all(
+                f.get("regulation_citation") or f.get("corpus_silent") for f in findings
+            ),
+            "corpus_present": summary["corpus_present"],
+            "latency_seconds": round(_time.monotonic() - started, 2),
+        },
+    }
+
+
+def _obligation_check(article: str, item: dict) -> tuple[str, bool, dict]:
+    fields = item.get("card_fields") or {}
+    lifecycle = item.get("lifecycle") or {}
+    signals = item.get("evaluation_signals") or []
+    trace = item.get("trace_evidence") or {}
+    if article == "Art 9":
+        present = bool(signals) and bool(lifecycle.get("reviewed_by"))
+        return (
+            "evaluation signals declared and a reviewer is recorded in the lifecycle",
+            present,
+            {"kind": "card_field", "ref": "evaluation_signals + lifecycle.reviewed_by",
+             "value": {"signals": len(signals), "reviewed_by": lifecycle.get("reviewed_by", "")}},
+        )
+    if article == "Art 10":
+        present = fields.get("has_inputs", False)
+        return (
+            "a declared input/tool boundary exists on the card",
+            present,
+            {"kind": "card_field", "ref": "inputs", "value": fields.get("has_inputs")},
+        )
+    if article == "Art 11":
+        present = all(fields.get(k) for k in ("has_purpose", "has_inputs", "has_outputs", "has_constraints", "has_version"))
+        return (
+            "purpose, inputs, outputs, constraints, and version are all present on the card",
+            present,
+            {"kind": "card_field", "ref": "card completeness", "value": fields},
+        )
+    if article == "Art 12":
+        invocations = int(trace.get("invocations") or 0)
+        return (
+            "trace evidence exists for this capability",
+            invocations > 0,
+            {"kind": "trace", "ref": "planner traces", "value": {"invocations": invocations}},
+        )
+    if article == "Art 13":
+        present = fields.get("has_constraints", False) and bool(signals)
+        return (
+            "constraints and evaluation signals are declared to consumers",
+            present,
+            {"kind": "card_field", "ref": "constraints + evaluation_signals",
+             "value": {"constraints": fields.get("has_constraints"), "signals": len(signals)}},
+        )
+    if article == "Art 14":
+        present = bool(item.get("oversight_declared"))
+        return (
+            "the card declares a human oversight or escalation boundary",
+            present,
+            {"kind": "card_field", "ref": "constraints",
+             "value": (item.get("oversight_evidence") or [None])[0]},
+        )
+    if article == "Art 72":
+        present = lifecycle.get("status") == "approved" and bool(signals)
+        return (
+            "lifecycle status is approved and observed signals are declared",
+            present,
+            {"kind": "lifecycle", "ref": "status + evaluation_signals",
+             "value": {"status": lifecycle.get("status", ""), "replaced_by": lifecycle.get("replaced_by", "")}},
+        )
+    return ("unrecognised article", False, {"kind": "none", "ref": "", "value": None})
+
+
+def _gap_for(article: str, cap_id: str) -> str:
+    gaps = {
+        "Art 9": "No reviewer recorded or no evaluation signals declared.",
+        "Art 10": "No declared input/tool boundary on the card.",
+        "Art 11": "The card is missing one or more of purpose, inputs, outputs, constraints, version.",
+        "Art 12": f"No trace evidence found for {cap_id}; run the workflow so records exist.",
+        "Art 13": "Constraints or evaluation signals are not declared on the card.",
+        "Art 14": "No human oversight or escalation declaration on the card.",
+        "Art 72": "The capability is not approved in the registry lifecycle, or declares no observed signals.",
+    }
+    return gaps.get(article, "Evidence absent.")
+
+
+def _remediation_for(article: str) -> str:
+    hints = {
+        "Art 9": "Declare evaluation_signals on the card and record a reviewer via the registry lifecycle.",
+        "Art 10": "Declare the capability's inputs and tool dependencies on the card.",
+        "Art 11": "Complete the capability card: purpose, inputs, outputs, constraints, version.",
+        "Art 12": "Exercise the capability through the planner so traces exist; keep trace retention on.",
+        "Art 13": "Declare constraints and evaluation signals on the card (hot-reloads and re-registers).",
+        "Art 14": "Add an oversight/escalation constraint to capability-card.yaml (hot-reloads and re-registers).",
+        "Art 72": "Approve the card via the registry lifecycle and keep observed signals flowing.",
+    }
+    return hints.get(article, "")
 
 
 if __name__ == "__main__":

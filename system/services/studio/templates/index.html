@@ -30,6 +30,7 @@
           <button id="mode-ingest" type="button" data-mode="knowledge-ingest">Ingest</button>
           <button id="mode-graph" type="button" data-mode="wiki-graph">Graph</button>
           <button id="mode-query" type="button" data-mode="knowledge-query">Ask</button>
+          <button id="mode-estate" type="button" data-mode="estate-check">Estate check</button>
         </div>
 
         <div class="workflow-fields" data-mode-panel="cv-fit">
@@ -81,6 +82,15 @@
               placeholder="Ask a question the wiki should answer."
               rows="3"></textarea>
           </label>
+        </div>
+
+        <div class="workflow-fields hidden" data-mode-panel="estate-check">
+          <p class="mode-note">
+            Scans this system's own governance artefacts — registered capability
+            cards, lifecycle state, and planner traces — against the EU AI Act's
+            high-risk obligations, citing the regulations corpus in the wiki.
+            Findings and evidence only; never a compliance determination.
+          </p>
         </div>
 
         <div class="workflow-fields hidden" data-mode-panel="wiki-graph">
