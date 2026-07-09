@@ -182,10 +182,10 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 
 | Repo profile | What you do | Walkthrough / data | Used by course session |
 |---|---|---|---|
-| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Session 2 — "Name the shape" (lab: modify your agent) |
-| `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Course Session 4 — "Apply the shape" (demo) |
+| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
+| `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
 | `session3` (EVE) | Author an AU with Vercel EVE, then wrap and register your own | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: scaffold-and-wrap) |
-| `session4` (estate check) | The estate scans itself against the EU AI Act and you fix findings live | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 extension / standalone demo |
+| `session4` (estate check) | The estate scans itself against the EU AI Act and you fix findings live; includes the wiki workflows for the corpus and Ask beats | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (demo: the estate checks itself) |
 
 ## License
 
