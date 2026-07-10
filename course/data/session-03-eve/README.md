@@ -28,8 +28,10 @@ on Node/EVE.
 
 1. **Modify** — edit `system/agents-eve/interviewer/agent/instructions.md` and
    watch the registry `skills_hash` change live in the studio.
-2. **Create (capstone)** — build your own EVE agent from scratch, meet the AOA
-   governance limits, then close them. Full guided lab:
+2. **Boundary (capstone)** — run the red-flags agent through EVE's native
+   runtime, observe that it is absent from the AOA registry, add a local
+   contract constraint, then expose the same behaviour through the generic
+   adapter. Docker owns Node, EVE and package dependencies. Full guided lab:
    [`system/agents-eve/EXERCISE.md`](../../../system/agents-eve/EXERCISE.md).
 
 Both are described in [`system/EVE.md`](../../../system/EVE.md).

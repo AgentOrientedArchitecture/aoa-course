@@ -1,7 +1,7 @@
 {
  "promotion": {
-  "title": "EU AI Act - Article 6: classification rules for high-risk AI systems",
-  "summary": "Regulation (EU) 2024/1689 classifies AI systems by risk. An AI system referred to in Annex III is considered high-risk (Article 6(2)), with derogations in Article 6(3). High-risk obligations apply from 2 August 2026.",
+  "title": "EU AI Act - Article 6 classification and current implementation schedule",
+  "summary": "Regulation (EU) 2024/1689 classifies Annex III systems as high-risk, subject to Article 6(3). Following the 7 May 2026 AI Omnibus political agreement, current European Commission guidance says rules for specified high-risk areas including employment apply from 2 December 2027. Verify the enacted schedule and classification before deployment.",
   "concepts": [
    "EU AI Act - Article 6"
   ],

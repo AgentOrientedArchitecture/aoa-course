@@ -1,5 +1,9 @@
 # Session 3 — Authoring Agentic Units with Vercel EVE
 
+> Protocol scope: the course adapter currently emits the A2A v0.3 JSON-RPC
+> card/message shape. It demonstrates the outward boundary and registry
+> integration; it is not an A2A v1 conformance implementation.
+
 Read [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`AGENTS.md`](AGENTS.md) first. This
 document is about Session 3: introducing [Vercel EVE](https://github.com/vercel/eve)
 — a filesystem-first framework for building agents — as another way to author an
@@ -152,18 +156,18 @@ version changed while the Agent ID stayed stable. The next run reflects the new
 instructions. (The Python agents hot-reload behaviour the same way — try editing
 `system/agents/evaluator/capabilities/cv/instructions.md` in Session 1.)
 
-**2. Create your own agent with EVE — the capstone.**
-Build a brand-new EVE agent from scratch, feel what it can do standalone (the
-capability), run into what it *can't* do inside a governed AOA system (the
-limitations — no card, no registry, no identity, no A2A, no observed-behaviour
-provenance), then add the adapter and watch it become a first-class governed AU.
-The full guided lab is in [`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
+**2. Put a vendor-authored agent behind an AOA contract — the capstone.**
+Run the checked-in red-flags agent first through EVE's native session API, then
+observe that it has no published contract, governed identity, registry entry,
+AOA trace boundary or outward agent face. Add one context-specific constraint
+to its capability card and switch the same behaviour files to the generic
+adapter. The full guided lab is in
+[`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
 
-The short version: `npx eve@latest init my-agent` (or `cp -r interviewer my-agent`),
-write `agent/instructions.md` + the env-driven `agent/agent.ts`, add a
-`capability-card.yaml`, reuse `adapter/`, add a compose service modelled on
-`eve-interviewer` with a distinct `AGENT_ID` and port, add the capability id to the
-registry allowlist, and `./scripts/session3-up.sh`.
+`./scripts/session3-lab-native.sh` and `./scripts/session3-lab-wrap.sh` use one
+pinned Docker image for both halves. Node, EVE and package dependencies stay in
+the image; the architectural variable is the public boundary, not the
+participant's workstation.
 
 ## Notes and fallbacks
 

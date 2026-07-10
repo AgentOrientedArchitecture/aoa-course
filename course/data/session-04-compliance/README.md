@@ -1,9 +1,10 @@
-# Session 4 — Estate check: an EU AI Act findings scanner
+# Session 4 - Estate check: EU AI Act evidence readiness
 
 The estate scans itself. A three-AU workflow reads the system's own governance
-artefacts — registered capability cards, registry lifecycle state, planner
-traces — checks them against the EU AI Act's high-risk obligations, and writes
-a findings report in which every finding cites the regulation verbatim.
+artefacts - registered capability cards, registry lifecycle state, planner
+traces - checks them for evidence hooks related to selected EU AI Act
+high-risk-system obligations, and writes a findings report in which every
+finding cites the regulation verbatim.
 
 **Findings and evidence only.** The scanner never says "compliant". Green
 means *evidence present*; Article 10 is capped at amber by construction; when
@@ -18,8 +19,8 @@ from model memory.
 - **parser-estate** reads `cards.json` and `traces/*.jsonl` through
   `tool-filesystem` (governance as ordinary files) and emits a typed estate
   inventory. Deterministic — a scan is a read, not a judgement.
-- **evaluator-compliance** classifies each AU against Annex III point 4
-  (recruitment / candidate evaluation → high-risk), runs seven evidence checks
+- **evaluator-compliance** identifies Annex III point 4 markers
+  (recruitment / candidate evaluation -> contextual legal assessment), runs seven evidence checks
   (Articles 9, 10, 11, 12, 13, 14, 72), and attaches the top regulation
   passage from the wiki store to every finding.
 - **reporter-findings** renders the posture table and per-finding detail, with
@@ -46,8 +47,9 @@ require?" from the same corpus.
 1. `./scripts/session4-reset.sh && ./scripts/session4-seed.sh` — opening state.
 2. Run one CV-fit from the Studio (needs a model provider) — creates trace
    evidence, so Article 12 has something to find.
-3. Run the Estate check. The CV-fit trio is flagged **Annex III high-risk**
-   with the verbatim citation; `evaluator-cv` shows **Art 14 red** (no
+3. Run the Estate check. The CV-fit trio is flagged **Annex III candidate -
+   employment** with the verbatim citation and a legal-assessment caveat;
+   `evaluator-cv` shows **Art 14 red** (no
    oversight declaration) and **Art 72 red** (draft, unapproved).
 4. **Fix the estate live, two governance surfaces:**
    - Edit `system/agents/evaluator/capabilities/cv/capability-card.yaml` —
@@ -56,12 +58,30 @@ require?" from the same corpus.
      re-registers; watch the registry pane.
    - `./scripts/session4-approve.sh` — the `card_approved` governance event
      appears in the Studio.
-5. Re-run the Estate check: Art 14 and Art 72 flip green. **The findings
-   cleared because the estate changed — not the checker.**
+5. Re-run the Estate check: Art 14 and Art 72 flip green. **The evidence hooks
+   appeared because the estate changed - no legal obligation was thereby
+   satisfied.**
+
+## The deliberate legal tension
+
+The teaching system uses synthetic CVs; it is not a hiring system. If the same
+capabilities were used to analyse, filter, or evaluate real candidates, Annex
+III point 4 would be engaged unless a contextual assessment established an
+Article 6(3) derogation. The original Regulation schedule and current
+Commission implementation guidance also differ: following the May 2026 AI
+Omnibus political agreement, the Commission says employment-area high-risk
+rules apply from **2 December 2027**, not August 2026. Check the enacted text
+and current guidance before deployment.
+
+That is the story, not an awkward disclaimer: we can build a technically
+effective tool whose real use may be restricted or unlawful. Architecture can
+make evidence and control surfaces inspectable; it cannot grant permission to
+deploy.
 
 ## What this is not
 
-- Not a compliance determination, certification, or legal advice.
+- Not a classification decision, compliance determination, certification, or
+  legal advice.
 - Not a source-code scanner: v1 reads estate artefacts only (cards, lifecycle,
   traces). A code-level inventory builder (SAST-style detectors for model
   calls and agent frameworks, feeding the same evaluator) is a documented
@@ -78,5 +98,5 @@ deliberately simple. The designed swap is a `tool-reg-knowledge` bridge over
 the native `cogs` engine (`cogs ask --json` or the `cogs mcp` server), which
 adds embeddings, graph-hop retrieval, contradiction surfacing, and abstention
 at the retrieval layer. Registering that bridge under the same contract
-replaces the knowledge plane **without touching the evaluator** — the course's
-third principle, demonstrated on the compliance checker itself.
+replaces the knowledge plane **without touching the evaluator** - the course's
+third principle, demonstrated on the evidence-readiness checker itself.

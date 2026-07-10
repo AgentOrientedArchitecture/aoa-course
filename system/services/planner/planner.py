@@ -326,7 +326,7 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
             TaskSpec(
                 id="evaluate-compliance",
-                purpose="Check the estate inventory against EU AI Act high-risk obligations with regulation citations.",
+                purpose="Check the estate inventory for EU AI Act evidence hooks with regulation citations.",
                 discovery={
                     "kind": "au",
                     "text": "evaluate compliance obligations eu ai act findings citations risk tier",

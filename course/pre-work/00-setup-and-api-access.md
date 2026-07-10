@@ -3,28 +3,18 @@
 Before the first hands-on session, install the base tooling, set up one working
 model provider, and verify that the course stack can call it. The runtime
 supports local Ollama and OpenAI-compatible hosted APIs through `.env` files in
-the repo root.
+the repo root. Session 3's EVE dependencies run inside Docker; no host Node/npm
+installation is required.
 
 ---
 
 ## Base Tooling
 
-You need all three of these before the workshop:
+You need these before the workshop:
 
 1. **Docker Desktop** (or Docker Engine + Compose v2). Confirm with
    `docker compose version`.
-2. **Node.js 20 or newer with npm** — required for the Session 3 exercise,
-   where you scaffold your own agent with EVE. Install from
-   [nodejs.org](https://nodejs.org) or via your package manager. Confirm with
-   `node --version`.
-3. **Git**, to clone this repository.
-
-After installing Node, warm the npm cache for EVE so the Session 3 scaffold
-step does not depend on venue wifi:
-
-```bash
-npx eve@latest --version
-```
+2. **Git**, to clone this repository.
 
 Then build the course containers once at home (this downloads base images —
 a few GB — so it must not wait for venue wifi). After configuring `.env`
@@ -34,6 +24,7 @@ below, run each session script once and shut down again:
 ./scripts/session1-up.sh && ./scripts/down.sh
 ./scripts/session2-up.sh && ./scripts/down.sh
 ./scripts/session3-up.sh && ./scripts/down.sh
+./scripts/session3-lab-native.sh && ./scripts/down.sh
 ./scripts/session4-up.sh && ./scripts/down.sh
 ```
 
@@ -226,8 +217,7 @@ bash scripts/test_model_provider.sh
 
 ## Pre-Work Checklist
 
-- [ ] Install Docker Desktop, Node.js >= 20 with npm, and Git.
-- [ ] Run `npx eve@latest --version` once to warm the npm cache.
+- [ ] Install Docker Desktop (or Docker Engine + Compose v2) and Git.
 - [ ] Choose SambaNova, NVIDIA, or local Ollama on the host.
 - [ ] Copy the matching example file to `.env`.
 - [ ] Add your hosted API key if using SambaNova or NVIDIA.

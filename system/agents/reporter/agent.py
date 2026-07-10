@@ -376,15 +376,17 @@ def _markdown_list(title: str, values: list) -> list[str]:
 # ----------------------------------------------------------------------
 
 _SCOPE_BANNER = (
-    "> **Findings and evidence only. This is not a compliance determination.**\n"
+    "> **Findings and evidence only. This is not a classification or compliance determination.**\n"
     "> Scope: EU AI Act (Regulation 2024/1689) only; estate artefacts only "
     "(capability cards, registry lifecycle, traces) - not source code, models, "
-    "or training data.\n"
+    "training data, or the legal context of a real deployment.\n"
+    "> Annex III marker matches require contextual legal assessment. Verify the "
+    "enacted application schedule and current guidance before deployment.\n"
 )
 
 _FOOTER = (
-    "\n---\n\n*AOA does not confer compliance; it makes the audit evidence "
-    "exist by construction.*\n"
+    "\n---\n\n*AOA does not confer permission or compliance; it makes evidence "
+    "hooks and control surfaces explicit.*\n"
 )
 
 _SEVERITY_MARK = {"green": "🟢", "amber": "🟠", "red": "🔴", "unknown": "⚪"}
@@ -422,7 +424,7 @@ def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> 
 
     lines.append(
         f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** - "
-        f"{summary.get('high_risk', 0)} Annex-III-shaped (high-risk). "
+        f"{summary.get('annex_iii_candidates', 0)} Annex III candidates for legal review. "
         f"Findings: {summary.get('red', 0)} red / {summary.get('amber', 0)} amber / "
         f"{summary.get('green', 0)} green / {summary.get('unknown', 0)} corpus-silent."
     )
@@ -444,7 +446,11 @@ def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> 
         for art in _ARTICLE_ORDER:
             f = by_cap[cap].get(art)
             marks.append(_SEVERITY_MARK.get(f.get("severity"), "?") if f else "-")
-        risk = "**high (Annex III)**" if risk_by_cap.get(cap, "").startswith("high") else "not classified"
+        risk = (
+            "**Annex III candidate**"
+            if risk_by_cap.get(cap, "").startswith("Annex III candidate")
+            else "no employment marker found"
+        )
         lines.append(f"| `{cap}` | {risk} | " + " | ".join(marks) + " |")
     lines.append("")
     lines.append("_Green means evidence present - never obligation satisfied. Art 10 is capped at amber by construction._")

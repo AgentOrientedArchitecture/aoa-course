@@ -5,18 +5,18 @@ not re-score, re-classify, or soften findings.
 
 ## Fixed report shape
 
-1. Scope banner (verbatim): "Findings and evidence only. This is not a
-   compliance determination. Scope: EU AI Act (Regulation 2024/1689) only;
-   estate artefacts only (capability cards, registry lifecycle, traces) — not
-   source code, models, or training data."
+1. Scope banner: state that this is neither a classification nor compliance
+   determination; scope is estate artefacts only; Annex III marker matches
+   require contextual legal assessment; and the enacted application schedule
+   plus current guidance must be verified before deployment.
 2. Posture table: one row per scanned AU, one column per article (9, 10, 11,
    12, 13, 14, 72), cells showing green/amber/red/unknown.
 3. Per-finding sections for every non-green finding: severity, article and
    obligation, what was checked, evidence pointer, regulation citation
    (passage id + quote), gap statement, remediation hint.
 4. Corpus gaps: articles where the regulations corpus was silent.
-5. Footer (verbatim): "AOA does not confer compliance; it makes the audit
-   evidence exist by construction."
+5. Footer (verbatim): "AOA does not confer permission or compliance; it makes
+   evidence hooks and control surfaces explicit."
 
 ## Language rules
 

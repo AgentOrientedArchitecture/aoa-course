@@ -63,11 +63,13 @@ Ollama or NVIDIA NIM for that agent.
 - Agent **code** (`agent.py`, `_base/`) is baked into the image, not mounted:
   code changes need `./scripts/sessionN-up.sh` again (it rebuilds).
 
-## Session 3: `npx eve@latest init` is slow or fails at the venue
+## Session 3: the EVE lab image did not build
 
-Warm the cache at home (`npx eve@latest --version`) per the pre-work. Node
-must be ≥ 20 (`node --version`). Corporate proxies that break npm: set
-`npm_config_proxy`/`https-proxy` or use a hotspot.
+Build it at home with `./scripts/session3-lab-native.sh`; the image contains
+Node, pinned EVE dependencies and the authored lab agent. On the day, confirm
+it exists with `docker image inspect aoa-course/eve-lab:0.17.1`. If a laptop
+missed pre-work, pair with a prepared neighbour rather than installing
+packages over venue wifi.
 
 ## Session 4: every finding says "corpus silent"
 

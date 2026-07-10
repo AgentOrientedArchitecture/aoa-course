@@ -1,0 +1,60 @@
+# Session 3 lab: the same EVE-authored agent appears first through EVE's native
+# runtime and then through the AOA adapter. Both services use one pre-built
+# dependency image, so participants need Docker but no host Node/npm setup.
+
+services:
+  registry:
+    environment:
+      REGISTRY_CARD_ALLOWLIST: tool-document-text,parser-cv,evaluator-cv,reporter-cv-fit,interviewer-questions,red-flags-review
+
+  eve-red-flags-native:
+    profiles: ["session3-lab-native"]
+    build:
+      context: ./agents-eve
+      dockerfile: lab/Dockerfile
+    image: aoa-course/eve-lab:0.17.1
+    container_name: aoa-eve-red-flags-native
+    command: ["npm", "exec", "--", "eve", "dev", "--no-ui", "--host", "0.0.0.0", "--port", "3000"]
+    ports:
+      - "7310:3000"
+    volumes:
+      - ./agents-eve/red-flags/agent.ts:/app/agent/agent.ts:ro
+      - ./agents-eve/red-flags/instructions.md:/app/agent/instructions.md:ro
+    environment:
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+
+  eve-red-flags-wrapped:
+    profiles: ["session3-lab-wrapped"]
+    build:
+      context: ./agents-eve
+      dockerfile: lab/Dockerfile
+    image: aoa-course/eve-lab:0.17.1
+    container_name: aoa-eve-red-flags-wrapped
+    ports:
+      - "7311:8888"
+    volumes:
+      - ./agents-eve/red-flags/agent.ts:/app/agent/agent.ts:ro
+      - ./agents-eve/red-flags/instructions.md:/app/agent/instructions.md:ro
+      - ./agents-eve/red-flags/capability-card.yaml:/app/capability-card.yaml:ro
+      - ./agents-eve/red-flags/boot.mjs:/app/adapter/boot.mjs:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:eve-red-flags
+      AGENT_NAME: eve-red-flags
+      AGENT_HOST: eve-red-flags-wrapped
+      AGENT_PORT: 8888
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+    depends_on:
+      registry:
+        condition: service_healthy

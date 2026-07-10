@@ -13,7 +13,7 @@ This repo holds two things:
 
 Across four hands-on sessions you'll build an AOA system, starting from a
 single model call and ending with a small multi-capability platform that mixes
-agent runtimes — and then checks its own governance against a real regulation.
+agent runtimes - and then checks its own governance evidence against a real regulation.
 
 > Note on numbering: the repo's session profiles are the **hands-on** sequence.
 > If you are following a live course, the mapping table under
@@ -46,15 +46,19 @@ planner, and studio as the Python agents. The workflow becomes
 that the last step runs on a different runtime. See
 [`system/EVE.md`](system/EVE.md).
 
+The reference adapters currently emit the A2A v0.3 JSON-RPC card/message shape.
+They demonstrate an outward agent boundary, not A2A v1 conformance.
+
 In **Session 4** the estate checks itself. An `estate-check` workflow scans the
-registry's capability cards, governance lifecycle, and planner traces against
-the EU AI Act's high-risk obligations, citing the regulation verbatim from a
-corpus loaded through the Session 2 wiki pipeline. Findings and evidence only —
-never a compliance verdict. The CV-fit agents you built in Session 1 turn out
-to be Annex III high-risk (candidate evaluation), and you close two of their
-findings live: add an oversight constraint to a capability card, approve the
-card through the registry lifecycle, re-scan, and watch the findings clear —
-because the estate changed, not the checker. See
+registry's capability cards, governance lifecycle, and planner traces for
+evidence hooks related to selected EU AI Act high-risk-system obligations,
+citing the regulation verbatim from a corpus loaded through the Session 2 wiki
+pipeline. Findings and evidence only - never a classification or compliance
+verdict. The synthetic CV-fit agents match the language of Annex III point 4;
+a real employment deployment would need a contextual legal assessment. You
+add an oversight constraint, approve the card, and re-scan: the evidence hooks
+change because the estate changed, but no legal obligation is thereby
+satisfied. See
 [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md).
 
 ## Run it
@@ -109,10 +113,10 @@ then seeds the regulations corpus:
 ./scripts/session4-up.sh && ./scripts/session4-seed.sh
 ```
 
-Session 3's agent is built and run entirely inside its container, so you still
-only need Docker to run it. You need Node/npm on your host only if you want to
-scaffold a brand-new EVE agent with `npx eve@latest init` (the Session 3
-"create" exercise).
+Session 3's agents are built and run entirely inside containers. The capstone
+uses one pinned EVE dependency image to show the same authored agent first in
+vendor-native mode and then behind the AOA contract. Participants need Docker,
+not host Node/npm or a venue-time package install.
 
 The provided `.env.ollama` example assumes Ollama is already running on your
 host machine. If you want Compose to start the included Ollama container
@@ -125,6 +129,8 @@ There are also thin helper scripts for the common paths:
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
 ./scripts/session3-up.sh
+./scripts/session3-lab-native.sh  # EVE-native half of the capstone
+./scripts/session3-lab-wrap.sh    # same agent behind the AOA boundary
 ./scripts/session4-up.sh    # + session4-seed.sh / session4-reset.sh / session4-approve.sh
 ./scripts/logs.sh
 ./scripts/down.sh
@@ -136,6 +142,8 @@ On Windows Command Prompt, use the matching batch files:
 scripts\session1-up.bat
 scripts\session2-up.bat
 scripts\session3-up.bat
+scripts\session3-lab-native.bat
+scripts\session3-lab-wrap.bat
 scripts\logs.bat
 scripts\down.bat
 ```
@@ -184,7 +192,7 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 |---|---|---|---|
 | `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
 | `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
-| `session3` (EVE) | Author an AU with Vercel EVE, then wrap and register your own | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: scaffold-and-wrap) |
+| `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
 | `session4` (estate check) | The estate scans itself against the EU AI Act and you fix findings live; includes the wiki workflows for the corpus and Ask beats | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (demo: the estate checks itself) |
 
 ## License

@@ -1,13 +1,33 @@
 ---
-title: "EU AI Act - Article 6: classification rules for high-risk AI systems"
+title: "EU AI Act - Article 6 classification and current implementation schedule"
 source_type: curated-raw-note
 curated_from:
   - aoa-knowledge raw/clips/2026-07-07-eu-ai-act-operative-articles.md (EUR-Lex CELEX 32024R1689)
+current_schedule:
+  - https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai (last updated 7 July 2026)
+  - https://digital-strategy.ec.europa.eu/en/policies/guidelines-ai-high-risk-systems (last updated 6 July 2026)
 ---
 
-# EU AI Act - Article 6: classification rules for high-risk AI systems
+# EU AI Act - Article 6 classification and current implementation schedule
 
-Regulation (EU) 2024/1689 classifies AI systems by risk. An AI system referred to in Annex III is considered high-risk (Article 6(2)), with derogations in Article 6(3). High-risk obligations apply from 2 August 2026.
+Regulation (EU) 2024/1689 classifies AI systems by risk. An AI system referred
+to in Annex III is considered high-risk (Article 6(2)), subject to the
+derogation and documentation rules in Article 6(3)-(4).
+
+## Current implementation schedule - verify before deployment
+
+The Regulation's original application schedule put most provisions into
+application on 2 August 2026. Following the 7 May 2026 political agreement on
+the AI Omnibus, the European Commission's current implementation guidance says
+that rules for systems in specified high-risk areas - including employment -
+apply from **2 December 2027**. Rules for systems embedded in regulated products
+apply from **2 August 2028**.
+
+This note deliberately preserves both facts: the operative classification text
+below, and the current Commission schedule. The legal and guidance corpus must
+be checked again before a real system is placed on the market or put into
+service. A course scanner cannot determine whether a particular deployment is
+in scope or whether the Article 6(3) derogation applies.
 
 ## Passage 1
 

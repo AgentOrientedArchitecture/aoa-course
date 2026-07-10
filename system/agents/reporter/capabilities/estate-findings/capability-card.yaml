@@ -19,6 +19,7 @@ constraints:
   - The output is a single JSON object.
   - The report opens with the fixed scope banner and closes with the evidence-by-construction footer.
   - The report never contains the words compliant, complies, or certified.
+  - Annex III marker matches are rendered as candidates for contextual legal assessment, not classifications.
   - Deterministic template; no model call is made.
 evaluation_signals:
   - valid_output_shape

@@ -280,7 +280,7 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
 
     findings: list[dict] = []
     counts = {"red": 0, "amber": 0, "green": 0, "unknown": 0}
-    high_risk = 0
+    annex_iii_candidates = 0
 
     for item in inventory:
         if not isinstance(item, dict):
@@ -289,10 +289,11 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
         purpose = str(item.get("purpose") or "").lower()
         annex_shaped = any(marker in f" {purpose} " for marker in _ANNEX_III_MARKERS)
         if annex_shaped:
-            high_risk += 1
+            annex_iii_candidates += 1
         risk_tier = (
-            "high (Annex III pt 4 - employment)" if annex_shaped
-            else "not classified high-risk by this check"
+            "Annex III candidate (employment) - contextual legal assessment required"
+            if annex_shaped
+            else "no Annex III employment marker found by this check"
         )
         for article, obligation in _OBLIGATIONS.items():
             checked, present, evidence = _obligation_check(article, item)
@@ -331,7 +332,7 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
 
     summary = {
         "aus_scanned": len([i for i in inventory if isinstance(i, dict)]),
-        "high_risk": high_risk,
+        "annex_iii_candidates": annex_iii_candidates,
         **counts,
         "corpus_present": all(citations.get(a) for a in _OBLIGATIONS),
     }
@@ -339,7 +340,7 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
         "outputs": {"findings": findings, "summary": summary},
         "signals": {
             "valid_output_shape": True,
-            "risk_tier_assigned": True,
+            "risk_marker_assessed": True,
             "all_findings_cited": all(
                 f.get("regulation_citation") or f.get("corpus_silent") for f in findings
             ),

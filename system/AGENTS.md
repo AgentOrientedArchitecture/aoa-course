@@ -209,15 +209,16 @@ The shared scaffold in `_base/base.py` keeps a new `agent.py` typically under 10
 
 ## Agents authored with EVE (Session 3)
 
-An Agentic Unit does not have to run on the Python scaffold. Session 3 authors one
-with [Vercel EVE](https://github.com/vercel/eve) — a filesystem-first TypeScript
+An Agentic Unit does not have to run on the Python scaffold. Session 3 uses
+[Vercel EVE](https://github.com/vercel/eve) — a filesystem-first TypeScript
 framework — under `agents-eve/`. EVE supplies the behaviour (`instructions.md`),
 model wiring (`agent.ts`), and runtime; a small `aoa-eve` adapter supplies the
-governance EVE lacks (the capability card, registry registration, the A2A surface,
-trace, and `skills_hash` hot reload) so the agent is discovered and orchestrated
-exactly like a Python AU. The four parts are still all there — the card, the
-behaviour markdown, the model wiring, and the tool/dependency story — just in EVE's
-vocabulary. See [`EVE.md`](EVE.md).
+composition and governance surfaces EVE does not aim to provide (the capability
+card, registry registration, A2A surface, trace, and `skills_hash` hot reload).
+The capstone runs the same red-flags agent first in native EVE mode and then
+through that adapter, using a single pinned dependency image. The four parts are
+still all there — the card, behaviour markdown, model wiring, and tool/dependency
+story — just in EVE's vocabulary. See [`EVE.md`](EVE.md).
 
 ## Conventions
 
@@ -244,11 +245,11 @@ The filesystem, document text extractor, and wiki store are MCP-backed examples.
 [`tools/document-text/`](tools/document-text/) plus
 [`tools/wiki-store/`](tools/wiki-store/).
 
-## Session 4 — estate-check (compliance findings)
+## Session 4 - estate-check (evidence-readiness findings)
 
-The `estate-check` workflow (`parser-estate` → `evaluator-compliance` →
-`reporter-findings`) scans the estate's own governance artefacts against the
-EU AI Act. Conventions it adds:
+The `estate-check` workflow (`parser-estate` -> `evaluator-compliance` ->
+`reporter-findings`) scans the estate's own governance artefacts for evidence
+hooks related to selected EU AI Act obligations. Conventions it adds:
 
 - `parser-estate` consumes `tool-filesystem` over two read-only mounts
   (`/data/estate/registry`, `/data/estate/traces`) declared in
@@ -257,6 +258,9 @@ EU AI Act. Conventions it adds:
   evidence present (never "obligation satisfied"), amber = partial, red =
   absent, unknown = the regulations corpus is silent (abstain, never
   paraphrase the law from model memory).
+- Annex III marker matches are labelled candidates for contextual legal
+  assessment. The scanner does not decide Article 6(3), application dates, or
+  whether deployment is permitted.
 - `reporter-findings` is deterministic and machine-checks its own language
   rule via the `no_compliance_verdict` signal.
 - The regulations corpus lives in the wiki store; seed with
