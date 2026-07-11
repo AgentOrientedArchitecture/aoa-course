@@ -129,10 +129,9 @@ There are also thin helper scripts for the common paths:
 ```bash
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
-./scripts/session3-up.sh
-./scripts/session3-lab-init.sh    # EVE CLI creates the agent
-./scripts/session3-lab-native.sh  # run the learner-authored EVE agent
-./scripts/session3-lab-wrap.sh    # adopt it into the AOA workflow
+./scripts/session3-build.sh    # pre-work: images only, no agent created
+./scripts/session3-up.sh       # enter the interactive EVE workshop
+./scripts/session3-adopt.sh    # publish the tested agent into AOA
 ./scripts/session4-up.sh    # + session4-seed.sh / session4-reset.sh / session4-approve.sh
 ./scripts/logs.sh
 ./scripts/down.sh
@@ -143,10 +142,9 @@ On Windows Command Prompt, use the matching batch files:
 ```bat
 scripts\session1-up.bat
 scripts\session2-up.bat
-scripts\session3-up.bat
-scripts\session3-lab-init.bat
-scripts\session3-lab-native.bat
-scripts\session3-lab-wrap.bat
+scripts\session3-build.bat    rem pre-work: images only
+scripts\session3-up.bat       rem interactive EVE workshop
+scripts\session3-adopt.bat    rem publish the tested agent into AOA
 scripts\logs.bat
 scripts\down.bat
 ```

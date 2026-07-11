@@ -23,11 +23,12 @@ services:
     image: aoa-course/eve-workshop:0.17.1
     container_name: aoa-eve-workshop-native
     working_dir: /workshop
-    command: ["npm", "exec", "--", "eve", "dev", "--no-ui", "--host", "0.0.0.0", "--port", "3000"]
+    command: ["/app/workshop-shell.sh"]
     ports:
       - "7310:3000"
     volumes:
       - ./agents-eve/workshop:/workshop
+      - ./agents-eve/adoption-kit:/adoption-kit:ro
       - eve-workshop-node-modules:/workshop/node_modules
     environment:
       PROVIDER: ${PROVIDER:-ollama}

@@ -23,10 +23,13 @@ below, run each session script once and shut down again:
 ```bash
 ./scripts/session1-up.sh && ./scripts/down.sh
 ./scripts/session2-up.sh && ./scripts/down.sh
-./scripts/session3-up.sh && ./scripts/down.sh
-./scripts/session3-lab-native.sh && ./scripts/down.sh
+./scripts/session3-build.sh
 ./scripts/session4-up.sh && ./scripts/down.sh
 ```
+
+`session3-build` only downloads and builds the pinned workshop toolchain. It
+does not run `eve init` or create the learner's agent; that happens interactively
+during Session 3. On Windows use `scripts\session3-build.bat`.
 
 This course currently provides three tested environment examples:
 

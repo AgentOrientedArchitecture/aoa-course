@@ -151,13 +151,13 @@ curl http://localhost:7305/cards/interviewer-questions
 The learner path no longer begins with a completed vendor-authored agent. It
 starts with an empty authored surface under `agents-eve/workshop/`:
 
-1. `./scripts/session3-lab-init.sh` runs the real `eve init .` CLI inside the
-   pinned workshop image.
-2. The learner rewrites the generated `instructions.md` and model wiring to
-   make a useful standalone interview-question agent.
-3. `./scripts/session3-lab-native.sh` runs it through EVE's native session API.
-4. The learner adds `capability-card.yaml` without changing the EVE files.
-5. `./scripts/session3-lab-wrap.sh` starts the generic `aoa-eve` bridge and the
+1. `./scripts/session3-up.sh` starts the AOA base and attaches the terminal to
+   the pinned workshop container.
+2. The learner types `eve init .`, edits the generated `instructions.md` and
+   model wiring through the host-mounted directory, then uses `eve info` and
+   `eve dev` to test the standalone agent in EVE's terminal UI.
+3. The learner adds `capability-card.yaml` without changing the EVE files.
+4. `./scripts/session3-adopt.sh` starts the generic `aoa-eve` bridge and the
    same agent becomes the `interviewer-questions` step in the existing AOA
    workflow.
 
@@ -173,8 +173,10 @@ a text editor only. The full guided lab is
 
 ## Notes and fallbacks
 
-- The container runs `eve dev --no-ui` so `instructions.md` edits hot-reload EVE
-  behaviour. If you prefer a lighter runtime, build once and serve the compiled
+- The learner-facing native container exposes EVE's interactive terminal UI.
+  The wrapped service runs an internal `eve dev --no-ui` child process so
+  `instructions.md` edits still hot-reload behaviour. If you prefer a lighter
+  runtime, build once and serve the compiled
   output instead: change the Dockerfile to `RUN npx eve build` and the boot command
   to run `eve start` (see `adapter/eve.mjs`); the registry `skills_hash` still
   updates live via the adapter's watcher, but EVE behaviour then changes only on

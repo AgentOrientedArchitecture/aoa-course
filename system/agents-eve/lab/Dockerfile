@@ -6,7 +6,8 @@ FROM node:24-slim
 
 ENV NODE_ENV=development \
     EVE_APP_ROOT=/workshop \
-    EVE_PORT=3000
+    EVE_PORT=3000 \
+    PATH=/app/node_modules/.bin:$PATH
 
 WORKDIR /app
 
@@ -17,7 +18,9 @@ RUN npm ci --no-audit --no-fund
 # EVE project. The generic entry point derives JSON input/output mapping from
 # the capability card, so adoption does not require agent-specific code.
 COPY interviewer/adapter/ ./adapter/
+COPY lab/workshop-shell.sh ./workshop-shell.sh
+RUN chmod +x ./workshop-shell.sh
 
 EXPOSE 3000 8888
 
-CMD ["npm", "exec", "--", "eve", "dev", "--no-ui", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["/app/workshop-shell.sh"]

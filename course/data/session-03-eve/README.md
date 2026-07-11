@@ -26,12 +26,13 @@ on Node/EVE.
 
 ## Exercise
 
-Start with no authored agent. Use the EVE CLI in the pinned workshop image to
-scaffold one, give it the bounded `interviewer-questions` job, and prove it works
-through EVE's native session API. Then add one capability card and run the same
-files through the generic AOA bridge. The final checkpoint is not merely a
-registry row: run **CV fit + interview** and watch the agent you created perform
-the third step of the existing workflow.
+Start with no authored agent. `session3-up` opens an interactive shell in the
+pinned workshop image; type `eve init .`, edit the generated files through the
+host-mounted directory, then use `eve info` and `eve dev` to test the bounded
+`interviewer-questions` agent in EVE's own terminal UI. Only after it works do
+you add one capability card and run `session3-adopt`. The final checkpoint is
+not merely a registry row: run **CV fit + interview** and watch the agent you
+created perform the third step of the existing workflow.
 
 Node, npm, EVE, and package dependencies remain in Docker. The host needs no
 JavaScript toolchain. Full guided lab:

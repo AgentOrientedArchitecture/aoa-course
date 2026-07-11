@@ -1,37 +1,63 @@
-# Session 3 lab — build an EVE agent, then adopt it into AOA
+# Session 3 lab — learn EVE, build an agent, then adopt it into AOA
 
-Start with no agent. Use EVE to create one that works on its own. Only after it
-is useful will you give it the public contract that lets the AOA estate
-discover and compose it.
+This lab begins with no authored agent. You will use EVE's own CLI, edit the
+files EVE creates, and test the agent through EVE before AOA is involved. Only
+then will you publish a capability contract and use the agent through the
+course's existing intent interface.
 
-The learning sequence is deliberate:
+The sequence is:
 
-1. **Create** — use the real EVE CLI to scaffold a minimal agent.
-2. **Make useful** — give it one bounded job and test it through EVE.
-3. **Adopt** — add one capability card; the generic `aoa-eve` bridge supplies
-   identity, registration, trace, and the outward A2A surface.
-4. **Compose** — run the existing CV-fit workflow and watch your agent perform
-   its final step.
+1. **Learn the EVE CLI** — run `eve init`, `eve info`, and `eve dev` yourself.
+2. **Build and test** — edit the bind-mounted EVE project and talk to the agent
+   in EVE's terminal UI.
+3. **Adopt** — add one capability card and start the generic AOA bridge.
+4. **Compose** — invoke your agent through **CV fit + interview** in Studio.
 
-Node, npm, EVE, and all package dependencies live in the pinned workshop image.
-The host needs Docker, a text editor, and the course `.env` only.
+Node, npm, EVE, and dependencies live inside a pinned Docker image. Your laptop
+needs Docker, a text editor, and the course `.env`; it does not need Node.
 
-## Checkpoint 1 — ask EVE to create an agent
+## Checkpoint 1 — enter the EVE workshop
 
-The checked-in `system/agents-eve/workshop/` directory contains a package shell
-but deliberately has no `agent/` directory. Run:
-
-```bash
-./scripts/session3-lab-init.sh
-```
-
-On Windows:
+From the `aoa-course` directory, run:
 
 ```bat
-scripts\session3-lab-init.bat
+scripts\session3-up.bat
 ```
 
-This runs `eve init .` inside `aoa-course/eve-workshop:0.17.1`. EVE creates:
+On macOS or Linux:
+
+```bash
+./scripts/session3-up.sh
+```
+
+The script does two things:
+
+1. starts the Session 3 AOA services in the background;
+2. attaches your terminal to the pinned EVE workshop container.
+
+You should see a banner and this prompt:
+
+```text
+eve-workshop>
+```
+
+The container's `/workshop` directory is bind-mounted from this Windows-visible
+directory:
+
+```text
+system\agents-eve\workshop
+```
+
+Anything EVE creates there appears immediately in your editor on the laptop.
+
+Explore the CLI, then initialise the agent yourself:
+
+```sh
+eve --help
+eve init .
+```
+
+EVE adds its authored surface to the existing pinned package shell:
 
 ```text
 system/agents-eve/workshop/
@@ -41,13 +67,24 @@ system/agents-eve/workshop/
     channels/eve.ts
 ```
 
-At this point the agent is the generic assistant EVE scaffolded. There is no
-AOA card or adapter in the workspace.
+After initialisation, EVE may enter its development UI automatically. Press
+`Ctrl+C` to return to the `eve-workshop>` shell while you edit the generated
+files. If you exit the container accidentally, run `session3-up` again; the
+mounted files remain on the laptop.
 
-## Checkpoint 2 — give the standalone agent one useful job
+At this point there is still no capability card and nothing has registered in
+AOA. You have an EVE project, not yet an Agentic Unit.
 
-Replace the generated `agent/agent.ts` with the course's provider-neutral model
-wiring. It uses the same `.env` as the rest of the system:
+## Checkpoint 2 — turn the default project into your agent
+
+Keep the workshop terminal open. On the Windows host, open:
+
+```text
+system\agents-eve\workshop\agent\agent.ts
+```
+
+Replace it with the course's provider-neutral model wiring. It consumes the
+same `.env` model settings as the other course agents:
 
 ```ts
 import { createOpenAI } from "@ai-sdk/openai";
@@ -74,19 +111,15 @@ export default defineAgent({
 });
 ```
 
-Now ask EVE what it discovered:
+Now edit:
 
-```bash
-docker compose \
-  -f system/docker-compose.yml \
-  -f system/docker-compose.session3.yml \
-  -f system/docker-compose.session3-lab.yml \
-  run --rm --no-deps eve-workshop-native npm exec -- eve info
+```text
+system\agents-eve\workshop\agent\instructions.md
 ```
 
-Now rewrite `agent/instructions.md`. Give the agent one bounded job: turn a
-CV-fit evaluation into 5–8 evidence-seeking interview questions. Require a
-single JSON result with this shape:
+Give the agent one bounded job: turn a CV-fit evaluation into 5–8 questions
+that help a human interviewer test the stated strengths and gaps. Require one
+JSON result:
 
 ```json
 {
@@ -97,102 +130,130 @@ single JSON result with this shape:
 }
 ```
 
-Useful constraints to express in the instructions:
+Useful rules to express in your own instructions:
 
 - work only from the supplied evaluation and optional CV;
-- lead with gaps and weak scores, but treat each gap as a hypothesis;
+- lead with gaps and weak scores, but treat a gap as a hypothesis;
 - ask for concrete situations, decisions, evidence, and trade-offs;
 - do not re-score the candidate or make a hiring decision;
 - return JSON only.
 
-Start the standalone EVE agent:
+Back at `eve-workshop>`, ask EVE what it discovered:
 
-```bash
-./scripts/session3-lab-native.sh
+```sh
+eve info
 ```
 
-Send it a native EVE message:
+Then start EVE's interactive development UI:
 
-```bash
-curl -i -X POST http://127.0.0.1:7310/eve/v1/session \
-  -H 'content-type: application/json' \
-  -d '{"message":"Design interview questions from this evaluation: {\"scores\":{\"seniority_match\":2},\"verdict\":\"fit\",\"strengths\":[\"Strong SQL\"],\"gaps\":[\"No production ownership evidence\"]}"}'
+```sh
+eve dev
 ```
 
-The agent now works. EVE owns its files, model wiring, runtime, session, and
-behaviour. Open `http://localhost:8080` and notice that the AOA registry still
-cannot see it. That is expected: you have built an agent, not yet published an
-estate contract.
+Talk to the agent directly. A useful first message is:
 
-## Checkpoint 3 — adopt it with one boundary file
-
-Copy the small card template next to the EVE project:
-
-```bash
-cp system/agents-eve/adoption-kit/interviewer-questions.yaml \
-  system/agents-eve/workshop/capability-card.yaml
+```text
+Design interview questions from this evaluation:
+{"scores":{"seniority_match":2},"verdict":"fit","strengths":["Strong SQL"],"gaps":["No production ownership evidence"]}
 ```
 
-Read it before continuing. Add one constraint that matters in your employment
-context. The important distinction is now visible:
+Iterate on `instructions.md` from the Windows editor and send another message.
+EVE watches the mounted files and rebuilds for the next turn. Stay here until
+the standalone agent behaves as intended.
+
+This checkpoint matters: EVE has now proved its value without AOA. It owns the
+agent files, model wiring, runtime, sessions, and developer feedback loop.
+
+Press `Ctrl+C` when you are ready to return to the workshop shell.
+
+## Checkpoint 3 — add the AOA adoption boundary
+
+Still inside the workshop container, copy the small contract template:
+
+```sh
+cp /adoption-kit/interviewer-questions.yaml capability-card.yaml
+```
+
+On Windows, open the new file at:
+
+```text
+system\agents-eve\workshop\capability-card.yaml
+```
+
+Read it and add one constraint that matters in your employment context. The
+separation should now be concrete:
 
 - `agent/instructions.md` tells this implementation how to behave;
 - `capability-card.yaml` tells other teams what they may rely on.
 
-Do not alter `agent.ts` or `instructions.md` during adoption. Start the wrapped
-service:
+Do not change the EVE-authored files merely to make adoption work. For an
+ordinary JSON-in/JSON-out agent, the generic bridge derives the invocation
+message, tolerant result parsing, and basic signals from the card.
 
-```bash
-./scripts/session3-lab-wrap.sh
+Leave the container shell:
+
+```sh
+exit
 ```
 
-The pinned image starts the generic `aoa-eve` bridge. There is no
-agent-specific adapter file in your project: for JSON-in/JSON-out agents the
-bridge derives the invocation prompt, output parsing, and basic signals from
-the card.
+Back in Windows Command Prompt, adopt the agent:
 
-Inspect the new public surfaces:
-
-```bash
-curl -s 'http://localhost:7100/find?id=interviewer-questions'
-curl -s 'http://localhost:7311/.well-known/agent-card.json'
+```bat
+scripts\session3-adopt.bat
 ```
 
-The registry row now has a stable Agent ID, lifecycle, endpoint, A2A face, model
-provenance, and `skills_hash`. The EVE-authored files are unchanged.
+On macOS or Linux:
 
-## Checkpoint 4 — use your agent inside the existing ecosystem
+```bash
+./scripts/session3-adopt.sh
+```
 
-In the Studio at `http://localhost:8080`, choose **CV fit + interview**. Submit a
-CV and job description from `course/data/session-01-cv-fit/`.
+This starts the EVE runtime behind the reusable AOA bridge. Inspect the result
+in a browser if useful:
 
-The existing workflow now runs:
+- Registry: `http://localhost:7100/find?id=interviewer-questions`
+- Agent Card: `http://localhost:7311/.well-known/agent-card.json`
+
+The same EVE agent now has a stable Agent ID, registry lifecycle, outward A2A
+face, trace boundary, model provenance, and `skills_hash`.
+
+## Checkpoint 4 — use the existing intent interface
+
+Open Studio at `http://localhost:8080` and select **CV fit + interview**. Submit
+a CV and job description from `course/data/session-01-cv-fit/`.
+
+The intent runs:
 
 ```text
 parse-cv → evaluate-cv-fit → interviewer-questions
 ```
 
-The first two units are Python AUs. The final unit is the EVE agent you just
-created. The planner composes all three from the same registry contract and A2A
-surface; it does not import EVE or understand EVE sessions.
+The first two steps are existing Python AUs. The final step is the EVE agent you
+created and tested. The planner calls it through the same registry contract and
+A2A surface; the intent interface does not import EVE or understand EVE
+sessions.
+
+Read the responsibility walk in Studio. It should show your adopted Agent ID
+and the questions returned by your EVE implementation.
 
 ## Debrief
 
-The adoption cost for this simple agent was one authored boundary file:
-
-| EVE project remains responsible for | AOA bridge adds |
+| EVE remains responsible for | AOA adds at adoption |
 |---|---|
 | `agent.ts`, `instructions.md`, tools, sessions | capability publication and stable Agent ID |
-| EVE native runtime | registry discovery and lifecycle |
+| EVE CLI, native runtime, and development UI | registry discovery and lifecycle |
 | framework-local history and evals | estate trace boundary and outward A2A face |
 
-An agent-specific codec is still possible when the native input/output shape is
-unusual. It is an exception, not the starting point. The replacement test is:
-could another runtime honour the same card without making callers learn EVE?
+The agent-specific adoption cost was one public contract file. A custom codec
+is possible for an unusual native shape, but it is an exception rather than the
+default. The replacement test is: could another runtime honour the same card
+without making the intent interface learn EVE?
 
-## Instructor fallback
+## Compatibility helpers and fallback
 
-If a participant machine cannot scaffold or run the workspace, use the
-pre-authored reference agent under `system/agents-eve/interviewer/` with the
-`session3-reference` profile. The old `red-flags/` example is retained as a
-code-level adapter example, but is no longer the learner path.
+- `session3-lab-native` remains as an alias for `session3-up`.
+- `session3-lab-wrap` remains as the underlying adoption helper.
+- `session3-lab-init` remains as a non-interactive instructor fallback; it is
+  deliberately not part of the learner path.
+- The pre-authored agent under `system/agents-eve/interviewer/` remains the
+  instructor fallback under the `session3-reference` profile.
