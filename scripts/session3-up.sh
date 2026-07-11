@@ -7,8 +7,11 @@ compose=(docker compose)
 if [[ -f .env ]]; then
   compose+=(--env-file .env)
 fi
+
+local_ollama=false
 if [[ "${AOA_LOCAL:-}" == "1" || "${AOA_LOCAL:-}" == "true" ]]; then
   compose+=(--profile local)
+  local_ollama=true
 fi
 
 files=(
@@ -17,17 +20,24 @@ files=(
   -f system/docker-compose.session3-lab.yml
 )
 
-# Remove either governed implementation before entering the standalone EVE
-# workshop. The agent should not exist in the AOA registry until adoption.
-"${compose[@]}" "${files[@]}" --profile session3-lab-wrapped stop eve-workshop-wrapped >/dev/null 2>&1 || true
-"${compose[@]}" "${files[@]}" --profile session3-reference stop eve-interviewer >/dev/null 2>&1 || true
+# Native authoring is deliberately isolated from AOA. Remove a previous estate
+# before opening EVE so no stale interviewer card appears during this checkpoint.
+"${compose[@]}" "${files[@]}" \
+  --profile session3 \
+  --profile session3-lab-native \
+  --profile session3-lab-wrapped \
+  down --remove-orphans
 
 "${compose[@]}" "${files[@]}" build eve-workshop-native
-"${compose[@]}" "${files[@]}" --profile session3 up --build -d --remove-orphans
+
+if [[ "$local_ollama" == "true" ]]; then
+  "${compose[@]}" "${files[@]}" up -d ollama
+fi
 
 echo
-echo "AOA is running at http://localhost:8080."
-echo "Opening the interactive EVE workshop container..."
+echo "Opening the native EVE workshop. AOA is not running yet."
+echo "Use eve init, eve info, and eve dev to build and test the agent."
 echo
 
-exec "${compose[@]}" "${files[@]}" run --rm --no-deps --service-ports eve-workshop-native
+exec "${compose[@]}" "${files[@]}" \
+  run --rm --no-deps --service-ports eve-workshop-native

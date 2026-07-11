@@ -16,7 +16,6 @@ docker compose %ENV_ARGS% ^
   --profile session3 ^
   --profile session3-lab-native ^
   --profile session3-lab-wrapped ^
-  --profile session3-reference ^
   logs -f --tail=100 %*
 
 exit /b %ERRORLEVEL%

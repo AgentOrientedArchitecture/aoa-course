@@ -27,9 +27,10 @@ below, run each session script once and shut down again:
 ./scripts/session4-up.sh && ./scripts/down.sh
 ```
 
-`session3-build` only downloads and builds the pinned workshop toolchain. It
-does not run `eve init` or create the learner's agent; that happens interactively
-during Session 3. On Windows use `scripts\session3-build.bat`.
+`session3-build` downloads and builds the complete Session 3 image set,
+including the pinned `aoa-course/eve-workshop:0.17.1` toolchain. It does not
+start EVE or AOA, run `eve init`, or create learner files; authoring happens
+interactively during Session 3. On Windows use `scripts\session3-build.bat`.
 
 This course currently provides three tested environment examples:
 
@@ -225,8 +226,8 @@ bash scripts/test_model_provider.sh
 - [ ] Copy the matching example file to `.env`.
 - [ ] Add your hosted API key if using SambaNova or NVIDIA.
 - [ ] Run `bash scripts/test_model_provider.sh` if using SambaNova or NVIDIA.
-- [ ] Run each session script once at home to build the containers, then
-      `./scripts/down.sh`.
+- [ ] Run the Session 1, 2, and 4 start commands once at home, shutting each
+      stack down afterwards; run `session3-build` for Session 3.
 - [ ] Start any session stack and open the studio.
 
 Last verified: July 2026.

@@ -1,41 +1,45 @@
 # Session 3 — Authoring AUs with EVE
 
-Session 3 introduces [Vercel EVE](https://github.com/vercel/eve) as another way to
-author an Agentic Unit, governed by the same registry, planner, and studio as the
-Python agents. The full write-up is in [`system/EVE.md`](../../../system/EVE.md).
+Session 3 uses [Vercel EVE](https://github.com/vercel/eve) to author and accept
+an agent natively before adopting it into the same registry, planner, and Studio
+used by the Python agents. The full technical write-up is in
+[`system/EVE.md`](../../../system/EVE.md).
 
 ## Data
 
-Session 3 runs the CV-fit workflow with one extra step — an EVE-authored
-interviewer agent that turns the fit verdict into interview questions:
+The adopted agent adds one step to the CV-fit workflow:
 
-```
+```text
 parse-cv → evaluate-cv-fit → interviewer-questions
 ```
 
-So it reuses the **Session 1** CV and job-description examples in
-[`../session-01-cv-fit/`](../session-01-cv-fit/). In the studio, choose the
-**CV fit + interview** mode and drop in a CV and a job description (for example
+Reuse the Session 1 CV and job-description examples in
+[`../session-01-cv-fit/`](../session-01-cv-fit/). For example, submit
 `session-01-cv-fit/cv-examples/jordan-okafor.txt` with
-`session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt`).
-
-The trace ends in a set of interview questions grouped by area, produced by the
-`interviewer-questions` capability — which, in the registry, looks exactly like a
-Python AU (an `agent_id`, an `a2a_endpoint`, a `skills_hash`) even though it runs
-on Node/EVE.
+`session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt` in Studio's
+**CV fit + interview** mode.
 
 ## Exercise
 
-Start with no authored agent. `session3-up` opens an interactive shell in the
-pinned workshop image; type `eve init .`, edit the generated files through the
-host-mounted directory, then use `eve info` and `eve dev` to test the bounded
-`interviewer-questions` agent in EVE's own terminal UI. Only after it works do
-you add one capability card and run `session3-adopt`. The final checkpoint is
-not merely a registry row: run **CV fit + interview** and watch the agent you
-created perform the third step of the existing workflow.
+The learner starts with a blank authored surface under
+`system/agents-eve/workshop/`. The Session 3 public commands are:
 
-Node, npm, EVE, and package dependencies remain in Docker. The host needs no
-JavaScript toolchain. Full guided lab:
+1. `session3-build` — pre-build the pinned
+   `aoa-course/eve-workshop:0.17.1` image.
+2. `session3-up` — run native EVE only; inside it, run `eve init .`, `eve info`,
+   and `eve dev`.
+3. `session3-adopt` — create `capability-card.yaml` automatically when missing,
+   start AOA, and publish the accepted agent.
+
+Use `eve dev` to complete the native acceptance tests before adoption. The
+agent must return JSON only, exactly five bounded interview questions, and no
+more than 1200 tokens. If you later edit the generated capability card, rerun
+`session3-adopt` to revalidate and republish it.
+
+Course-owned EVE infrastructure lives under `system/agents-eve/runtime/`.
+Learner-authored files and the generated capability card stay under
+`system/agents-eve/workshop/`.
+
+Node, npm, EVE, and package dependencies remain in Docker; no host JavaScript
+toolchain is required. Follow the complete guided lab in
 [`system/agents-eve/EXERCISE.md`](../../../system/agents-eve/EXERCISE.md).
-
-Both are described in [`system/EVE.md`](../../../system/EVE.md).

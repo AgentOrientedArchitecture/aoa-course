@@ -210,18 +210,24 @@ The shared scaffold in `_base/base.py` keeps a new `agent.py` typically under 10
 ## Agents authored with EVE (Session 3)
 
 An Agentic Unit does not have to run on the Python scaffold. Session 3 uses
-[Vercel EVE](https://github.com/vercel/eve) — a filesystem-first TypeScript
-framework — under `agents-eve/`. EVE supplies the behaviour (`instructions.md`),
-model wiring (`agent.ts`), and runtime; a small `aoa-eve` adapter supplies the
-composition and governance surfaces EVE does not aim to provide (the capability
-card, registry registration, A2A surface, trace, and `skills_hash` hot reload).
-The capstone begins with no authored agent. The real EVE CLI runs inside a
-pinned workshop image, scaffolds the agent into a bind-mounted workspace, and
-the learner gives it a bounded job before AOA appears. Adoption then adds one
-capability card; the generic `aoa-eve` bridge derives the normal JSON boundary
-without agent-specific code and the same EVE files become a workflow step. The
-four parts are still all there — card, behaviour markdown, model wiring, and
-tool/dependency story — but their ownership is visible. See [`EVE.md`](EVE.md).
+[Vercel EVE](https://github.com/vercel/eve), a filesystem-first TypeScript
+framework. Course-owned image and bridge infrastructure lives under
+`agents-eve/runtime/`; learner-owned files live under `agents-eve/workshop/`.
+
+The learner starts with a blank authored surface, runs `eve init .`, adds the
+provider-neutral `agent.ts` and bounded `instructions.md`, inspects with
+`eve info`, and completes native acceptance tests in `eve dev`. `session3-up` runs
+that native EVE environment only; no AOA services or governed identity exist at
+this stage.
+
+`session3-adopt` creates `workshop/capability-card.yaml` automatically when it
+is missing, then starts AOA and the generic bridge. The bridge stamps identity
+and `skills_hash`, registers the card, exposes the A2A surface, and emits the
+trace boundary. The same learner files then fulfil the
+`interviewer-questions` workflow step without agent-specific adoption code.
+Card edits require rerunning `session3-adopt` to revalidate and republish the
+contract. Changes made during later native acceptance should likewise be
+followed by another adoption run before AOA testing. See [`EVE.md`](EVE.md).
 
 ## Conventions
 

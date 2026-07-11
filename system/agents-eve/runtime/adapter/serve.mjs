@@ -208,6 +208,7 @@ export async function serve(cfg) {
       await update(card);
       console.log(`[aoa-eve] reloaded ${id} (skills_hash ${after.slice(0, 8)})`);
     } catch (err) {
+      card.provenance.skills_hash = before;
       console.error(`[aoa-eve] failed to update ${id}: ${err}`);
     }
   }, HOT_RELOAD_INTERVAL_MS).unref();

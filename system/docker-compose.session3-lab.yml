@@ -10,16 +10,13 @@ services:
     environment:
       REGISTRY_CARD_ALLOWLIST: tool-document-text,parser-cv,evaluator-cv,reporter-cv-fit,interviewer-questions
 
-  # Keep the pre-authored interviewer available for instructor fallback via
-  # `--profile session3-reference`, but remove it from the learner lab path.
-  eve-interviewer:
-    profiles: !override ["session3-reference"]
+
 
   eve-workshop-native:
     profiles: ["session3-lab-native"]
     build:
       context: ./agents-eve
-      dockerfile: lab/Dockerfile
+      dockerfile: runtime/Dockerfile
     image: aoa-course/eve-workshop:0.17.1
     container_name: aoa-eve-workshop-native
     working_dir: /workshop
@@ -28,7 +25,6 @@ services:
       - "7310:3000"
     volumes:
       - ./agents-eve/workshop:/workshop
-      - ./agents-eve/adoption-kit:/adoption-kit:ro
       - eve-workshop-node-modules:/workshop/node_modules
     environment:
       PROVIDER: ${PROVIDER:-ollama}
@@ -43,7 +39,7 @@ services:
     profiles: ["session3-lab-wrapped"]
     build:
       context: ./agents-eve
-      dockerfile: lab/Dockerfile
+      dockerfile: runtime/Dockerfile
     image: aoa-course/eve-workshop:0.17.1
     container_name: aoa-eve-workshop-wrapped
     working_dir: /workshop

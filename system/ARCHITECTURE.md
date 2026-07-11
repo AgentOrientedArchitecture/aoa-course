@@ -11,14 +11,16 @@ create materially different agents without changing the parser code. AU-to-AU
 orchestration uses A2A Agent Cards and JSON-RPC `message/send`; deterministic
 tools expose MCP tools behind small registered AOA bridges.
 
-Session 3 adds a fourth workflow and a fourth agent codebase authored with
-[Vercel EVE](https://github.com/vercel/eve) — a TypeScript agent running on Node
-rather than the Python scaffold, but governed as an ordinary AU through the same
-registry, A2A surface, and studio. See [`EVE.md`](EVE.md).
+Session 3 adds a fourth workflow authored with
+[Vercel EVE](https://github.com/vercel/eve). The learner accepts the TypeScript
+agent in native EVE before adopting it as an ordinary AU through the same
+registry, A2A surface, and studio. Course runtime infrastructure lives under
+`agents-eve/runtime/`; learner files live under `agents-eve/workshop/`. See
+[`EVE.md`](EVE.md).
 
 ## What the system does
 
-Three workflows run through one registry:
+Four workflows run through one registry:
 
 **CV evaluation** (Session 1):
 
@@ -32,6 +34,17 @@ returns structured CV data. The planner then starts `evaluator-cv` with the
 parsed CV and the job description; the evaluator returns scores and a verdict.
 Finally the planner starts `reporter-cv-fit`, which produces a structured
 fit-verdict report. Every step is visible in the studio's trace pane.
+
+**CV fit + interview** (Session 3) extends that evaluation with a learner-authored
+EVE capability:
+
+```text
+parser-cv → evaluator-cv → interviewer-questions
+```
+
+The learner first accepts the agent through native EVE. Adoption generates its
+capability card when missing, starts AOA, and exposes the accepted implementation
+through the same governed A2A boundary as the Python AUs.
 
 **Knowledge ingest** (Session 2) starts the wiki-management loop:
 
@@ -82,13 +95,15 @@ Three agent codebases, deployed as distinct governed runtimes:
 Session 3 adds one more governed runtime, authored with EVE (TypeScript/Node)
 instead of the Python scaffold:
 
-| Runtime | Codebase | Capabilities |
+| Runtime | Learner codebase | Capabilities |
 |---|---|---|
-| `eve-interviewer` | `agents-eve/interviewer` (EVE) | `interviewer-questions` |
+| `eve-workshop-interviewer` | `agents-eve/workshop` (EVE) | `interviewer-questions` |
 
-It extends the CV-fit workflow with a fourth step,
-`parse-cv → evaluate-cv-fit → interviewer-questions`, and registers through the
-same registry and A2A surface as the Python agents. See [`EVE.md`](EVE.md).
+Reusable image and bridge infrastructure is kept separately under
+`agents-eve/runtime/`. `session3-up` runs only the native EVE workshop;
+`session3-adopt` generates the card when missing and starts the governed runtime
+through the same registry and A2A surface as the Python agents. See
+[`EVE.md`](EVE.md).
 
 Plus, in `tools/`:
 
@@ -112,7 +127,13 @@ from the container environment. In this course compose file those are stable
 URNs such as `urn:aoa:agent:cv-parser` and
 `urn:aoa:agent:wiki-parser`.
 
-When a single codebase backs more than one capability, the capability-specific files live in `capabilities/<name>/` subfolders; the code lives at the agent root. Every agent uses this pattern even when it has only one capability.
+When a single Python codebase backs more than one capability, the
+capability-specific files live in `capabilities/<name>/` subfolders; the code
+lives at the agent root. Every Python agent uses this pattern even when it has
+only one capability. Session 3 deliberately shows another ownership model:
+EVE-authored files and the generated card stay in `agents-eve/workshop/`, while
+the generic adoption runtime stays in `agents-eve/runtime/`. Card edits there
+require rerunning `session3-adopt`.
 
 ## Plumbing services
 
@@ -144,8 +165,10 @@ docker-compose.yml services:
 
 Session 1 starts the CV-only subset: registry, planner, studio,
 tool-document-text, `cv-parser`, evaluator, and reporter. Session 2 starts the
-full set above, including `wiki-parser`. Optional Ollama runs only when the
-`local` profile is enabled.
+full set above, including `wiki-parser`. Session 3 begins differently:
+`session3-up` runs only the native EVE workshop, and `session3-adopt` then starts
+the AOA services and generic EVE bridge around the learner's accepted files.
+Optional Ollama runs only when the `local` profile is enabled.
 
 Every agent container has the same shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
@@ -285,7 +308,8 @@ A browser surface at `localhost:8080` with two roles:
 **Intent:**
 
 - **Submit an intent.** Free-form text, sent to the planner.
-- **Choose a mode.** CV fit for Session 1; ingest, graph, and wiki query for Session 2.
+- **Choose a mode.** CV fit for Session 1; ingest, graph, and wiki query for
+  Session 2; CV fit + interview after Session 3 adoption.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
 - **Inspect the wiki graph.** The Session 2 wiki store projects its raw,
   promoted, and indexed knowledge into typed graph nodes. Documents, concepts,
@@ -318,8 +342,13 @@ docker compose --env-file .env \
   up --build -d --remove-orphans
 ```
 
-Open `http://localhost:8080` and you'll see the registry pane populate as
-agents and tools register.
+For Session 3, pre-build with `session3-build`, open only the native EVE
+workshop with `session3-up`, and start the composed AOA system only after native
+acceptance with `session3-adopt`. These are the public Session 3 entry points;
+the guided sequence is in [`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
+
+Open `http://localhost:8080` after starting an AOA stack and you'll see the
+registry pane populate as agents and tools register.
 
 Configure the model via `.env`:
 

@@ -11,14 +11,14 @@ ENV NODE_ENV=development \
 
 WORKDIR /app
 
-COPY lab/package.json lab/package-lock.json ./
+COPY runtime/package.json runtime/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 # The reusable AOA bridge is platform plumbing, not part of the participant's
 # EVE project. The generic entry point derives JSON input/output mapping from
 # the capability card, so adoption does not require agent-specific code.
-COPY interviewer/adapter/ ./adapter/
-COPY lab/workshop-shell.sh ./workshop-shell.sh
+COPY runtime/adapter/ ./adapter/
+COPY runtime/workshop-shell.sh ./workshop-shell.sh
 # Be defensive against an existing Windows checkout created before the
 # repository's LF rule was present. A CRLF shebang appears to Docker as a
 # missing `/bin/sh\r` interpreter.

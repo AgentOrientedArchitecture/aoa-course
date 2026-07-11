@@ -96,14 +96,12 @@ docker compose --env-file .env \
   up --build -d --remove-orphans
 ```
 
-Session 3 starts the CV-fit workflow plus the EVE-authored interviewer agent:
+Session 3 starts with a native EVE workshop, then adopts the tested agent into
+the CV-fit workflow:
 
 ```bash
-docker compose --env-file .env \
-  -f system/docker-compose.yml \
-  -f system/docker-compose.session3.yml \
-  --profile session3 \
-  up --build -d --remove-orphans
+./scripts/session3-up.sh       # run eve init, eve info, and eve dev
+./scripts/session3-adopt.sh    # create the AOA card and start the estate
 ```
 
 Session 4 starts the full estate — CV-fit, wiki, and the estate-check scanner —
@@ -116,8 +114,9 @@ then seeds the regulations corpus:
 Session 3's agent is created and run entirely inside containers. A pinned EVE
 workshop image exposes the real `eve init`, `eve info`, and `eve dev` CLI against
 a bind-mounted learner workspace. Participants need Docker, not host Node/npm
-or a venue-time package install. They build the agent natively first, then add
-one capability card and run the same files through the generic AOA bridge.
+or a venue-time package install. They build the agent natively first; the
+adoption script then creates its capability card and runs the same files through
+the generic AOA bridge.
 
 The provided `.env.ollama` example assumes Ollama is already running on your
 host machine. If you want Compose to start the included Ollama container
@@ -143,8 +142,9 @@ On Windows Command Prompt, use the matching batch files:
 scripts\session1-up.bat
 scripts\session2-up.bat
 scripts\session3-build.bat    rem pre-work: images only
-scripts\session3-up.bat       rem interactive EVE workshop
-scripts\session3-adopt.bat    rem publish the tested agent into AOA
+scripts\session3-up.bat       rem interactive native EVE workshop
+scripts\session3-adopt.bat    rem create the AOA card and start the estate
+scripts\session4-up.bat
 scripts\logs.bat
 scripts\down.bat
 ```

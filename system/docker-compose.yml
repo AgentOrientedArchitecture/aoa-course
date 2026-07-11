@@ -351,50 +351,7 @@ services:
       registry:
         condition: service_healthy
 
-  # ------------------------------------------------------------------
-  # EVE-authored agent (Session 3)
-  # ------------------------------------------------------------------
-  # A genuine Vercel EVE (TypeScript) agent, governed as a first-class AU by the
-  # same registry/planner/studio. The aoa-eve adapter gives it a capability card,
-  # registers it, and exposes the AOA HTTP + A2A surface every other agent has.
-  eve-interviewer:
-    profiles: ["session3"]
-    build:
-      context: ./agents-eve/interviewer
-      dockerfile: Dockerfile
-    image: aoa-course/eve-interviewer:latest
-    container_name: aoa-eve-interviewer
-    ports:
-      - "7305:8888"
-    volumes:
-      # The EVE agent/ dir and the co-located capability card are mounted so
-      # editing instructions.md hot-reloads behaviour, just like the Python AUs.
-      - ./agents-eve/interviewer/agent:/app/agent:ro
-      - ./agents-eve/interviewer/capability-card.yaml:/app/capability-card.yaml:ro
-      - ./inbox:/data/inbox:ro
-    environment:
-      REGISTRY_URL: http://registry:7100
-      PLANNER_URL: http://planner:7200
-      AGENT_ID: urn:aoa:agent:eve-interviewer
-      AGENT_NAME: eve-interviewer
-      AGENT_HOST: eve-interviewer
-      AGENT_PORT: 8888
-      CAPABILITY_ALLOWLIST: interviewer-questions
-      PROVIDER: ${PROVIDER:-ollama}
-      MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
-      # EVE compaction needs a context window for local/unlisted model ids.
-      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
-      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
-      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
-      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
-    depends_on:
-      registry:
-        condition: service_healthy
-      tool-document-text:
-        condition: service_started
+
 
   # ------------------------------------------------------------------
   # Optional: local model server (only started under `local` profile)

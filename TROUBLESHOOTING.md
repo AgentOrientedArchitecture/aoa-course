@@ -45,15 +45,18 @@ Nine times out of ten this is `.env`:
 
 Changed `.env`? Restart: `./scripts/down.sh && ./scripts/sessionN-up.sh`.
 
-## SambaNova rejects the EVE agent / "tool role not supported"
+## Session 3: native EVE model calls fail
 
-Expected: some OpenAI-compatible endpoints reject the `tool` message role. The
-course's EVE agent deliberately runs tool-free (sentinels in
-`system/agents-eve/interviewer/agent/tools/`) so it works on all tested
-providers. If you enabled real EVE tools in the enrichment exercise, switch to
-Ollama or NVIDIA NIM for that agent.
+The learner-authored `system/agents-eve/workshop/agent/agent.ts` should use the
+provider-neutral OpenAI-compatible wiring from the exercise. Check that the
+workshop received `MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and
+`OLLAMA_HOST` from the course `.env`. First verify the provider using the checks
+above, then reopen the native workshop with `session3-up` and retry `eve dev`.
+
 
 ## I edited instructions.md / capability-card.yaml and nothing changed
+
+For the Python agents in Sessions 1, 2, and 4:
 
 - The watcher re-registers within a second or two — watch the Registry pane's
   `skills_hash` chip (instructions) or the card fields (card edits).
@@ -63,13 +66,21 @@ Ollama or NVIDIA NIM for that agent.
 - Agent **code** (`agent.py`, `_base/`) is baked into the image, not mounted:
   code changes need `./scripts/sessionN-up.sh` again (it rebuilds).
 
-## Session 3: the EVE lab image did not build
+Session 3 has a deliberate build-then-adopt boundary. Learner files live under
+`system/agents-eve/workshop/`, while course runtime infrastructure lives under
+`system/agents-eve/runtime/`. Retest `agent.ts` or `instructions.md` natively
+with `session3-up` and `eve dev`; then rerun `session3-adopt` before checking AOA.
+Edits to the generated `workshop/capability-card.yaml` also require rerunning
+`session3-adopt` so the contract is revalidated and republished.
 
-Build it at home with `./scripts/session3-lab-native.sh`; the image contains
-Node, pinned EVE dependencies and the authored lab agent. On the day, confirm
-it exists with `docker image inspect aoa-course/eve-lab:0.17.1`. If a laptop
-missed pre-work, pair with a prepared neighbour rather than installing
-packages over venue wifi.
+## Session 3: the EVE workshop image did not build
+
+Build it at home with `./scripts/session3-build.sh` (Windows:
+`scripts\session3-build.bat`). The image contains Node and the pinned EVE
+toolchain, but no authored learner agent. Confirm it exists with
+`docker image inspect aoa-course/eve-workshop:0.17.1`. If a laptop missed
+pre-work, pair with a prepared neighbour rather than installing packages over
+venue wifi.
 
 ## Session 4: every finding says "corpus silent"
 

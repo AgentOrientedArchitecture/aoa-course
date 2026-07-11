@@ -7,45 +7,39 @@ set "ENV_ARGS="
 if exist ".env" set "ENV_ARGS=--env-file .env"
 
 set "LOCAL_ARGS="
-if /I "%AOA_LOCAL%"=="1" set "LOCAL_ARGS=--profile local"
-if /I "%AOA_LOCAL%"=="true" set "LOCAL_ARGS=--profile local"
+set "USE_LOCAL_OLLAMA=0"
+if /I "%AOA_LOCAL%"=="1" (
+  set "LOCAL_ARGS=--profile local"
+  set "USE_LOCAL_OLLAMA=1"
+)
+if /I "%AOA_LOCAL%"=="true" (
+  set "LOCAL_ARGS=--profile local"
+  set "USE_LOCAL_OLLAMA=1"
+)
 
-docker compose %ENV_ARGS% %LOCAL_ARGS% ^
-  -f system/docker-compose.yml ^
-  -f system/docker-compose.session3.yml ^
-  -f system/docker-compose.session3-lab.yml ^
-  --profile session3-lab-wrapped stop eve-workshop-wrapped >nul 2>&1
+set "COMPOSE=docker compose %ENV_ARGS% %LOCAL_ARGS% -f system/docker-compose.yml -f system/docker-compose.session3.yml -f system/docker-compose.session3-lab.yml"
 
-docker compose %ENV_ARGS% %LOCAL_ARGS% ^
-  -f system/docker-compose.yml ^
-  -f system/docker-compose.session3.yml ^
-  -f system/docker-compose.session3-lab.yml ^
-  --profile session3-reference stop eve-interviewer >nul 2>&1
-
-docker compose %ENV_ARGS% %LOCAL_ARGS% ^
-  -f system/docker-compose.yml ^
-  -f system/docker-compose.session3.yml ^
-  -f system/docker-compose.session3-lab.yml ^
-  build eve-workshop-native
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-docker compose %ENV_ARGS% %LOCAL_ARGS% ^
-  -f system/docker-compose.yml ^
-  -f system/docker-compose.session3.yml ^
-  -f system/docker-compose.session3-lab.yml ^
+rem Native authoring is deliberately isolated from AOA. Remove a previous
+rem estate so no stale interviewer card appears during this checkpoint.
+%COMPOSE% ^
   --profile session3 ^
-  up --build -d --remove-orphans
+  --profile session3-lab-native ^
+  --profile session3-lab-wrapped ^
+  down --remove-orphans
 if errorlevel 1 exit /b %ERRORLEVEL%
 
+%COMPOSE% build eve-workshop-native
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+if "%USE_LOCAL_OLLAMA%"=="1" (
+  %COMPOSE% up -d ollama
+  if errorlevel 1 exit /b 1
+)
+
 echo.
-echo AOA is running at http://localhost:8080.
-echo Opening the interactive EVE workshop container...
+echo Opening the native EVE workshop. AOA is not running yet.
+echo Use eve init, eve info, and eve dev to build and test the agent.
 echo.
 
-docker compose %ENV_ARGS% %LOCAL_ARGS% ^
-  -f system/docker-compose.yml ^
-  -f system/docker-compose.session3.yml ^
-  -f system/docker-compose.session3-lab.yml ^
-  run --rm --no-deps --service-ports eve-workshop-native
-
+%COMPOSE% run --rm --no-deps --service-ports eve-workshop-native
 exit /b %ERRORLEVEL%
