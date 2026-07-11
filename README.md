@@ -113,10 +113,11 @@ then seeds the regulations corpus:
 ./scripts/session4-up.sh && ./scripts/session4-seed.sh
 ```
 
-Session 3's agents are built and run entirely inside containers. The capstone
-uses one pinned EVE dependency image to show the same authored agent first in
-vendor-native mode and then behind the AOA contract. Participants need Docker,
-not host Node/npm or a venue-time package install.
+Session 3's agent is created and run entirely inside containers. A pinned EVE
+workshop image exposes the real `eve init`, `eve info`, and `eve dev` CLI against
+a bind-mounted learner workspace. Participants need Docker, not host Node/npm
+or a venue-time package install. They build the agent natively first, then add
+one capability card and run the same files through the generic AOA bridge.
 
 The provided `.env.ollama` example assumes Ollama is already running on your
 host machine. If you want Compose to start the included Ollama container
@@ -129,8 +130,9 @@ There are also thin helper scripts for the common paths:
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
 ./scripts/session3-up.sh
-./scripts/session3-lab-native.sh  # EVE-native half of the capstone
-./scripts/session3-lab-wrap.sh    # same agent behind the AOA boundary
+./scripts/session3-lab-init.sh    # EVE CLI creates the agent
+./scripts/session3-lab-native.sh  # run the learner-authored EVE agent
+./scripts/session3-lab-wrap.sh    # adopt it into the AOA workflow
 ./scripts/session4-up.sh    # + session4-seed.sh / session4-reset.sh / session4-approve.sh
 ./scripts/logs.sh
 ./scripts/down.sh
@@ -142,6 +144,7 @@ On Windows Command Prompt, use the matching batch files:
 scripts\session1-up.bat
 scripts\session2-up.bat
 scripts\session3-up.bat
+scripts\session3-lab-init.bat
 scripts\session3-lab-native.bat
 scripts\session3-lab-wrap.bat
 scripts\logs.bat

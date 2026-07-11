@@ -18,4 +18,5 @@ exec "${compose[@]}" \
   --profile session3 \
   --profile session3-lab-native \
   --profile session3-lab-wrapped \
+  --profile session3-reference \
   down --remove-orphans "$@"

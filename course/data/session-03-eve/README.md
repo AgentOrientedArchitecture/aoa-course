@@ -24,14 +24,17 @@ The trace ends in a set of interview questions grouped by area, produced by the
 Python AU (an `agent_id`, an `a2a_endpoint`, a `skills_hash`) even though it runs
 on Node/EVE.
 
-## Exercises
+## Exercise
 
-1. **Modify** — edit `system/agents-eve/interviewer/agent/instructions.md` and
-   watch the registry `skills_hash` change live in the studio.
-2. **Boundary (capstone)** — run the red-flags agent through EVE's native
-   runtime, observe that it is absent from the AOA registry, add a local
-   contract constraint, then expose the same behaviour through the generic
-   adapter. Docker owns Node, EVE and package dependencies. Full guided lab:
-   [`system/agents-eve/EXERCISE.md`](../../../system/agents-eve/EXERCISE.md).
+Start with no authored agent. Use the EVE CLI in the pinned workshop image to
+scaffold one, give it the bounded `interviewer-questions` job, and prove it works
+through EVE's native session API. Then add one capability card and run the same
+files through the generic AOA bridge. The final checkpoint is not merely a
+registry row: run **CV fit + interview** and watch the agent you created perform
+the third step of the existing workflow.
+
+Node, npm, EVE, and package dependencies remain in Docker. The host needs no
+JavaScript toolchain. Full guided lab:
+[`system/agents-eve/EXERCISE.md`](../../../system/agents-eve/EXERCISE.md).
 
 Both are described in [`system/EVE.md`](../../../system/EVE.md).

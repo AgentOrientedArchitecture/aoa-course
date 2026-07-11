@@ -215,10 +215,13 @@ framework — under `agents-eve/`. EVE supplies the behaviour (`instructions.md`
 model wiring (`agent.ts`), and runtime; a small `aoa-eve` adapter supplies the
 composition and governance surfaces EVE does not aim to provide (the capability
 card, registry registration, A2A surface, trace, and `skills_hash` hot reload).
-The capstone runs the same red-flags agent first in native EVE mode and then
-through that adapter, using a single pinned dependency image. The four parts are
-still all there — the card, behaviour markdown, model wiring, and tool/dependency
-story — just in EVE's vocabulary. See [`EVE.md`](EVE.md).
+The capstone begins with no authored agent. The real EVE CLI runs inside a
+pinned workshop image, scaffolds the agent into a bind-mounted workspace, and
+the learner gives it a bounded job before AOA appears. Adoption then adds one
+capability card; the generic `aoa-eve` bridge derives the normal JSON boundary
+without agent-specific code and the same EVE files become a workflow step. The
+four parts are still all there — card, behaviour markdown, model wiring, and
+tool/dependency story — but their ownership is visible. See [`EVE.md`](EVE.md).
 
 ## Conventions
 
