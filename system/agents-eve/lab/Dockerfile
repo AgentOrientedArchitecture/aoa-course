@@ -19,7 +19,10 @@ RUN npm ci --no-audit --no-fund
 # the capability card, so adoption does not require agent-specific code.
 COPY interviewer/adapter/ ./adapter/
 COPY lab/workshop-shell.sh ./workshop-shell.sh
-RUN chmod +x ./workshop-shell.sh
+# Be defensive against an existing Windows checkout created before the
+# repository's LF rule was present. A CRLF shebang appears to Docker as a
+# missing `/bin/sh\r` interpreter.
+RUN sed -i 's/\r$//' ./workshop-shell.sh && chmod +x ./workshop-shell.sh
 
 EXPOSE 3000 8888
 

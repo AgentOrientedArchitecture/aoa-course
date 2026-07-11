@@ -1,0 +1,7 @@
+# Shell scripts execute inside Linux containers even when the repository is
+# checked out on Windows. CRLF changes the shebang to `/bin/sh\r`, which Docker
+# reports misleadingly as "not found".
+*.sh text eol=lf
+
+# Keep native Windows helpers convenient in Command Prompt.
+*.bat text eol=crlf
