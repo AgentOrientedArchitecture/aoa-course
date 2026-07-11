@@ -1,25 +1,34 @@
-# Session 3 lab: the same EVE-authored agent appears first through EVE's native
-# runtime and then through the AOA adapter. Both services use one pre-built
-# dependency image, so participants need Docker but no host Node/npm setup.
+# Session 3 build-then-adopt lab.
+#
+# The checked-in workshop has no agent. The learner first uses the real EVE CLI
+# in the pinned image to scaffold one, gives it a bounded job, and runs it
+# natively. The wrapped service then adds the generic AOA boundary around the
+# unchanged workspace. Node, npm, EVE, and dependencies remain in containers.
 
 services:
   registry:
     environment:
-      REGISTRY_CARD_ALLOWLIST: tool-document-text,parser-cv,evaluator-cv,reporter-cv-fit,interviewer-questions,red-flags-review
+      REGISTRY_CARD_ALLOWLIST: tool-document-text,parser-cv,evaluator-cv,reporter-cv-fit,interviewer-questions
 
-  eve-red-flags-native:
+  # Keep the pre-authored interviewer available for instructor fallback via
+  # `--profile session3-reference`, but remove it from the learner lab path.
+  eve-interviewer:
+    profiles: !override ["session3-reference"]
+
+  eve-workshop-native:
     profiles: ["session3-lab-native"]
     build:
       context: ./agents-eve
       dockerfile: lab/Dockerfile
-    image: aoa-course/eve-lab:0.17.1
-    container_name: aoa-eve-red-flags-native
+    image: aoa-course/eve-workshop:0.17.1
+    container_name: aoa-eve-workshop-native
+    working_dir: /workshop
     command: ["npm", "exec", "--", "eve", "dev", "--no-ui", "--host", "0.0.0.0", "--port", "3000"]
     ports:
       - "7310:3000"
     volumes:
-      - ./agents-eve/red-flags/agent.ts:/app/agent/agent.ts:ro
-      - ./agents-eve/red-flags/instructions.md:/app/agent/instructions.md:ro
+      - ./agents-eve/workshop:/workshop
+      - eve-workshop-node-modules:/workshop/node_modules
     environment:
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
@@ -27,27 +36,30 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+      NPM_CONFIG_OFFLINE: "true"
 
-  eve-red-flags-wrapped:
+  eve-workshop-wrapped:
     profiles: ["session3-lab-wrapped"]
     build:
       context: ./agents-eve
       dockerfile: lab/Dockerfile
-    image: aoa-course/eve-lab:0.17.1
-    container_name: aoa-eve-red-flags-wrapped
+    image: aoa-course/eve-workshop:0.17.1
+    container_name: aoa-eve-workshop-wrapped
+    working_dir: /workshop
+    command: ["node", "/app/adapter/generic-boot.mjs"]
     ports:
       - "7311:8888"
     volumes:
-      - ./agents-eve/red-flags/agent.ts:/app/agent/agent.ts:ro
-      - ./agents-eve/red-flags/instructions.md:/app/agent/instructions.md:ro
-      - ./agents-eve/red-flags/capability-card.yaml:/app/capability-card.yaml:ro
-      - ./agents-eve/red-flags/boot.mjs:/app/adapter/boot.mjs:ro
+      - ./agents-eve/workshop:/workshop
+      - eve-workshop-node-modules:/workshop/node_modules
     environment:
+      EVE_APP_ROOT: /workshop
+      CARD_PATH: /workshop/capability-card.yaml
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
-      AGENT_ID: urn:aoa:agent:eve-red-flags
-      AGENT_NAME: eve-red-flags
-      AGENT_HOST: eve-red-flags-wrapped
+      AGENT_ID: urn:aoa:agent:eve-workshop-interviewer
+      AGENT_NAME: eve-workshop-interviewer
+      AGENT_HOST: eve-workshop-wrapped
       AGENT_PORT: 8888
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
@@ -55,6 +67,10 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+      NPM_CONFIG_OFFLINE: "true"
     depends_on:
       registry:
         condition: service_healthy
+
+volumes:
+  eve-workshop-node-modules:

@@ -8,8 +8,10 @@
 //   * hot reload: editing instructions.md re-stamps skills_hash in the registry
 //
 // It mirrors, in JS, the jobs system/agents/_base/base.py does for Python agents.
-// The agent-specific bits (how to phrase the turn, the output schema, the
-// signals) are injected by boot.mjs, so this file stays generic.
+// Agent-specific message/parsing/signal functions may be injected by boot.mjs.
+// When they are omitted, the bridge derives a useful JSON-in/JSON-out mapping
+// from the capability card. That is the lowest-friction adoption path used in
+// the Session 3 lab: an existing EVE agent adds a card, not integration code.
 import http from "node:http";
 import { loadStampedCard, rehash, buildAgentCard } from "./card.mjs";
 import { waitUntilReady, register, update } from "./registry.mjs";
@@ -97,14 +99,78 @@ function jsonRpcError(id, code, message) {
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
+function parseJsonResult(text) {
+  if (!text || !text.trim()) return { error: "empty model response" };
+  let value = text.trim();
+  const fence = value.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) value = fence[1].trim();
+  try {
+    return JSON.parse(value);
+  } catch {
+    const start = value.indexOf("{");
+    const end = value.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(value.slice(start, end + 1));
+      } catch {
+        // Fall through to the structured error below.
+      }
+    }
+    return { error: "model did not return valid JSON", raw: value.slice(0, 500) };
+  }
+}
+
+function valuePresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.trim().length > 0;
+  return value !== undefined && value !== null;
+}
+
+function genericMessage(card, inputs) {
+  const outputs = (card.outputs || []).map((item) => ({
+    name: item.name,
+    type: item.type,
+  }));
+  return [
+    `Fulfil the AOA capability \"${card.id}\".`,
+    String(card.purpose || "Follow your instructions for the supplied inputs.").trim(),
+    "",
+    "## Inputs (JSON)",
+    "```json",
+    JSON.stringify(inputs || {}, null, 2),
+    "```",
+    "",
+    "## Required output fields (JSON)",
+    "```json",
+    JSON.stringify(outputs, null, 2),
+    "```",
+    "",
+    "Respond with only one JSON object that follows your instructions and contains the required output fields.",
+  ].join("\n");
+}
+
+function genericSignals(card, outputs, latencySeconds) {
+  const valid = outputs && typeof outputs === "object" && !Array.isArray(outputs) && !("error" in outputs);
+  const signals = {
+    valid_output_shape: Boolean(valid),
+    latency_seconds: latencySeconds,
+  };
+  const required = (card.outputs || []).filter((item) => item.name);
+  for (const item of required) {
+    signals[`has_${item.name}`] = valid && valuePresent(outputs[item.name]);
+  }
+  signals.required_outputs_present = required.every((item) => valid && valuePresent(outputs[item.name]));
+  return signals;
+}
+
 /**
  * Start the agent.
  * @param {object} cfg
  * @param {string} cfg.cardPath          path to capability-card.yaml
  * @param {string} cfg.instructionsPath  path to agent/instructions.md (for skills_hash + watch)
- * @param {(inputs:object)=>string} cfg.buildMessage   turn message from AOA inputs
- * @param {(text:string)=>object} cfg.parseResult      parse the assistant text into AOA outputs
- * @param {(outputs:object, latencySeconds:number)=>object} cfg.computeSignals
+ * @param {(inputs:object)=>string} [cfg.buildMessage] turn message from AOA inputs
+ * @param {(text:string)=>object} [cfg.parseResult] parse assistant text into AOA outputs
+ * @param {(outputs:object, latencySeconds:number)=>object} [cfg.computeSignals]
  */
 export async function serve(cfg) {
   const evePort = Number(process.env.EVE_PORT || 3000);
@@ -114,6 +180,9 @@ export async function serve(cfg) {
 
   const { id, card } = loadStampedCard(cfg.cardPath, cfg.instructionsPath);
   const agentCard = buildAgentCard([card]);
+  const buildMessage = cfg.buildMessage || ((inputs) => genericMessage(card, inputs));
+  const parseResult = cfg.parseResult || parseJsonResult;
+  const computeSignals = cfg.computeSignals || ((outputs, latency) => genericSignals(card, outputs, latency));
 
   // 1. Bring up the EVE runtime and the registry, then register.
   startEve(evePort);
@@ -161,11 +230,11 @@ export async function serve(cfg) {
     });
     const t0 = Date.now();
     try {
-      const message = cfg.buildMessage(inputs);
+      const message = buildMessage(inputs);
       const text = await runTurn(evePort, message);
       const latency = (Date.now() - t0) / 1000;
-      const outputs = cfg.parseResult(text);
-      const signals = cfg.computeSignals(outputs, latency);
+      const outputs = parseResult(text);
+      const signals = computeSignals(outputs, latency);
       await emitTrace({
         trace_id: traceId,
         step: "au-finish",

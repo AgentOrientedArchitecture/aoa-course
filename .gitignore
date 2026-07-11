@@ -31,3 +31,10 @@ system/wiki/*
 
 # Local cogs index database
 .cogs/
+
+# Session 3 learner workspace. The runtime shell is checked in; the agent and
+# contract are created during the exercise.
+system/agents-eve/workshop/agent/
+system/agents-eve/workshop/capability-card.yaml
+system/agents-eve/workshop/.eve/
+system/agents-eve/workshop/.workflow-data/

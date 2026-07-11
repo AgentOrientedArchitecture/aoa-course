@@ -146,28 +146,30 @@ curl http://localhost:7305/.well-known/agent-card.json
 curl http://localhost:7305/cards/interviewer-questions
 ```
 
-## The two exercises
+## The build-then-adopt lab
 
-**1. Modify an existing agent by editing markdown.**
-Edit `system/agents-eve/interviewer/agent/instructions.md` (e.g. ask for
-scenario-based questions only). Save. The studio's registry pane shows a new
-`skills_hash` for `interviewer-questions` immediately — the governed behaviour
-version changed while the Agent ID stayed stable. The next run reflects the new
-instructions. (The Python agents hot-reload behaviour the same way — try editing
-`system/agents/evaluator/capabilities/cv/instructions.md` in Session 1.)
+The learner path no longer begins with a completed vendor-authored agent. It
+starts with an empty authored surface under `agents-eve/workshop/`:
 
-**2. Put a vendor-authored agent behind an AOA contract — the capstone.**
-Run the checked-in red-flags agent first through EVE's native session API, then
-observe that it has no published contract, governed identity, registry entry,
-AOA trace boundary or outward agent face. Add one context-specific constraint
-to its capability card and switch the same behaviour files to the generic
-adapter. The full guided lab is in
+1. `./scripts/session3-lab-init.sh` runs the real `eve init .` CLI inside the
+   pinned workshop image.
+2. The learner rewrites the generated `instructions.md` and model wiring to
+   make a useful standalone interview-question agent.
+3. `./scripts/session3-lab-native.sh` runs it through EVE's native session API.
+4. The learner adds `capability-card.yaml` without changing the EVE files.
+5. `./scripts/session3-lab-wrap.sh` starts the generic `aoa-eve` bridge and the
+   same agent becomes the `interviewer-questions` step in the existing AOA
+   workflow.
+
+For ordinary JSON-in/JSON-out agents, the generic bridge derives the invocation
+message, tolerant result parsing, and output-presence signals from the card.
+There is no agent-specific adapter file in the learner project. A codec remains
+available for genuinely unusual native shapes, but is the exception.
+
+The image contains Node 24, EVE 0.17.1, package dependencies, and a warmed npm
+cache so scaffolding works without venue networking. The host needs Docker and
+a text editor only. The full guided lab is
 [`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
-
-`./scripts/session3-lab-native.sh` and `./scripts/session3-lab-wrap.sh` use one
-pinned Docker image for both halves. Node, EVE and package dependencies stay in
-the image; the architectural variable is the public boundary, not the
-participant's workstation.
 
 ## Notes and fallbacks
 
@@ -179,3 +181,5 @@ participant's workstation.
   rebuild.
 - EVE's own docs ship inside the installed package under
   `node_modules/eve/docs/` and match the pinned version exactly.
+- `agents-eve/interviewer/` remains the ready-made instructor fallback.
+  `agents-eve/red-flags/` remains as the example of an agent-specific codec.
