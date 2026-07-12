@@ -9,6 +9,8 @@ response, return it.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from _base.base import Context, run
 from _base.json_utils import error_envelope, parse_json
 
@@ -168,6 +170,7 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
         return error_envelope("cards.json did not contain a card mapping")
 
     trace_lines, trace_files = await _read_trace_lines(fs, estate_root)
+    plans = _parse_plan_traces(trace_lines)
 
     inventory = []
     for cap_id, card in sorted(cards.items()):
@@ -223,6 +226,7 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
 
     outputs = {
         "inventory": inventory,
+        "plans": plans,
         "scanned_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
         "trace_files_scanned": trace_files,
     }
@@ -237,8 +241,314 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
     }
 
 
-async def _read_trace_lines(fs, estate_root: str, cap: int = 20) -> tuple[list[str], int]:
-    """Read the most recent trace files (by name) and return their lines."""
+def _parse_plan_traces(trace_lines: list[str]) -> list[dict[str, Any]]:
+    """Reduce planner JSONL records into per-trace plan evidence."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for line in trace_lines:
+        try:
+            record = _json.loads(line)
+        except (_json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        trace_id = record.get("trace_id")
+        if not isinstance(trace_id, str) or not trace_id.strip():
+            continue
+        grouped.setdefault(trace_id, []).append(record)
+
+    plans: list[dict[str, Any]] = []
+    for trace_id, records in grouped.items():
+        if _is_evidence_scan_trace(records):
+            continue
+        if not any(record.get("step") == "plan" for record in records):
+            continue
+        plans.append(_summarize_plan_trace(trace_id, records))
+    plans.sort(key=lambda item: str(item.get("started_at") or ""), reverse=True)
+    return plans
+
+
+def _is_evidence_scan_trace(records: list[dict[str, Any]]) -> bool:
+    evidence_workflows = {"agent-card-check", "flow-audit", "estate-check"}
+    for record in records:
+        if record.get("workflow") in evidence_workflows:
+            return True
+        intent = record.get("intent")
+        if isinstance(intent, dict) and intent.get("kind") in evidence_workflows:
+            return True
+    return False
+
+
+def _summarize_plan_trace(
+    trace_id: str, records: list[dict[str, Any]]
+) -> dict[str, Any]:
+    plan: dict[str, Any] = {"trace_id": trace_id}
+
+    workflow = next(
+        (
+            record.get("workflow")
+            for record in records
+            if isinstance(record.get("workflow"), str) and record.get("workflow")
+        ),
+        None,
+    )
+    start = next((record for record in records if record.get("step") == "start"), None)
+    start_intent = start.get("intent") if isinstance(start, dict) else None
+    if isinstance(start, dict) and start.get("ts"):
+        plan["started_at"] = start["ts"]
+    if not workflow and isinstance(start_intent, dict):
+        workflow = start_intent.get("kind")
+    if workflow:
+        plan["workflow"] = workflow
+
+    governance_invoke = next(
+        (record for record in records if record.get("step") == "governance-invoke"),
+        None,
+    )
+    governance_inputs = (
+        governance_invoke.get("inputs") if isinstance(governance_invoke, dict) else None
+    )
+    if isinstance(start_intent, dict) and isinstance(start_intent.get("use_context"), dict):
+        plan["use_context"] = start_intent["use_context"]
+    elif isinstance(governance_inputs, dict) and isinstance(
+        governance_inputs.get("use_context"), dict
+    ):
+        plan["use_context"] = governance_inputs["use_context"]
+
+    plan_event = next(
+        (record for record in records if record.get("step") == "plan"),
+        None,
+    )
+    resolved_plan = plan_event.get("plan") if isinstance(plan_event, dict) else None
+    if not isinstance(resolved_plan, list) and isinstance(governance_inputs, dict):
+        resolved_plan = governance_inputs.get("resolved_plan")
+    if isinstance(resolved_plan, list):
+        plan["resolved_composition"] = resolved_plan
+        capability_ids = []
+        for item in resolved_plan:
+            capability_id = item.get("capability") if isinstance(item, dict) else None
+            if (
+                isinstance(capability_id, str)
+                and capability_id
+                and capability_id not in capability_ids
+            ):
+                capability_ids.append(capability_id)
+        plan["capability_ids"] = capability_ids
+
+    if isinstance(governance_inputs, dict) and isinstance(
+        governance_inputs.get("capability_cards"), list
+    ):
+        plan["capability_cards"] = governance_inputs["capability_cards"]
+
+    plan_digest = next(
+        (
+            record.get("plan_digest")
+            for record in records
+            if isinstance(record.get("plan_digest"), str) and record.get("plan_digest")
+        ),
+        None,
+    )
+    if not plan_digest and isinstance(governance_inputs, dict):
+        value = governance_inputs.get("plan_digest")
+        if isinstance(value, str) and value:
+            plan_digest = value
+    if plan_digest:
+        plan["plan_digest"] = plan_digest
+
+    governance_result = next(
+        (record for record in records if record.get("step") == "plan-governance"),
+        None,
+    )
+    governance_release = next(
+        (record for record in records if record.get("step") == "governance-release"),
+        None,
+    )
+    governance: dict[str, Any] = {}
+    if isinstance(governance_invoke, dict):
+        _copy_if_present(
+            governance,
+            governance_invoke,
+            (("capability_id", "capability"), ("invoked_at", "ts")),
+        )
+    if isinstance(governance_result, dict):
+        _copy_if_present(
+            governance,
+            governance_result,
+            (
+                ("capability_id", "capability"),
+                ("decision", "decision"),
+                ("report", "evaluation_markdown"),
+                ("findings", "findings"),
+                ("recorded_at", "ts"),
+            ),
+        )
+    elif isinstance(governance_release, dict):
+        _copy_if_present(
+            governance,
+            governance_release,
+            (("decision", "decision"), ("recorded_at", "ts")),
+        )
+    if governance:
+        plan["governance"] = governance
+
+    hold_event = next(
+        (record for record in records if record.get("step") == "hold"),
+        None,
+    )
+    if isinstance(hold_event, dict):
+        hold: dict[str, Any] = {}
+        _copy_if_present(
+            hold,
+            hold_event,
+            (
+                ("timestamp", "ts"),
+                ("decision", "decision"),
+                ("plan_digest", "plan_digest"),
+                ("approval_required", "approval_required"),
+            ),
+        )
+        plan["hold"] = hold
+
+    approval_event = next(
+        (record for record in records if record.get("step") == "plan-approval"),
+        None,
+    )
+    if isinstance(approval_event, dict):
+        approval: dict[str, Any] = {}
+        _copy_if_present(
+            approval,
+            approval_event,
+            (
+                ("decision", "decision"),
+                ("actor_id", "actor_id"),
+                ("timestamp", "approved_at"),
+                ("plan_digest", "plan_digest"),
+                ("reason", "reason"),
+            ),
+        )
+        if "timestamp" not in approval and "ts" in approval_event:
+            approval["timestamp"] = approval_event["ts"]
+        plan["approval"] = approval
+
+    resume_event = next(
+        (record for record in records if record.get("step") == "resume"),
+        None,
+    )
+    if isinstance(resume_event, dict):
+        resume: dict[str, Any] = {}
+        _copy_if_present(
+            resume,
+            resume_event,
+            (
+                ("timestamp", "ts"),
+                ("actor_id", "actor_id"),
+                ("plan_digest", "plan_digest"),
+            ),
+        )
+        plan["resume"] = resume
+
+    governance_capabilities = {
+        record.get("capability")
+        for record in records
+        if record.get("step") in {"governance-invoke", "plan-governance"}
+        and isinstance(record.get("capability"), str)
+    }
+    first_application_invoke = next(
+        (
+            record
+            for record in records
+            if record.get("step") == "invoke"
+            and record.get("capability") not in governance_capabilities
+        ),
+        None,
+    )
+    if isinstance(first_application_invoke, dict):
+        if "ts" in first_application_invoke:
+            plan["first_application_invoke_at"] = first_application_invoke["ts"]
+        invoke_index = records.index(first_application_invoke)
+        plan["governance_preceded_application_invoke"] = (
+            isinstance(governance_result, dict)
+            and records.index(governance_result) < invoke_index
+        )
+        if isinstance(approval_event, dict):
+            plan["approval_preceded_application_invoke"] = (
+                records.index(approval_event) < invoke_index
+            )
+        if isinstance(resume_event, dict):
+            plan["resume_preceded_application_invoke"] = (
+                records.index(resume_event) < invoke_index
+            )
+
+    finish_event = next(
+        (record for record in reversed(records) if record.get("step") == "finish"),
+        None,
+    )
+    if isinstance(finish_event, dict) and "ts" in finish_event:
+        plan["finished_at"] = finish_event["ts"]
+    plan["execution_status"] = _execution_status(
+        records,
+        first_application_invoke=first_application_invoke,
+        finish_event=finish_event,
+        hold_event=hold_event,
+        approval_event=approval_event,
+        resume_event=resume_event,
+        governance_result=governance_result,
+    )
+    return plan
+
+
+def _copy_if_present(
+    target: dict[str, Any],
+    source: dict[str, Any],
+    fields: tuple[tuple[str, str], ...],
+) -> None:
+    for output_name, source_name in fields:
+        if source_name in source:
+            target[output_name] = source[source_name]
+
+
+def _execution_status(
+    records: list[dict[str, Any]],
+    *,
+    first_application_invoke: dict[str, Any] | None,
+    finish_event: dict[str, Any] | None,
+    hold_event: dict[str, Any] | None,
+    approval_event: dict[str, Any] | None,
+    resume_event: dict[str, Any] | None,
+    governance_result: dict[str, Any] | None,
+) -> str:
+    steps = {record.get("step") for record in records}
+    if "rejected" in steps or (
+        isinstance(approval_event, dict) and approval_event.get("decision") == "reject"
+    ):
+        return "rejected"
+    if isinstance(finish_event, dict):
+        outputs = finish_event.get("outputs")
+        if "error" in steps or (isinstance(outputs, dict) and outputs.get("error")):
+            return "error"
+        return "finished"
+    if "error" in steps:
+        return "error"
+    if isinstance(first_application_invoke, dict):
+        return "running"
+    if isinstance(resume_event, dict):
+        return "resumed"
+    if isinstance(approval_event, dict):
+        return "approved"
+    if isinstance(hold_event, dict):
+        return "held"
+    if "governance-release" in steps:
+        return "released"
+    if isinstance(governance_result, dict) and governance_result.get("decision") == "reject":
+        return "rejected"
+    if "plan" in steps:
+        return "resolved"
+    if "start" in steps:
+        return "started"
+    return "observed"
+
+
+async def _read_trace_lines(fs, estate_root: str) -> tuple[list[str], int]:
+    """Read every planner trace file and return its JSONL records."""
     traces_dir = f"{estate_root}/traces"
     try:
         listing = await fs({"op": "list_directory", "path": traces_dir})
@@ -246,9 +556,9 @@ async def _read_trace_lines(fs, estate_root: str, cap: int = 20) -> tuple[list[s
         return [f'__trace_read_error__ {exc!r}'], 0
     entries = listing.get("entries") or []
     names = sorted(
-        e.get("name") for e in entries
+        str(e.get("name")) for e in entries
         if isinstance(e, dict) and str(e.get("name", "")).endswith(".jsonl")
-    )[-cap:]
+    )
     lines: list[str] = []
     count = 0
     for name in names:

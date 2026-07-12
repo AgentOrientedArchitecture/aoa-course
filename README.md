@@ -49,16 +49,18 @@ that the last step runs on a different runtime. See
 The reference adapters currently emit the A2A v0.3 JSON-RPC card/message shape.
 They demonstrate an outward agent boundary, not A2A v1 conformance.
 
-In **Session 4** the estate checks itself. An `estate-check` workflow scans the
-registry's capability cards, governance lifecycle, and planner traces for
-evidence hooks related to selected EU AI Act high-risk-system obligations,
-citing the regulation verbatim from a corpus loaded through the Session 2 wiki
-pipeline. Findings and evidence only - never a classification or compliance
-verdict. The synthetic CV-fit agents match the language of Annex III point 4;
-a real employment deployment would need a contextual legal assessment. You
-add an oversight constraint, approve the card, and re-scan: the evidence hooks
-change because the estate changed, but no legal obligation is thereby
-satisfied. See
+In **Session 4** learners compare three distinct surfaces. **Agent card
+check** runs `parser-estate → evaluator-agent-evidence →
+reporter-agent-evidence`, cites Article 14 verbatim from the hidden wiki store,
+and shows how an `evaluator-cv` card edit hot-reloads and improves declared
+evidence. **CV fit** resolves an employment composition that
+`evaluator-plan-governance` holds before application lookup or invocation;
+approving the exact digest resumes the same trace. **Flow audit** runs
+`parser-estate → evaluator-flow-evidence → reporter-flow-audit` after execution
+to report evidence for the gate, digest, ordering, resume, and completion.
+Card evidence, operational plan release, execution evidence, and legal
+compliance or effective oversight are separate claims. Green means declared
+evidence only, never legal compliance or proof of effective oversight. See
 [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md).
 
 ## Run it
@@ -104,11 +106,13 @@ the CV-fit workflow:
 ./scripts/session3-adopt.sh    # create the AOA card and start the estate
 ```
 
-Session 4 starts the full estate — CV-fit, wiki, and the estate-check scanner —
-then seeds the regulations corpus:
+Session 4 starts the three-stage Studio — agent card check, CV fit, and flow
+audit — with deterministic planner routing, then seeds the hidden regulations
+corpus used for verbatim citations:
 
 ```bash
-./scripts/session4-up.sh && ./scripts/session4-seed.sh
+./scripts/session4-up.sh
+./scripts/session4-seed.sh
 ```
 
 Session 3's agent is created and run entirely inside containers. A pinned EVE
@@ -131,7 +135,7 @@ There are also thin helper scripts for the common paths:
 ./scripts/session3-build.sh    # pre-work: images only, no agent created
 ./scripts/session3-up.sh       # enter the interactive EVE workshop
 ./scripts/session3-adopt.sh    # publish the tested agent into AOA
-./scripts/session4-up.sh    # + session4-seed.sh / session4-reset.sh / session4-approve.sh
+./scripts/session4-up.sh       # then session4-seed.sh
 ./scripts/logs.sh
 ./scripts/down.sh
 ```
@@ -157,8 +161,10 @@ host-machine Ollama path does not need `AOA_LOCAL=1`.
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and
 ask modes. Session 3 shows CV fit plus a "CV fit + interview" mode that runs the
-EVE-authored interviewer agent. Session 4 shows everything plus the "Estate
-check" mode.
+EVE-authored interviewer agent. Session 4 exposes exactly **Agent card check**,
+**CV fit**, and **Flow audit**. The wiki store remains a hidden knowledge source
+for verbatim regulation citations. CV fit pauses for exact-digest approval;
+the two evidence workflows auto-proceed.
 
 If something misbehaves, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
@@ -195,7 +201,7 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 | `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
 | `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
 | `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
-| `session4` (estate check) | The estate scans itself against the EU AI Act and you fix findings live; includes the wiki workflows for the corpus and Ask beats | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (demo: the estate checks itself) |
+| `session4` (card evidence + plan release + flow audit) | Improve declared Agent card evidence, approve the exact digest for a held CV-fit composition, then audit post-execution gate and completion evidence | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, release, execution evidence, and legal claims) |
 
 ## License
 

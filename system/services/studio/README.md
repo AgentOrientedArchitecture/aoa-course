@@ -1,81 +1,136 @@
 # studio
 
-A browser surface at `http://localhost:8080`.
+Studio is the browser surface at `http://localhost:8080`. It submits course
+intents, merges registry and planner event streams, and renders the correlated
+trace. Session 4 exposes exactly Agent card check, CV fit, and Flow audit, and
+uses Studio as the human interaction point for a held CV-fit plan.
 
-The studio has two roles in this system:
+## Observation
 
-**Observation** — three live panes:
+- **Registry** lists registered capability ID, Agent ID, lifecycle actors and
+  status, version, kind, and current `skills_hash`. It also shows recent card
+  lifecycle events.
+- **Intent Studio** renders intent, capability context, resolved tasks, **Plan
+  governance**, the responsibility walk, evidence, and the final result.
+- **Plan governance** displays the deterministic evaluator's Markdown report,
+  decision, and plan digest. For a held CV-fit run it shows **Approve this plan
+  and run** and states that execution is paused before the first application AU.
+- **Details** displays a selected capability card, governance actor, or wiki
+  graph node.
+- **Wiki graph** projects the Session 2 store as documents, concepts, passages,
+  and open questions. Graph inspection and reset are direct UI controls, not AU
+  workflows.
 
-- **Registry.** Every registered capability — capability id, Agent ID,
-  lifecycle status, publisher/approver actors, version, kind, and current
-  `skills_hash`. Updates as capabilities register, deregister, or change.
-  The governance log shows recent `card_published`, `card_approved`, and
-  `card_deprecated` events.
-- **Intent Studio.** The centre pane shows the selected intent, supplied
-  inputs, lifecycle rail, trace summary, responsibility walk, planner summary,
-  task cards, and final result. Raw event payloads remain available behind an
-  expandable details section.
-- **Details.** Click a registry row to read its card, or click a wiki graph
-  node to inspect that node.
-- **Wiki graph.** A typed graph view of the Session 2 wiki store: documents,
-  concepts, passages, and open questions use different shapes and colours. The
-  reset button clears the local wiki store so the ingest demo can be replayed.
-  The underlying files are visible in `system/wiki/`.
+Raw event payloads remain available in expandable details.
 
-**Intent** — two ways to drive the system:
+## Session 4 behavior
 
-- A mode switch for `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
-  `knowledge-query`.
-- Text boxes and file drops that forward course inputs to the planner.
-  Submitted inputs are written to `system/inbox/`.
+The Session 4 mode switch exposes exactly:
 
-The studio drives the demo workflows and shows the trace. The responsibility
-walk is the Session 1 teaching surface: it follows intent, planner proposal,
-registry selection, AU invocation, inward tool calls, AU responses, signals,
-timings, Agent ID, registry governance actors, and the final artefact. For the cut-down
-knowledge-management system, ingest returns a stored wiki summary and query
-returns a grounded answer. The graph mode is read-only and refreshes the wiki
-graph without submitting a planner intent.
+```text
+agent-card-check,cv-fit,flow-audit
+```
 
-The visible workflow modes are controlled by `STUDIO_WORKFLOWS`, a comma
-separated list of `cv-fit`, `knowledge-ingest`, `wiki-graph`, and
-`knowledge-query`. The Session 1 compose override sets it to `cv-fit`; Session
-4 uses all modes.
+### Agent card check
+
+Agent card check runs
+`parser-estate → evaluator-agent-evidence → reporter-agent-evidence`. It shows
+current declared card evidence and verbatim regulation citations retrieved from
+the wiki store. The wiki remains a hidden knowledge source, not a Session 4
+mode.
+
+After the learner adds the Article 14 oversight constraint to the
+`evaluator-cv` capability card, the registry pane shows the card hot reload.
+Rerunning Agent card check shows the declaration and evidence improve. Green
+means declared evidence only, not legal compliance or an effective control.
+
+### CV fit
+
+Studio sends a declared employment use context with the input paths. After the
+planner resolves the concrete plan, `evaluator-plan-governance` returns
+`require-human-approval`. Studio renders the report and digest; no application
+AU has been looked up or invoked. Clicking **Approve this plan and run** posts
+approval for that exact digest. The same trace records `plan-approval`,
+`resume`, application execution, and the result.
+
+The planner rejects a different or stale digest with HTTP `409`; Studio displays
+the returned error and does not release the held plan.
+
+### Flow audit
+
+Flow audit runs
+`parser-estate → evaluator-flow-evidence → reporter-flow-audit` after execution.
+It reports only observed evidence for the gate, exact digest, event order,
+resume, and completion. It does not treat an Agent card declaration as proof
+that execution occurred.
+
+Agent card check and Flow audit auto-proceed under the deterministic course
+policy. Card evidence, operational release, and execution evidence are distinct.
+None establishes legal permission, legal compliance or certification, or proof
+of effective human oversight.
+
+## Course-state limitation
+
+Studio proxies active-run reads and approvals to planner memory. If the planner
+restarts, an existing held trace remains as JSONL evidence but is no longer an
+active run that Studio can approve or resume. Submit a new intent and review its
+new digest. This is not production persistence or crash-idempotent workflow
+recovery.
 
 ## Internals
 
 The backend (`studio.py`) is a thin FastAPI proxy:
 
-- Subscribes to `registry/stream` and `planner/events` and re-emits them on
-  `/events` so the browser only opens one SSE connection.
-- Forwards `POST /intent` to the planner.
-- Serves `templates/index.html` and `static/`.
+- subscribes to `registry/stream` and `planner/events`, then re-emits one SSE
+  stream on `/events`;
+- persists submitted text/files to `system/inbox/` and forwards intent paths to
+  the planner;
+- proxies active-run reads and exact-digest approval requests;
+- serves `templates/index.html` and `static/`.
 
-The frontend is plain HTML and ES modules — no build step. Look at
-`templates/index.html` and `static/app.js` to see what's going on.
-
-The graph view is intentionally direct: Studio asks `tool-wiki-store` for a
-read-only graph projection and for demo reset. Those actions are UI controls
-over wiki state, not AU workflows, so the AU responsibility trace remains
-focused on ingest and query.
+The frontend is plain HTML and ES modules with no build step. The responsibility
+walk includes governance invocation/decision, hold, approval, resume,
+automatic release, application AU/tool boundaries, and completion. The backend
+may retain additional compatibility routes, but Session 4 presents only its
+three learner-facing modes.
 
 ## Endpoints
 
 | Method | Path | Returns |
 |---|---|---|
-| `GET`  | `/` | the studio page |
-| `GET`  | `/events` | merged SSE stream of registry + trace events |
-| `POST` | `/intent` | proxied to the planner |
-| `GET`  | `/api/wiki/graph` | read-only wiki graph projection |
-| `POST` | `/api/wiki/reset` | clear the local wiki store for replay |
-| `GET`  | `/healthz` | `{ "ok": true }` |
+| `GET` | `/` | Studio page |
+| `GET` | `/events` | merged registry and planner SSE stream |
+| `POST` | `/api/intent` | proxied planner result after input persistence |
+| `GET` | `/api/runs/{trace_id}` | active in-memory planner run |
+| `POST` | `/api/runs/{trace_id}/approval` | proxied exact-digest approval/rejection result |
+| `GET` | `/api/capabilities` | initial registry snapshot |
+| `GET` | `/api/capabilities/{capability_id}` | one capability card |
+| `GET` | `/api/wiki/graph` | read-only wiki graph projection |
+| `POST` | `/api/wiki/reset` | clear local wiki state for replay |
+| `GET` | `/healthz` | `{ "ok": true }` |
 
 ## Running locally
 
-The studio runs on port 8080. It expects:
+Studio runs on port `8080` and expects:
 
-```
+```text
 REGISTRY_URL=http://registry:7100
 PLANNER_URL=http://planner:7200
-STUDIO_WORKFLOWS=cv-fit,knowledge-ingest,wiki-graph,knowledge-query
+STUDIO_WORKFLOWS=agent-card-check,cv-fit,flow-audit
+```
+
+Start and seed Session 4 from the repository root.
+
+macOS or Linux:
+
+```bash
+./scripts/session4-up.sh
+./scripts/session4-seed.sh
+```
+
+Windows Command Prompt:
+
+```bat
+scripts\session4-up.bat
+scripts\session4-seed.bat
 ```

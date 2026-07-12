@@ -16,7 +16,7 @@ agents/<name>/
       tools.yaml           # 3. tool dependencies (capability ids)
 ```
 
-**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. At runtime the shared scaffold stamps the card with `agent_id`/`identity`; the registry then stamps lifecycle governance actors such as `published_by` and `approved_by`. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only and exposed at `/cards/<id>`.
+**1. Capability card** — the contract. Public. Names the capability, declares its inputs and outputs, the constraints any output must satisfy, the evaluation signals the system can check, and provenance. At runtime the shared scaffold stamps the card with `agent_id`/`identity`; the registry then stamps lifecycle governance actors such as `published_by` and `approved_by`. Schema is in [`ARCHITECTURE.md`](ARCHITECTURE.md#capability-card-schema). Mounted read-only in the container, exposed at `/cards/<id>`, and hot-reloaded when its host file changes.
 
 **2. `instructions.md`** — practical know-how for fulfilling this capability: prompt structure, judgement rubric, examples, edge-case guidance. This shapes the capability's working behaviour. Two governed agents can run the same code and tools but behave differently because their capability card and `instructions.md` are different. Edits show up as a changed `skills_hash`; the Agent ID stays stable.
 
@@ -49,25 +49,26 @@ model, and call the same document-text tool for document parsing. Their
 different capability cards and `instructions.md` files give them different contracts
 and behaviour.
 
-The evaluator at the end of Session 2:
+The evaluator grows across the course:
 
 ```
 agents/evaluator/
   agent.py
   capabilities/
-    cv/
-      capability-card.yaml      # id: evaluator-cv
-      instructions.md                 # rubric for CV-vs-JD fit
-      tools.yaml
-    promote/
-      capability-card.yaml      # id: evaluator-promote
-      instructions.md                 # rubric for wiki promotion
-      tools.yaml
-    wiki-query/
-      capability-card.yaml      # id: evaluator-wiki-query
-      instructions.md                 # rubric for retrieved wiki evidence
-      tools.yaml
+    cv/                 # evaluator-cv: CV-vs-JD fit
+    promote/            # evaluator-promote: wiki promotion
+    wiki-query/         # evaluator-wiki-query: retrieved wiki evidence
+    plan-governance/    # evaluator-plan-governance: deterministic composition gate
+    agent-evidence/     # evaluator-agent-evidence: declared card evidence
+    flow-evidence/      # evaluator-flow-evidence: post-execution flow evidence
 ```
+
+Each folder contains its capability card, `instructions.md`, and `tools.yaml`.
+The three Session 4 evaluator roles are distinct:
+`evaluator-agent-evidence` assesses declared card evidence,
+`evaluator-plan-governance` controls whether an exact resolved plan may
+execute, and `evaluator-flow-evidence` assesses observed execution evidence
+after a run.
 
 Each container registers the capabilities allowed for that runtime at boot. The
 registry lists separate rows. The studio shows separate cards. A single
@@ -94,22 +95,27 @@ The registry stores cards in `cards.json`, watches that file for external edits,
 
 ## Hot reload
 
-A file watcher inside each agent container watches every mounted `instructions.md`. On change:
+A file watcher inside each agent container watches every mounted capability
+folder. On an `instructions.md` change it re-reads the instructions, recomputes
+`skills_hash`, and updates the registry. On a `capability-card.yaml` change it
+re-reads the public contract, restores scaffold-owned identity, model, hash, and
+endpoint fields, and updates the registry.
 
-1. Re-read `instructions.md`.
-2. Recompute `skills_hash`.
-3. POST the updated card to the registry's `/update` endpoint.
-4. Continue serving requests, using the new `instructions.md` from the next invocation onwards.
-
-There is no restart. The studio's registry pane updates the `skills_hash` for that one capability while everything else stays still.
+There is no restart. Studio's registry pane shows the affected capability
+update. Session 4 uses this to make an `evaluator-cv` constraint edit visible
+before the learner reruns Agent card check.
 
 ## Invocation
 
 The planner gives the planner model compact registry context and asks for a
-task plan. The runtime validates that plan against capability cards before
-executing it, falling back to the deterministic course plan if needed. Once a
-task is bound to an AU capability, the selected card includes `a2a_endpoint`,
-so the planner sends an A2A JSON-RPC request:
+task plan. The runtime validates that plan against capability cards, falling
+back to the deterministic course plan if needed, and binds each task to a
+concrete card. When plan governance is enabled, the planner records the
+resolved plan and digest and invokes the control-plane
+`evaluator-plan-governance` before any application-card lookup or invocation.
+Only a released plan proceeds. Once an application task is released, its
+selected card includes `a2a_endpoint`, so the planner sends an A2A JSON-RPC
+request:
 
 ```json
 POST http://evaluator:8888/a2a
@@ -254,28 +260,46 @@ The filesystem, document text extractor, and wiki store are MCP-backed examples.
 [`tools/document-text/`](tools/document-text/) plus
 [`tools/wiki-store/`](tools/wiki-store/).
 
-## Session 4 - estate-check (evidence-readiness findings)
+## Session 4 - card evidence, plan release, and flow audit
 
-The `estate-check` workflow (`parser-estate` -> `evaluator-compliance` ->
-`reporter-findings`) scans the estate's own governance artefacts for evidence
-hooks related to selected EU AI Act obligations. Conventions it adds:
+Session 4 exposes exactly three learner-facing Studio workflows:
 
-- `parser-estate` consumes `tool-filesystem` over two read-only mounts
-  (`/data/estate/registry`, `/data/estate/traces`) declared in
-  `docker-compose.session4.yml` — governance artefacts read as ordinary files.
-- `evaluator-compliance` treats severities as evidence statements: green =
-  evidence present (never "obligation satisfied"), amber = partial, red =
-  absent, unknown = the regulations corpus is silent (abstain, never
-  paraphrase the law from model memory).
-- Annex III marker matches are labelled candidates for contextual legal
-  assessment. The scanner does not decide Article 6(3), application dates, or
-  whether deployment is permitted.
-- `reporter-findings` is deterministic and machine-checks its own language
-  rule via the `no_compliance_verdict` signal.
-- The regulations corpus lives in the wiki store; seed with
-  `scripts/session4-seed.sh` or `scripts\session4-seed.bat`, reset the demo state with
-  `scripts/session4-reset.sh`, approve the staged card with
-  `scripts/session4-approve.sh`.
-- Capability-card edits now hot-reload exactly like `instructions.md` edits:
-  the `_base` watcher observes each capability folder and re-registers on
-  change, preserving registry lifecycle.
+```text
+agent-card-check: parser-estate → evaluator-agent-evidence → reporter-agent-evidence
+cv-fit:           parser-cv → evaluator-cv → reporter-cv-fit
+flow-audit:       parser-estate → evaluator-flow-evidence → reporter-flow-audit
+```
+
+**Agent card check** evaluates declarations in current capability cards.
+`evaluator-agent-evidence` retrieves verbatim Article 14 and other regulation
+passages from the wiki store, which remains a hidden knowledge source in this
+session. Editing the `evaluator-cv` card constraint hot-reloads and changes this
+evidence surface. Green means declared evidence only, not an implemented or
+effective control.
+
+For **CV fit**, the deterministic control-plane AU
+`evaluator-plan-governance` runs after concrete resolution and digest creation,
+but before any application lookup or invocation. The employment use context
+returns `require-human-approval`, so no application AU runs while the plan is
+held. **Approve this plan and run** must submit the exact held digest; the same
+trace records `plan-approval` and `resume` before the frozen plan executes. A
+wrong or stale digest receives HTTP `409`.
+
+**Flow audit** is post-execution evidence only. `parser-estate` reconstructs
+planner JSONL records, `evaluator-flow-evidence` evaluates evidence for the
+gate, digest, ordering, resume, and completion, and `reporter-flow-audit`
+renders that evidence without treating card declarations as execution.
+
+These are separate claims: card evidence is a declaration, plan governance is
+an operational release decision, and flow audit is execution evidence. None
+confers legal permission, establishes legal compliance or certification, or
+proves effective human oversight.
+
+The digest binds workflow, intent, resolved tasks/dataflow, and the selected
+cards' identity/version, purpose, contracts, constraints, signals, lifecycle,
+provenance, and endpoints. It is a correlation mechanism, not a signature or
+authorization credential.
+
+Held run objects live in planner memory. A planner restart leaves trace JSONL
+evidence on disk but loses the active run required for approval or resume; this
+is not production persistence or crash-idempotent orchestration.

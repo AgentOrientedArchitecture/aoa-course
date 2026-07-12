@@ -1,7 +1,6 @@
-# Session 4 runs the full estate — CV-fit + wiki + estate-check — so the
-# compliance scanner has something real to scan: registered cards, governance
-# lifecycle, and traces from workflows the audience just ran. The wiki store
-# doubles as the regulations corpus (seed it with scripts/session4-seed.sh).
+# Session 4 is a three-stage learner path: agent-card evidence, governed CV fit,
+# then a post-execution flow audit. The wiki store remains the regulations
+# corpus behind the evidence evaluators (seed it with session4-seed.sh or .bat).
 #
 # Use with:
 #   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session4.yml --profile session4 up --build -d --remove-orphans
@@ -9,18 +8,19 @@
 services:
   registry:
     environment:
-      REGISTRY_CARD_ALLOWLIST: tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,evaluator-cv,reporter-cv-fit,parser-notes,parser-query,evaluator-promote,evaluator-wiki-query,reporter-ingest-summary,reporter-answer,parser-estate,evaluator-compliance,reporter-findings
+      REGISTRY_CARD_ALLOWLIST: tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,evaluator-cv,evaluator-plan-governance,reporter-cv-fit,parser-estate,evaluator-agent-evidence,evaluator-flow-evidence,reporter-agent-evidence,reporter-flow-audit
 
   planner:
     environment:
-      # Deterministic keeps the demo reliable: the planner runs the fixed
-      # estate-check workflow instead of asking a small local model to
-      # rediscover the three-step plan each time.
+      # Deterministic keeps all three learner stages reliable instead of asking
+      # a small local model to rediscover each course workflow.
       PLANNER_STRATEGY: deterministic
+      PLAN_GOVERNANCE_CAPABILITY: evaluator-plan-governance
+      PLAN_APPROVER_ID: urn:aoa:human:course-plan-approver
 
   studio:
     environment:
-      STUDIO_WORKFLOWS: cv-fit,estate-check,knowledge-ingest,wiki-graph,knowledge-query
+      STUDIO_WORKFLOWS: agent-card-check,cv-fit,flow-audit
 
   tool-filesystem:
     volumes:
@@ -32,8 +32,8 @@ services:
 
   evaluator:
     environment:
-      CAPABILITY_ALLOWLIST: evaluator-cv,evaluator-promote,evaluator-wiki-query,evaluator-compliance
+      CAPABILITY_ALLOWLIST: evaluator-cv,evaluator-agent-evidence,evaluator-flow-evidence,evaluator-plan-governance
 
   reporter:
     environment:
-      CAPABILITY_ALLOWLIST: reporter-cv-fit,reporter-ingest-summary,reporter-answer,reporter-findings
+      CAPABILITY_ALLOWLIST: reporter-cv-fit,reporter-agent-evidence,reporter-flow-audit

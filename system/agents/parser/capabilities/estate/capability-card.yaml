@@ -1,16 +1,19 @@
 id: parser-estate
-version: 0.1.0
+version: 0.2.0
 kind: au
 purpose: |
   Inventory the AOA estate's own governance artefacts: registered capability
-  cards, registry lifecycle state, and planner trace evidence. Produces a
-  typed estate inventory for downstream obligation checking.
+  cards, registry lifecycle state, and observed planner trace evidence.
+  Produces component inventory and per-trace plan evidence records for
+  downstream checking.
 inputs:
   - name: estate_root
     type: string
     required: true
 outputs:
   - name: inventory
+    type: array
+  - name: plans
     type: array
   - name: scanned_at
     type: string
@@ -20,6 +23,9 @@ constraints:
   - The output is a single JSON object.
   - Reads only via tool-filesystem under its configured root; never mutates the estate.
   - Every inventory row names the capability_id and agent_id it describes.
+  - Every plan row names its trace_id, excludes agent-card-check, flow-audit, and compatibility estate-check self-traces, and reports only fields supported by observed trace records.
+  - Governance evaluator invocation is control-plane evidence and is not reported as the first application invocation.
+  - Plan records are execution evidence, not compliance, legal, or deployment determinations.
   - Deterministic; no model call is made.
 evaluation_signals:
   - valid_output_shape

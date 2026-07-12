@@ -1,0 +1,34 @@
+id: reporter-flow-audit
+version: 0.1.0
+kind: au
+purpose: |
+  Render a post-execution flow audit from evaluator-supplied plan findings,
+  showing governance, exact-digest approval, event order, resume, and completion
+  evidence. The report contains no component-card matrix and makes no legal or
+  compliance determination.
+inputs:
+  - name: plans
+    type: array
+    required: true
+  - name: findings
+    type: object
+    required: true
+outputs:
+  - name: findings_markdown
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - The report renders one evidence table per observed employment-shaped plan or trace.
+  - It contains flow evidence only and no component-card appendix.
+  - Regulation citations include complete evaluator-supplied passages and are never truncated.
+  - Green means the specified execution evidence was observed, not that oversight was effective or an obligation was satisfied.
+  - The report never contains the words compliant, complies, or certified.
+  - Deterministic template; no model call is made.
+evaluation_signals:
+  - valid_output_shape
+  - has_markdown
+  - no_compliance_verdict
+  - all_plans_rendered
+  - all_findings_rendered
+provenance:
+  model: none

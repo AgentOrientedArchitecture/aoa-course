@@ -1,33 +1,42 @@
 id: evaluator-compliance
-version: 0.1.0
+version: 0.2.0
 kind: au
 purpose: |
   Evaluate whether an estate exposes evidence hooks related to selected EU AI
-  Act high-risk-system obligations (Articles 9-14 and 72), and identify
-  Annex-III-shaped purposes for contextual legal review. Cite regulation
-  passages retrieved from the course wiki store. Emits findings and evidence
-  only - never a classification, compliance, or deployment verdict.
+  Act high-risk-system obligations (Articles 9-14 and 72), identify
+  Annex-III-shaped purposes for contextual legal review, and assess observed
+  end-to-end plan-gate evidence. Cite regulation passages retrieved from the
+  course wiki store. Emits findings and evidence only - never a classification,
+  legal permission, compliance, or deployment verdict.
 inputs:
   - name: inventory
     type: array
     required: true
+  - name: plans
+    type: array
+    required: true
 outputs:
   - name: findings
+    type: array
+  - name: plan_findings
     type: array
   - name: summary
     type: object
 constraints:
   - The output is a single JSON object.
   - Findings carry evidence pointers and complete retrieved regulation citations (passage ids and verbatim passages); a finding with no retrievable regulation passage is marked corpus_silent with severity unknown, never invented from model memory.
-  - Severity green means evidence present, never obligation satisfied; Article 10 findings are capped at amber by construction.
-  - No output may state or imply a compliance determination.
+  - Severity green means evidence present, never obligation satisfied; Article 10 component findings are capped at amber by construction.
+  - Employment-shaped plan findings check that approval was required, bound to the same digest, recorded before application invocation, and followed by completed execution.
+  - A recorded approval is operational evidence only; it does not prove effective human oversight or satisfy Article 14.
+  - No output may state or imply legal permission or a compliance determination.
   - Annex III marker matches are candidates for contextual legal assessment, not classifications.
   - Application dates come from a dated corpus note and must be verified before deployment.
 evaluation_signals:
   - valid_output_shape
   - risk_marker_assessed
+  - plan_sequence_assessed
   - all_findings_cited
   - corpus_present
   - latency_p95_under(20s)
 provenance:
-  model: ${MODEL}
+  model: none

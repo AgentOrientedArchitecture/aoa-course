@@ -1,0 +1,48 @@
+id: evaluator-plan-governance
+version: 0.1.0
+kind: au
+purpose: |
+  Evaluate a fully resolved multi-AU plan before application capabilities run.
+  Detect employment-shaped compositions and require an accountable human
+  approval before execution. Emits an operational gate and evidence report,
+  never a legal classification, compliance, or deployment determination.
+inputs:
+  - name: workflow
+    type: string
+    required: true
+  - name: use_context
+    type: deployment-context
+    required: true
+  - name: resolved_plan
+    type: resolved-plan
+    required: true
+  - name: capability_cards
+    type: array
+    required: true
+  - name: plan_digest
+    type: string
+    required: true
+outputs:
+  - name: decision
+    type: string
+  - name: plan_digest
+    type: string
+  - name: findings
+    type: array
+  - name: evaluation_markdown
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - decision is one of proceed, require-human-approval, or reject.
+  - Employment-shaped plans that score, rank, recommend, screen, or prepare interviews for candidates require accountable human approval before any application AU executes.
+  - The evaluator assesses declared use context, resolved task purposes/capabilities/input mappings, and selected card output contracts, not isolated capability posture.
+  - The decision is an operational execution gate only and never legal permission or a compliance determination.
+  - Deterministic; no model call is made.
+evaluation_signals:
+  - valid_output_shape
+  - resolved_plan_assessed
+  - decision_supported
+  - no_compliance_verdict
+  - latency_p95_under(2s)
+provenance:
+  model: none

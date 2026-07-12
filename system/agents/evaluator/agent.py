@@ -42,8 +42,14 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _promote_note(inputs, ctx)
     if capability_id == "evaluator-wiki-query":
         return await _evaluate_wiki_query(inputs, ctx)
+    if capability_id == "evaluator-agent-evidence":
+        return await _evaluate_agent_evidence(inputs, ctx)
+    if capability_id == "evaluator-flow-evidence":
+        return await _evaluate_flow_evidence(inputs, ctx)
     if capability_id == "evaluator-compliance":
         return await _evaluate_compliance(inputs, ctx)
+    if capability_id == "evaluator-plan-governance":
+        return await _evaluate_plan_governance(inputs, ctx)
     return error_envelope(f"evaluator does not back capability {capability_id!r}")
 
 
@@ -212,6 +218,235 @@ def _rank_wiki_passages(passages: object) -> list[dict]:
     return ranked
 
 # ----------------------------------------------------------------------
+# evaluator-plan-governance — deterministic pre-execution composition gate
+# ----------------------------------------------------------------------
+
+_EMPLOYMENT_TEXT_MARKERS = (
+    "candidate",
+    "employment",
+    "hiring",
+    "recruit",
+    "curriculum vitae",
+    "job description",
+    " cv",
+    "cv ",
+)
+_CONSEQUENCE_TEXT_MARKERS = (
+    "score",
+    "ranking",
+    "rank candidate",
+    "verdict",
+    "recommendation",
+    "candidate screening",
+    "evaluate fit",
+    "interview question",
+    "interview preparation",
+)
+_CONSEQUENTIAL_OUTPUT_NAMES = {
+    "scores",
+    "verdict",
+    "recommendation",
+    "ranking",
+    "questions",
+    "report_markdown",
+}
+
+
+def _plan_policy_assessment(
+    workflow: str,
+    use_context: dict,
+    resolved_plan: list,
+    capability_cards: list,
+) -> dict:
+    """Apply one structured employment-composition policy in both evaluators."""
+    workflow_l = workflow.strip().lower()
+    context_domain = str(use_context.get("domain") or "").lower()
+    data_subjects = {
+        str(subject).strip().lower()
+        for subject in use_context.get("data_subjects") or []
+        if str(subject).strip()
+    }
+    output_use = str(use_context.get("output_use") or "").lower()
+    decision_effect = str(use_context.get("decision_effect") or "").lower()
+    capabilities = [
+        str(step.get("capability") or "").strip().lower()
+        for step in resolved_plan
+        if isinstance(step, dict) and step.get("capability")
+    ]
+    plan_text = json.dumps(resolved_plan, sort_keys=True, default=str).lower()
+
+    employment_reasons: list[str] = []
+    if workflow_l.startswith("cv-fit"):
+        employment_reasons.append(f"workflow:{workflow_l}")
+    if context_domain in {"employment", "hiring", "recruitment"}:
+        employment_reasons.append(f"domain:{context_domain}")
+    if data_subjects.intersection({"candidate", "candidates", "job applicants", "applicants"}):
+        employment_reasons.append("data-subjects:candidates")
+    if any(marker in output_use for marker in ("candidate", "employment", "hiring", "interview")):
+        employment_reasons.append(f"output-use:{output_use}")
+    if any(
+        capability.startswith("parser-cv")
+        or capability.startswith("evaluator-cv")
+        or capability.startswith("reporter-cv")
+        or capability.startswith("interviewer-")
+        for capability in capabilities
+    ):
+        employment_reasons.append("composition:cv-or-interview-capability")
+    employment_reasons.extend(
+        f"plan-text:{marker.strip()}"
+        for marker in _EMPLOYMENT_TEXT_MARKERS
+        if marker in f" {plan_text} "
+    )
+
+    consequence_reasons: list[str] = []
+    if decision_effect in {"recommendation", "decision", "selection", "ranking", "screening"}:
+        consequence_reasons.append(f"decision-effect:{decision_effect}")
+    if any(
+        marker in output_use
+        for marker in ("screen", "recommend", "rank", "selection", "interview-preparation")
+    ):
+        consequence_reasons.append(f"output-use:{output_use}")
+    consequence_reasons.extend(
+        f"plan-text:{marker}"
+        for marker in _CONSEQUENCE_TEXT_MARKERS
+        if marker in plan_text
+    )
+    for card in capability_cards:
+        if not isinstance(card, dict):
+            continue
+        output_names = {
+            str(field.get("name") or "").strip().lower()
+            for field in card.get("outputs") or []
+            if isinstance(field, dict)
+        }
+        matched_outputs = sorted(output_names.intersection(_CONSEQUENTIAL_OUTPUT_NAMES))
+        if matched_outputs:
+            consequence_reasons.append(
+                f"card-outputs:{card.get('id', 'unknown')}:{','.join(matched_outputs)}"
+            )
+
+    return {
+        "employment_shaped": bool(employment_reasons and consequence_reasons),
+        "employment_reasons": sorted(set(employment_reasons)),
+        "consequence_reasons": sorted(set(consequence_reasons)),
+    }
+
+
+async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
+    workflow = str(inputs.get("workflow") or "").strip()
+    use_context = inputs.get("use_context")
+    resolved_plan = inputs.get("resolved_plan")
+    capability_cards = inputs.get("capability_cards")
+    plan_digest = str(inputs.get("plan_digest") or "").strip()
+
+    if not workflow:
+        return error_envelope("workflow is required")
+    if not isinstance(use_context, dict):
+        return error_envelope("use_context (object) is required")
+    if not isinstance(resolved_plan, list) or not resolved_plan:
+        return error_envelope("resolved_plan (non-empty array) is required")
+    if not isinstance(capability_cards, list):
+        return error_envelope("capability_cards (array) is required")
+    if not plan_digest:
+        return error_envelope("plan_digest is required")
+
+    policy = _plan_policy_assessment(
+        workflow, use_context, resolved_plan, capability_cards
+    )
+    employment_shaped = policy["employment_shaped"]
+    decision = "require-human-approval" if employment_shaped else "proceed"
+
+    capabilities = [
+        str(step.get("capability") or "")
+        for step in resolved_plan
+        if isinstance(step, dict) and step.get("capability")
+    ]
+    findings = [{
+        "finding_id": f"{workflow}/composition",
+        "severity": "amber" if employment_shaped else "green",
+        "checked": (
+            "workflow, declared use context, resolved task purposes/capabilities/input mappings, "
+            "and selected card output contracts"
+        ),
+        "evidence": {
+            "workflow": workflow,
+            "capabilities": capabilities,
+            "use_context": use_context,
+            "resolved_plan": resolved_plan,
+            "selected_cards": [
+                {
+                    "id": card.get("id"),
+                    "version": card.get("version"),
+                    "agent_id": card.get("agent_id"),
+                    "outputs": card.get("outputs") or [],
+                }
+                for card in capability_cards
+                if isinstance(card, dict)
+            ],
+            "employment_reasons": policy["employment_reasons"],
+            "consequence_reasons": policy["consequence_reasons"],
+            "plan_digest": plan_digest,
+        },
+        "control": (
+            "Record accountable human approval for this exact plan digest before invoking any application AU."
+            if employment_shaped
+            else "No pre-execution human approval is required by the course composition policy."
+        ),
+    }]
+
+    lines = [
+        "# Pre-execution plan governance",
+        "",
+        "> **Operational execution decision only. This is not legal permission or a legal determination.**",
+        "",
+        f"- **Workflow:** `{workflow}`",
+        f"- **Plan digest:** `{plan_digest}`",
+        f"- **Resolved composition:** `{' -> '.join(capabilities)}`",
+        f"- **Decision:** **{decision}**",
+        "",
+    ]
+    if employment_shaped:
+        lines += [
+            "## Why execution is held",
+            "",
+            "The resolved plan combines candidate or employment context with scoring, evaluation, recommendation, screening, or interview-oriented outputs.",
+            "Individually governed AUs do not make that end-to-end composition safe to execute automatically.",
+            "",
+            "## Required control",
+            "",
+            "An accountable human must approve this exact resolved plan before the first application AU runs.",
+            "The approval is recorded on the same trace and applies only to the displayed plan digest.",
+        ]
+    else:
+        lines += [
+            "## Policy result",
+            "",
+            "No consequential employment composition was found by the deterministic course policy, so execution may proceed.",
+        ]
+    evaluation_markdown = "\n".join(lines).strip() + "\n"
+    lowered = evaluation_markdown.lower()
+
+    return {
+        "outputs": {
+            "decision": decision,
+            "plan_digest": plan_digest,
+            "findings": findings,
+            "evaluation_markdown": evaluation_markdown,
+        },
+        "signals": {
+            "valid_output_shape": True,
+            "resolved_plan_assessed": True,
+            "decision_supported": bool(findings),
+            "no_compliance_verdict": not any(
+                word in lowered for word in ("compliant", "complies", "certified")
+            ),
+            "latency_seconds": round(_time.monotonic() - started, 3),
+        },
+    }
+
+
+# ----------------------------------------------------------------------
 # evaluator-compliance — EU AI Act obligation checks over an estate
 # inventory. Deterministic checks + wiki-store retrieval for citations.
 # Findings and evidence only; never a verdict.
@@ -247,24 +482,24 @@ _OBLIGATIONS = {
 }
 
 
-async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
-    started = _time.monotonic()
-    inventory = inputs.get("inventory")
-    if not isinstance(inventory, list):
-        return error_envelope("inventory (array) is required")
-
+async def _retrieve_regulation_citations(
+    ctx: Context, queries: dict[str, str]
+) -> dict[str, dict | None] | None:
+    """Retrieve one complete, citation-preserving passage per requested article."""
     wiki = ctx.tools.get("tool-wiki-store")
     if wiki is None:
-        return error_envelope("tool-wiki-store is not available")
+        return None
 
-    # One retrieval per article, shared across every AU — the citation cache.
     citations: dict[str, dict | None] = {}
-    for key, query in _ARTICLE_QUERIES.items():
+    for key, query in queries.items():
         try:
             found = await wiki({"op": "search", "query": query, "limit": 3})
             passages = [
-                p for p in found.get("passages") or []
-                if isinstance(p, dict) and p.get("passage_id") and int(p.get("score") or 0) >= 2
+                passage
+                for passage in found.get("passages") or []
+                if isinstance(passage, dict)
+                and passage.get("passage_id")
+                and int(passage.get("score") or 0) >= 2
             ]
         except Exception:
             passages = []
@@ -277,7 +512,12 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
             if passages
             else None
         )
+    return citations
 
+
+def _component_evidence(
+    inventory: list, citations: dict[str, dict | None]
+) -> tuple[list[dict], dict]:
     findings: list[dict] = []
     counts = {"red": 0, "amber": 0, "green": 0, "unknown": 0}
     annex_iii_candidates = 0
@@ -331,22 +571,253 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
             })
 
     summary = {
-        "aus_scanned": len([i for i in inventory if isinstance(i, dict)]),
+        "aus_scanned": len([item for item in inventory if isinstance(item, dict)]),
         "annex_iii_candidates": annex_iii_candidates,
         **counts,
-        "corpus_present": all(citations.get(a) for a in _OBLIGATIONS),
+        "corpus_present": all(citations.get(article) for article in _OBLIGATIONS),
     }
+    return findings, summary
+
+
+def _flow_evidence(
+    plans: list, article_14_citation: dict | None
+) -> tuple[list[dict], dict]:
+    plan_findings = [
+        _plan_governance_finding(plan, article_14_citation)
+        for plan in plans
+        if isinstance(plan, dict) and _employment_shaped_plan(plan)
+    ]
+    counts = {"red": 0, "amber": 0, "green": 0, "unknown": 0}
+    for finding in plan_findings:
+        counts[finding["severity"]] += 1
+    summary = {
+        "plans_observed": len(plan_findings),
+        "employment_plans_assessed": len(plan_findings),
+        "plan_counts": counts,
+        "corpus_present": article_14_citation is not None,
+    }
+    return plan_findings, summary
+
+
+async def _evaluate_agent_evidence(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
+    inventory = inputs.get("inventory")
+    if not isinstance(inventory, list):
+        return error_envelope("inventory (array) is required")
+    citations = await _retrieve_regulation_citations(ctx, _ARTICLE_QUERIES)
+    if citations is None:
+        return error_envelope("tool-wiki-store is not available")
+    findings, summary = _component_evidence(inventory, citations)
     return {
         "outputs": {"findings": findings, "summary": summary},
         "signals": {
             "valid_output_shape": True,
             "risk_marker_assessed": True,
             "all_findings_cited": all(
-                f.get("regulation_citation") or f.get("corpus_silent") for f in findings
+                finding.get("regulation_citation") or finding.get("corpus_silent")
+                for finding in findings
             ),
             "corpus_present": summary["corpus_present"],
             "latency_seconds": round(_time.monotonic() - started, 2),
         },
+    }
+
+
+async def _evaluate_flow_evidence(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
+    plans = inputs.get("plans")
+    if not isinstance(plans, list):
+        return error_envelope("plans (array) is required")
+    citations = await _retrieve_regulation_citations(
+        ctx, {"Art 14": _ARTICLE_QUERIES["Art 14"]}
+    )
+    if citations is None:
+        return error_envelope("tool-wiki-store is not available")
+    plan_findings, summary = _flow_evidence(plans, citations.get("Art 14"))
+    return {
+        "outputs": {"plan_findings": plan_findings, "summary": summary},
+        "signals": {
+            "valid_output_shape": True,
+            "plan_sequence_assessed": True,
+            "all_findings_cited": all(
+                finding.get("regulation_citation") or finding.get("corpus_silent")
+                for finding in plan_findings
+            ),
+            "corpus_present": summary["corpus_present"],
+            "latency_seconds": round(_time.monotonic() - started, 2),
+        },
+    }
+
+
+async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
+    """Compatibility wrapper returning the former combined estate evidence shape."""
+    started = _time.monotonic()
+    inventory = inputs.get("inventory")
+    plans = inputs.get("plans")
+    if not isinstance(inventory, list):
+        return error_envelope("inventory (array) is required")
+    if not isinstance(plans, list):
+        return error_envelope("plans (array) is required")
+    citations = await _retrieve_regulation_citations(ctx, _ARTICLE_QUERIES)
+    if citations is None:
+        return error_envelope("tool-wiki-store is not available")
+
+    findings, component_summary = _component_evidence(inventory, citations)
+    plan_findings, flow_summary = _flow_evidence(plans, citations.get("Art 14"))
+    summary = {
+        **component_summary,
+        **flow_summary,
+        "corpus_present": component_summary["corpus_present"],
+    }
+    all_findings = findings + plan_findings
+    return {
+        "outputs": {
+            "findings": findings,
+            "plan_findings": plan_findings,
+            "summary": summary,
+        },
+        "signals": {
+            "valid_output_shape": True,
+            "risk_marker_assessed": True,
+            "plan_sequence_assessed": True,
+            "all_findings_cited": all(
+                finding.get("regulation_citation") or finding.get("corpus_silent")
+                for finding in all_findings
+            ),
+            "corpus_present": summary["corpus_present"],
+            "latency_seconds": round(_time.monotonic() - started, 2),
+        },
+    }
+
+
+def _employment_shaped_plan(plan: dict) -> bool:
+    assessment = _plan_policy_assessment(
+        str(plan.get("workflow") or ""),
+        plan.get("use_context") if isinstance(plan.get("use_context"), dict) else {},
+        plan.get("resolved_composition")
+        if isinstance(plan.get("resolved_composition"), list)
+        else [],
+        plan.get("capability_cards")
+        if isinstance(plan.get("capability_cards"), list)
+        else [],
+    )
+    return bool(assessment["employment_shaped"])
+
+
+def _plan_governance_finding(plan: dict, citation: dict | None) -> dict:
+    trace_id = str(plan.get("trace_id") or "unknown")
+    plan_digest = str(plan.get("plan_digest") or "")
+    governance = plan.get("governance") if isinstance(plan.get("governance"), dict) else {}
+    hold = plan.get("hold") if isinstance(plan.get("hold"), dict) else {}
+    approval = plan.get("approval") if isinstance(plan.get("approval"), dict) else {}
+    resume = plan.get("resume") if isinstance(plan.get("resume"), dict) else {}
+    decision = str(governance.get("decision") or "")
+    execution_status = str(plan.get("execution_status") or "unknown")
+    invoked_at = str(plan.get("first_application_invoke_at") or "")
+    approval_digest = str(approval.get("plan_digest") or "")
+    hold_digest = str(hold.get("plan_digest") or "")
+    resume_digest = str(resume.get("plan_digest") or "")
+    hold_recorded = bool(hold)
+    approval_recorded = approval.get("decision") == "approve"
+    resume_recorded = bool(resume)
+    digest_match = bool(
+        plan_digest
+        and hold_digest == plan_digest
+        and approval_digest == plan_digest
+        and resume_digest == plan_digest
+    )
+    governance_preceded = plan.get("governance_preceded_application_invoke") is not False
+    approval_preceded = plan.get("approval_preceded_application_invoke") is True
+    resume_preceded = plan.get("resume_preceded_application_invoke") is True
+    finished = execution_status == "finished"
+
+    severity = "green"
+    checked = (
+        "pre-execution governance decision, exact-digest approval, event order, "
+        "and observed application completion"
+    )
+    gap = ""
+    remediation = ""
+    if decision == "proceed":
+        severity = "red"
+        gap = "The employment-shaped plan was released automatically instead of requiring accountable review."
+        remediation = "Require approval for the exact resolved plan digest before any application AU invocation."
+    elif decision != "require-human-approval":
+        severity = "red" if invoked_at else "amber"
+        gap = "No observed pre-execution decision required human approval for this employment-shaped plan."
+        remediation = "Run the plan through the composition governance evaluator before application execution."
+    elif invoked_at and not governance_preceded:
+        severity = "red"
+        gap = "An application AU invocation was observed before the governance decision."
+        remediation = "Move the governance gate between resolved-plan recording and the first application invocation."
+    elif not hold_recorded:
+        severity = "red" if invoked_at else "amber"
+        gap = "No hold record binds this employment-shaped plan before approval or execution."
+        remediation = "Record a hold for the exact resolved plan digest before accepting approval."
+    elif not approval_recorded:
+        severity = "red" if invoked_at else "amber"
+        gap = (
+            "Application execution was observed without an approval record."
+            if invoked_at
+            else "The plan was held and no approval has yet been recorded."
+        )
+        remediation = "Record an accountable approve/reject decision for the exact held plan digest."
+    elif not resume_recorded:
+        severity = "red" if invoked_at else "amber"
+        gap = "Approval was recorded, but no same-trace resume record was observed."
+        remediation = "Record resume for the approved digest before invoking any application AU."
+    elif not digest_match:
+        severity = "red"
+        gap = "The approval, hold, or resume evidence does not bind to the resolved plan digest."
+        remediation = "Reject stale approvals and approve only the exact digest shown in the governance report."
+    elif invoked_at and not approval_preceded:
+        severity = "red"
+        gap = "An application AU invocation was observed before the approval event."
+        remediation = "Keep application execution paused until approval is durably recorded on the same trace."
+    elif invoked_at and not resume_preceded:
+        severity = "red"
+        gap = "An application AU invocation was observed before the same-trace resume event."
+        remediation = "Resume the approved plan before invoking the first application AU."
+    elif not invoked_at or not finished:
+        severity = "amber"
+        gap = "Approval evidence is present, but completed application execution is not yet observed."
+        remediation = "Complete or investigate the run, then repeat the estate check."
+
+    evidence = {
+        "trace_id": trace_id,
+        "workflow": plan.get("workflow"),
+        "use_context": plan.get("use_context") or {},
+        "capability_ids": plan.get("capability_ids") or [],
+        "plan_digest": plan_digest,
+        "governance_decision": decision or "not observed",
+        "hold_digest": hold_digest or "not observed",
+        "approval": approval or "not observed",
+        "resume": resume or "not observed",
+        "governance_preceded_application_invoke": governance_preceded,
+        "approval_preceded_application_invoke": approval_preceded,
+        "resume_preceded_application_invoke": resume_preceded,
+        "first_application_invoke_at": invoked_at or "not observed",
+        "execution_status": execution_status,
+    }
+    return {
+        "finding_id": f"{trace_id}/plan-governance",
+        "scope": "plan",
+        "trace_id": trace_id,
+        "plan_digest": plan_digest,
+        "workflow": plan.get("workflow", ""),
+        "article": "Art 14",
+        "obligation": "human oversight",
+        "severity": severity,
+        "checked": checked,
+        "evidence": evidence,
+        "regulation_citation": citation,
+        "corpus_silent": citation is None,
+        "gap": gap,
+        "remediation_hint": remediation,
+        "interpretation": (
+            "This is operational evidence about a course execution gate. It does not establish "
+            "effective human oversight, satisfy Article 14, or confer legal permission."
+        ),
     }
 
 

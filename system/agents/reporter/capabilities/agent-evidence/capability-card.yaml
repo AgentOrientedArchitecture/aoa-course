@@ -1,0 +1,31 @@
+id: reporter-agent-evidence
+version: 0.1.0
+kind: au
+purpose: |
+  Render individual Agentic Unit card-evidence findings with complete wiki-sourced
+  regulation citations. The report contains component evidence only and never a
+  plan, trace, legal, or compliance verdict.
+inputs:
+  - name: inventory
+    type: array
+    required: true
+  - name: findings
+    type: object
+    required: true
+outputs:
+  - name: findings_markdown
+    type: string
+constraints:
+  - The output is a single JSON object.
+  - The report presents agent-card evidence as its primary and only evidence section.
+  - It states that green means declared evidence is present, not that an obligation is satisfied or a control is effective.
+  - Regulation citations include complete evaluator-supplied passages and are never truncated.
+  - The report never contains the words compliant, complies, or certified.
+  - Deterministic template; no model call is made.
+evaluation_signals:
+  - valid_output_shape
+  - has_markdown
+  - no_compliance_verdict
+  - all_findings_rendered
+provenance:
+  model: none

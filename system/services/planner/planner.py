@@ -9,6 +9,7 @@ ingest material into a wiki store, then answer questions from that store.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -35,6 +36,10 @@ INVOKE_TIMEOUT = float(os.environ.get("PLANNER_INVOKE_TIMEOUT", "300"))
 PLANNER_STRATEGY = os.environ.get("PLANNER_STRATEGY", "hybrid").strip().lower()
 PLANNER_MODEL_TIMEOUT = float(os.environ.get("PLANNER_MODEL_TIMEOUT_SECONDS", "60"))
 PLANNER_MODEL_MAX_TOKENS = int(os.environ.get("PLANNER_MODEL_MAX_TOKENS", "2048"))
+PLAN_GOVERNANCE_CAPABILITY = os.environ.get("PLAN_GOVERNANCE_CAPABILITY", "").strip()
+PLAN_APPROVER_ID = os.environ.get(
+    "PLAN_APPROVER_ID", "urn:aoa:human:course-plan-approver"
+).strip()
 
 
 # ----------------------------------------------------------------------
@@ -78,6 +83,19 @@ class PlanBuildResult:
     validation: dict[str, Any] | None = None
     error: str | None = None
     error_detail: str | None = None
+
+
+@dataclass
+class PreparedRun:
+    trace_id: str
+    workflow: str
+    intent: dict[str, Any]
+    resolved_steps: list[ResolvedStep]
+    plan_digest: str
+    governance: dict[str, Any] | None = None
+    status: str = "preparing"
+    outputs: dict[str, Any] | None = None
+    approval: dict[str, Any] | None = None
 
 
 WORKFLOWS: dict[str, Workflow] = {
@@ -307,6 +325,107 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "agent-card-check": Workflow(
+        name="agent-card-check",
+        tasks=[
+            TaskSpec(
+                id="scan-agent-cards",
+                purpose="Inventory registered capability cards and their declared evidence.",
+                discovery={
+                    "kind": "au",
+                    "text": "scan estate inventory capability cards lifecycle evidence",
+                    "required_inputs": [{"name": "estate_root", "type": "string"}],
+                    "required_outputs": [{"name": "inventory"}],
+                },
+                input_map={"estate_root": "inputs.estate_root"},
+                selected_capability="parser-estate",
+            ),
+            TaskSpec(
+                id="evaluate-agent-evidence",
+                purpose="Evaluate individual capability-card evidence with wiki-sourced regulation citations.",
+                discovery={
+                    "kind": "au",
+                    "text": "evaluate agent card evidence eu ai act citations",
+                    "required_inputs": [{"name": "inventory", "type": "array"}],
+                    "required_outputs": [
+                        {"name": "findings"},
+                        {"name": "summary"},
+                    ],
+                },
+                input_map={"inventory": "scan-agent-cards.outputs.inventory"},
+                selected_capability="evaluator-agent-evidence",
+            ),
+            TaskSpec(
+                id="write-agent-evidence",
+                purpose="Render the individual agent-card evidence report.",
+                discovery={
+                    "kind": "au",
+                    "text": "write agent card evidence report markdown citations",
+                    "required_inputs": [
+                        {"name": "inventory", "type": "array"},
+                        {"name": "findings", "type": "object"},
+                    ],
+                    "required_outputs": [{"name": "findings_markdown"}],
+                },
+                input_map={
+                    "inventory": "scan-agent-cards.outputs.inventory",
+                    "findings": "evaluate-agent-evidence.outputs",
+                },
+                selected_capability="reporter-agent-evidence",
+            ),
+        ],
+    ),
+    "flow-audit": Workflow(
+        name="flow-audit",
+        tasks=[
+            TaskSpec(
+                id="scan-flow-evidence",
+                purpose="Reconstruct observed resolved plans and execution evidence from traces.",
+                discovery={
+                    "kind": "au",
+                    "text": "scan estate traces plan governance approval resume completion",
+                    "required_inputs": [{"name": "estate_root", "type": "string"}],
+                    "required_outputs": [{"name": "plans"}],
+                },
+                input_map={"estate_root": "inputs.estate_root"},
+                selected_capability="parser-estate",
+            ),
+            TaskSpec(
+                id="evaluate-flow-evidence",
+                purpose="Evaluate post-execution plan governance, approval, order, resume, and completion evidence.",
+                discovery={
+                    "kind": "au",
+                    "text": "evaluate flow trace plan governance exact digest approval order completion",
+                    "required_inputs": [{"name": "plans", "type": "array"}],
+                    "required_outputs": [
+                        {"name": "plan_findings"},
+                        {"name": "summary"},
+                    ],
+                },
+                input_map={"plans": "scan-flow-evidence.outputs.plans"},
+                selected_capability="evaluator-flow-evidence",
+            ),
+            TaskSpec(
+                id="write-flow-audit",
+                purpose="Render a post-execution flow audit without component-card findings.",
+                discovery={
+                    "kind": "au",
+                    "text": "write flow audit markdown governance approval execution evidence",
+                    "required_inputs": [
+                        {"name": "plans", "type": "array"},
+                        {"name": "findings", "type": "object"},
+                    ],
+                    "required_outputs": [{"name": "findings_markdown"}],
+                },
+                input_map={
+                    "plans": "scan-flow-evidence.outputs.plans",
+                    "findings": "evaluate-flow-evidence.outputs",
+                },
+                selected_capability="reporter-flow-audit",
+            ),
+        ],
+    ),
+    # Compatibility workflow retained for older traces and direct API callers.
     "estate-check": Workflow(
         name="estate-check",
         tasks=[
@@ -330,13 +449,20 @@ WORKFLOWS: dict[str, Workflow] = {
                 discovery={
                     "kind": "au",
                     "text": "evaluate compliance obligations eu ai act findings citations risk tier",
-                    "required_inputs": [{"name": "inventory", "type": "array"}],
+                    "required_inputs": [
+                        {"name": "inventory", "type": "array"},
+                        {"name": "plans", "type": "array"},
+                    ],
                     "required_outputs": [
                         {"name": "findings"},
+                        {"name": "plan_findings"},
                         {"name": "summary"},
                     ],
                 },
-                input_map={"inventory": "scan-estate.outputs.inventory"},
+                input_map={
+                    "inventory": "scan-estate.outputs.inventory",
+                    "plans": "scan-estate.outputs.plans",
+                },
             ),
             TaskSpec(
                 id="write-findings-report",
@@ -346,12 +472,14 @@ WORKFLOWS: dict[str, Workflow] = {
                     "text": "write findings report markdown posture evidence regulation citations",
                     "required_inputs": [
                         {"name": "inventory", "type": "array"},
+                        {"name": "plans", "type": "array"},
                         {"name": "findings", "type": "object"},
                     ],
                     "required_outputs": [{"name": "findings_markdown"}],
                 },
                 input_map={
                     "inventory": "scan-estate.outputs.inventory",
+                    "plans": "scan-estate.outputs.plans",
                     "findings": "evaluate-compliance.outputs",
                 },
             ),
@@ -384,6 +512,8 @@ class State:
     def __init__(self) -> None:
         self.subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
         self.record_lock = asyncio.Lock()
+        self.runs: dict[str, PreparedRun] = {}
+        self.run_locks: dict[str, asyncio.Lock] = {}
 
     async def broadcast(self, record: dict[str, Any]) -> None:
         for q in list(self.subscribers):
@@ -488,6 +618,12 @@ def _deterministic_capability_for_task(task: TaskSpec) -> str:
         "parse-query": "parser-query",
         "evaluate-wiki-query": "evaluator-wiki-query",
         "write-grounded-answer": "reporter-answer",
+        "scan-agent-cards": "parser-estate",
+        "evaluate-agent-evidence": "evaluator-agent-evidence",
+        "write-agent-evidence": "reporter-agent-evidence",
+        "scan-flow-evidence": "parser-estate",
+        "evaluate-flow-evidence": "evaluator-flow-evidence",
+        "write-flow-audit": "reporter-flow-audit",
         "scan-estate": "parser-estate",
         "evaluate-compliance": "evaluator-compliance",
         "write-findings-report": "reporter-findings",
@@ -884,15 +1020,309 @@ def _resolve_path(path: str, intent_inputs: dict[str, Any], step_outputs: dict[s
 
 
 # ----------------------------------------------------------------------
+# Pre-execution plan governance
+# ----------------------------------------------------------------------
+
+
+def _resolved_plan_payload(resolved_steps: list[ResolvedStep]) -> list[dict[str, Any]]:
+    return [
+        {
+            "task": step.task.id,
+            "purpose": step.task.purpose,
+            "capability": step.capability,
+            "input_map": step.task.input_map,
+        }
+        for step in resolved_steps
+    ]
+
+
+def _plan_digest(workflow: str, intent: dict[str, Any], resolved_steps: list[ResolvedStep]) -> str:
+    payload = {
+        "workflow": workflow,
+        "intent": intent,
+        "plan": [
+            {
+                "resolved_task": item,
+                "governance_card": _governance_card_snapshot(step),
+            }
+            for item, step in zip(_resolved_plan_payload(resolved_steps), resolved_steps)
+        ],
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def _governance_card_snapshot(step: ResolvedStep) -> dict[str, Any]:
+    card = step.card
+    return {
+        "id": card.get("id"),
+        "version": card.get("version"),
+        "agent_id": card.get("agent_id"),
+        "purpose": card.get("purpose"),
+        "inputs": card.get("inputs", []),
+        "outputs": card.get("outputs", []),
+        "constraints": card.get("constraints", []),
+        "evaluation_signals": card.get("evaluation_signals", []),
+        "lifecycle": card.get("lifecycle", {}),
+        "provenance": card.get("provenance", {}),
+        "endpoint": card.get("endpoint"),
+        "a2a_endpoint": card.get("a2a_endpoint"),
+    }
+
+
+def _governance_fallback(run: PreparedRun, reason: str) -> dict[str, Any]:
+    markdown = (
+        "# Pre-execution plan governance\n\n"
+        "> **Operational execution decision only. This is not legal permission or a legal determination.**\n\n"
+        "- **Decision:** **require-human-approval**\n"
+        f"- **Plan digest:** `{run.plan_digest}`\n"
+        f"- **Reason:** The governance evaluator could not establish an automatic release: {reason}\n\n"
+        "An accountable human must inspect and approve this exact plan before application AUs run.\n"
+    )
+    return {
+        "decision": "require-human-approval",
+        "plan_digest": run.plan_digest,
+        "findings": [{
+            "finding_id": f"{run.workflow}/governance-evaluator",
+            "severity": "amber",
+            "checked": "pre-execution governance evaluator availability and output",
+            "evidence": {"reason": reason, "plan_digest": run.plan_digest},
+            "control": "Require accountable human approval before execution.",
+        }],
+        "evaluation_markdown": markdown,
+    }
+
+
+async def _evaluate_prepared_plan(
+    client: httpx.AsyncClient,
+    run: PreparedRun,
+    evaluator_card: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not PLAN_GOVERNANCE_CAPABILITY:
+        return {
+            "decision": "proceed",
+            "plan_digest": run.plan_digest,
+            "findings": [],
+            "evaluation_markdown": "",
+        }
+    if not evaluator_card:
+        decision = _governance_fallback(
+            run,
+            f"{PLAN_GOVERNANCE_CAPABILITY} is unavailable or is not an approved AU",
+        )
+        await _record({
+            "trace_id": run.trace_id,
+            "step": "plan-governance",
+            "workflow": run.workflow,
+            "capability": PLAN_GOVERNANCE_CAPABILITY,
+            **decision,
+            "signals": {"evaluator_available": False},
+        })
+        return decision
+
+    inputs = {
+        "workflow": run.workflow,
+        "use_context": run.intent.get("use_context") or {},
+        "resolved_plan": _resolved_plan_payload(run.resolved_steps),
+        "capability_cards": [
+            _governance_card_snapshot(step) for step in run.resolved_steps
+        ],
+        "plan_digest": run.plan_digest,
+    }
+    await _record({
+        "trace_id": run.trace_id,
+        "step": "governance-invoke",
+        "workflow": run.workflow,
+        "capability": PLAN_GOVERNANCE_CAPABILITY,
+        "plan_digest": run.plan_digest,
+        "inputs": inputs,
+    })
+    t0 = time.perf_counter()
+    try:
+        response = await _invoke(client, evaluator_card, run.trace_id, inputs)
+        outputs = response.get("outputs") or {}
+        signals = response.get("signals") or {}
+        decision_name = outputs.get("decision")
+        if _response_failed(response):
+            raise RuntimeError(str(outputs.get("error") or "governance evaluator failed"))
+        if decision_name not in {"proceed", "require-human-approval", "reject"}:
+            raise RuntimeError(f"invalid governance decision: {decision_name!r}")
+        if outputs.get("plan_digest") != run.plan_digest:
+            raise RuntimeError("governance evaluator returned a different plan digest")
+        decision = {
+            "decision": decision_name,
+            "plan_digest": run.plan_digest,
+            "findings": outputs.get("findings") or [],
+            "evaluation_markdown": str(outputs.get("evaluation_markdown") or ""),
+        }
+    except Exception as exc:  # fail closed: evaluation uncertainty requires review
+        logger.warning("plan governance failed closed for %s: %r", run.trace_id, exc)
+        decision = _governance_fallback(run, str(exc))
+        signals = {"exception": repr(exc), "evaluator_available": bool(evaluator_card)}
+
+    await _record({
+        "trace_id": run.trace_id,
+        "step": "plan-governance",
+        "workflow": run.workflow,
+        "capability": PLAN_GOVERNANCE_CAPABILITY,
+        **decision,
+        "signals": signals,
+        "latency_seconds": time.perf_counter() - t0,
+    })
+    return decision
+
+
+def _run_snapshot(run: PreparedRun) -> dict[str, Any]:
+    return {
+        "trace_id": run.trace_id,
+        "workflow": run.workflow,
+        "status": run.status,
+        "plan_digest": run.plan_digest,
+        "plan": _resolved_plan_payload(run.resolved_steps),
+        "governance": run.governance,
+        "approval": run.approval,
+        "outputs": run.outputs or {},
+    }
+
+
+async def _changed_plan_cards(run: PreparedRun) -> list[str]:
+    """Return selected capabilities whose current governance snapshot drifted."""
+    async with httpx.AsyncClient() as client:
+        current_cards = {
+            str(card.get("id")): card
+            for card in await _registry_list(client)
+            if isinstance(card, dict) and card.get("id")
+        }
+    changed: list[str] = []
+    for step in run.resolved_steps:
+        current = current_cards.get(step.capability)
+        if current is None:
+            changed.append(step.capability)
+            continue
+        current_step = ResolvedStep(
+            task=step.task,
+            capability=step.capability,
+            card=current,
+        )
+        if _governance_card_snapshot(current_step) != _governance_card_snapshot(step):
+            changed.append(step.capability)
+    return changed
+
+
+# ----------------------------------------------------------------------
 # Workflow execution
 # ----------------------------------------------------------------------
 
+
+async def _execute_prepared_run(run: PreparedRun) -> dict[str, Any]:
+    intent_inputs: dict[str, Any] = run.intent.get("inputs", {})
+    step_outputs: dict[str, dict[str, Any]] = {}
+    run.status = "running"
+
+    async with httpx.AsyncClient() as client:
+        for step in run.resolved_steps:
+            card = step.card
+            await _record({
+                "trace_id": run.trace_id,
+                "step": "lookup",
+                "task": step.task.id,
+                "capability": step.capability,
+                "card": card,
+            })
+
+            try:
+                inputs = {
+                    name: _resolve_path(path, intent_inputs, step_outputs)
+                    for name, path in step.task.input_map.items()
+                }
+            except ValueError as exc:
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "error",
+                    "task": step.task.id,
+                    "capability": step.capability,
+                    "error": str(exc),
+                })
+                run.status = "error"
+                run.outputs = {"error": str(exc)}
+                raise HTTPException(status_code=500, detail=str(exc))
+
+            await _record({
+                "trace_id": run.trace_id,
+                "step": "invoke",
+                "task": step.task.id,
+                "capability": step.capability,
+                "inputs": inputs,
+            })
+            t0 = time.perf_counter()
+            try:
+                response = await _invoke(client, card, run.trace_id, inputs)
+            except Exception as exc:  # noqa: BLE001 - every invocation failure must close the run
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "error",
+                    "task": step.task.id,
+                    "capability": step.capability,
+                    "error": repr(exc),
+                })
+                run.status = "error"
+                run.outputs = {"error": f"{step.capability}: {exc!r}"}
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "finish",
+                    "workflow": run.workflow,
+                    "outputs": run.outputs,
+                })
+                raise HTTPException(status_code=502, detail=run.outputs["error"]) from exc
+            elapsed = time.perf_counter() - t0
+            await _record({
+                "trace_id": run.trace_id,
+                "step": "response",
+                "task": step.task.id,
+                "capability": step.capability,
+                "outputs": response.get("outputs", {}),
+                "signals": response.get("signals", {}),
+                "latency_seconds": elapsed,
+            })
+            if _response_failed(response):
+                final_outputs = {
+                    "error": response.get("outputs", {}).get("error", "capability failed"),
+                    "failed_capability": step.capability,
+                    "failed_task": step.task.id,
+                    "signals": response.get("signals", {}),
+                }
+                run.status = "error"
+                run.outputs = final_outputs
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "finish",
+                    "workflow": run.workflow,
+                    "outputs": final_outputs,
+                })
+                return final_outputs
+            step_result = {
+                "outputs": response.get("outputs", {}),
+                "signals": response.get("signals", {}),
+            }
+            step_outputs[step.task.id] = step_result
+            step_outputs[step.capability] = step_result
+
+    final = step_outputs[run.resolved_steps[-1].task.id]
+    run.status = "done"
+    run.outputs = final.get("outputs", {})
+    await _record({
+        "trace_id": run.trace_id,
+        "step": "finish",
+        "workflow": run.workflow,
+        "outputs": run.outputs,
+    })
+    return run.outputs or {}
+
+
 async def _run_workflow(
     workflow: Workflow, intent: dict[str, Any]
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, str, dict[str, Any]]:
     trace_id = uuid.uuid4().hex[:12]
-    intent_inputs: dict[str, Any] = intent.get("inputs", {})
-    step_outputs: dict[str, dict[str, Any]] = {}
 
     await _record({
         "trace_id": trace_id,
@@ -903,7 +1333,26 @@ async def _run_workflow(
 
     resolved_steps: list[ResolvedStep] = []
     async with httpx.AsyncClient() as client:
-        capability_cards = await _registry_list(client)
+        all_capability_cards = await _registry_list(client)
+        configured_governance_card = next(
+            (
+                card for card in all_capability_cards
+                if card.get("id") == PLAN_GOVERNANCE_CAPABILITY
+            ),
+            None,
+        )
+        governance_card = (
+            configured_governance_card
+            if configured_governance_card
+            and configured_governance_card.get("kind") == "au"
+            and (configured_governance_card.get("lifecycle") or {}).get("status")
+            == "approved"
+            else None
+        )
+        capability_cards = [
+            card for card in all_capability_cards
+            if card.get("id") != PLAN_GOVERNANCE_CAPABILITY
+        ]
         au_cards = [card for card in capability_cards if card.get("kind") == "au"]
         await _record({
             "trace_id": trace_id,
@@ -984,104 +1433,79 @@ async def _run_workflow(
                 "card": card,
             })
 
+        run = PreparedRun(
+            trace_id=trace_id,
+            workflow=workflow.name,
+            intent=intent,
+            resolved_steps=resolved_steps,
+            plan_digest=_plan_digest(workflow.name, intent, resolved_steps),
+        )
         await _record({
             "trace_id": trace_id,
             "step": "plan",
             "workflow": workflow.name,
-            "plan": [
-                {
-                    "task": step.task.id,
-                    "purpose": step.task.purpose,
-                    "capability": step.capability,
-                    "input_map": step.task.input_map,
-                }
-                for step in resolved_steps
-            ],
+            "use_context": intent.get("use_context") or {},
+            "plan_digest": run.plan_digest,
+            "plan": _resolved_plan_payload(resolved_steps),
+        })
+        state.runs[trace_id] = run
+        state.run_locks.setdefault(trace_id, asyncio.Lock())
+        run.governance = await _evaluate_prepared_plan(client, run, governance_card)
+        decision = run.governance.get("decision")
+
+        if decision == "require-human-approval":
+            run.status = "held"
+            run.outputs = {
+                "plan_governance": run.governance,
+                "execution": {
+                    "status": "held",
+                    "approval_required": True,
+                    "trace_id": trace_id,
+                    "plan_digest": run.plan_digest,
+                },
+            }
+            await _record({
+                "trace_id": trace_id,
+                "step": "hold",
+                "workflow": workflow.name,
+                "decision": decision,
+                "plan_digest": run.plan_digest,
+                "approval_required": True,
+                "evaluation_markdown": run.governance.get("evaluation_markdown", ""),
+            })
+            return trace_id, run.status, run.outputs
+
+        if decision == "reject":
+            run.status = "rejected"
+            run.outputs = {
+                "error": "resolved plan rejected by the pre-execution governance policy",
+                "plan_governance": run.governance,
+            }
+            await _record({
+                "trace_id": trace_id,
+                "step": "rejected",
+                "workflow": workflow.name,
+                "decision": decision,
+                "plan_digest": run.plan_digest,
+            })
+            await _record({
+                "trace_id": trace_id,
+                "step": "finish",
+                "workflow": workflow.name,
+                "outputs": run.outputs,
+            })
+            return trace_id, run.status, run.outputs
+
+        await _record({
+            "trace_id": trace_id,
+            "step": "governance-release",
+            "workflow": workflow.name,
+            "decision": decision or "proceed",
+            "plan_digest": run.plan_digest,
         })
 
-        for step in resolved_steps:
-            card = step.card
-            await _record({
-                "trace_id": trace_id,
-                "step": "lookup",
-                "task": step.task.id,
-                "capability": step.capability,
-                "card": card,
-            })
-
-            try:
-                inputs = {
-                    name: _resolve_path(path, intent_inputs, step_outputs)
-                    for name, path in step.task.input_map.items()
-                }
-            except ValueError as e:
-                await _record({
-                    "trace_id": trace_id,
-                    "step": "error",
-                    "task": step.task.id,
-                    "capability": step.capability,
-                    "error": str(e),
-                })
-                raise HTTPException(status_code=500, detail=str(e))
-
-            await _record({
-                "trace_id": trace_id,
-                "step": "invoke",
-                "task": step.task.id,
-                "capability": step.capability,
-                "inputs": inputs,
-            })
-            t0 = time.perf_counter()
-            try:
-                response = await _invoke(client, card, trace_id, inputs)
-            except httpx.HTTPError as e:
-                await _record({
-                    "trace_id": trace_id,
-                    "step": "error",
-                    "task": step.task.id,
-                    "capability": step.capability,
-                    "error": repr(e),
-                })
-                raise HTTPException(status_code=502, detail=f"{step.capability}: {e!r}")
-            elapsed = time.perf_counter() - t0
-            await _record({
-                "trace_id": trace_id,
-                "step": "response",
-                "task": step.task.id,
-                "capability": step.capability,
-                "outputs": response.get("outputs", {}),
-                "signals": response.get("signals", {}),
-                "latency_seconds": elapsed,
-            })
-            if _response_failed(response):
-                final_outputs = {
-                    "error": response.get("outputs", {}).get("error", "capability failed"),
-                    "failed_capability": step.capability,
-                    "failed_task": step.task.id,
-                    "signals": response.get("signals", {}),
-                }
-                await _record({
-                    "trace_id": trace_id,
-                    "step": "finish",
-                    "workflow": workflow.name,
-                    "outputs": final_outputs,
-                })
-                return trace_id, final_outputs
-            step_result = {
-                "outputs": response.get("outputs", {}),
-                "signals": response.get("signals", {}),
-            }
-            step_outputs[step.task.id] = step_result
-            step_outputs[step.capability] = step_result
-
-    final = step_outputs[resolved_steps[-1].task.id]
-    await _record({
-        "trace_id": trace_id,
-        "step": "finish",
-        "workflow": workflow.name,
-        "outputs": final.get("outputs", {}),
-    })
-    return trace_id, final.get("outputs", {})
+    outputs = await _execute_prepared_run(run)
+    return trace_id, run.status, outputs
 
 
 def _response_failed(response: dict[str, Any]) -> bool:
@@ -1114,8 +1538,123 @@ async def healthz() -> dict[str, Any]:
 async def intent(request: Request) -> JSONResponse:
     body = await request.json()
     workflow = _select_workflow(body)
-    trace_id, outputs = await _run_workflow(workflow, body)
-    return JSONResponse({"trace_id": trace_id, "workflow": workflow.name, "outputs": outputs})
+    trace_id, status, outputs = await _run_workflow(workflow, body)
+    return JSONResponse({
+        "trace_id": trace_id,
+        "workflow": workflow.name,
+        "status": status,
+        "outputs": outputs,
+    })
+
+
+@app.get("/runs/{trace_id}")
+async def get_run(trace_id: str) -> JSONResponse:
+    run = state.runs.get(trace_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"unknown active run: {trace_id}")
+    return JSONResponse(_run_snapshot(run))
+
+
+@app.post("/runs/{trace_id}/approval")
+async def approve_run(trace_id: str, request: Request) -> JSONResponse:
+    run = state.runs.get(trace_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"unknown active run: {trace_id}")
+    body = await request.json()
+    decision = str(body.get("decision") or "approve").strip().lower()
+    expected_digest = str(body.get("plan_digest") or "").strip()
+    reason = str(body.get("reason") or "").strip()
+    if decision not in {"approve", "reject"}:
+        raise HTTPException(status_code=400, detail="decision must be approve or reject")
+    if expected_digest != run.plan_digest:
+        raise HTTPException(
+            status_code=409,
+            detail="approval does not match the currently held plan digest",
+        )
+
+    lock = state.run_locks.setdefault(trace_id, asyncio.Lock())
+    async with lock:
+        if run.status in {"done", "error", "rejected"}:
+            return JSONResponse(_run_snapshot(run))
+        if run.status != "held":
+            raise HTTPException(
+                status_code=409,
+                detail=f"run is {run.status}, not held for approval",
+            )
+
+        if decision == "approve":
+            try:
+                changed_cards = await _changed_plan_cards(run)
+            except httpx.HTTPError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail="could not revalidate the held plan against the registry",
+                ) from exc
+            if changed_cards:
+                await _record({
+                    "trace_id": trace_id,
+                    "step": "plan-approval-rejected",
+                    "workflow": run.workflow,
+                    "plan_digest": run.plan_digest,
+                    "reason": "selected capability card changed while the plan was held",
+                    "changed_capabilities": changed_cards,
+                })
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "held plan is stale because selected capability cards changed: "
+                        + ", ".join(changed_cards)
+                        + "; submit a new intent and review its new digest"
+                    ),
+                )
+
+        approved_at = _now_iso()
+        run.approval = {
+            "decision": decision,
+            "actor_id": PLAN_APPROVER_ID,
+            "approved_at": approved_at,
+            "plan_digest": run.plan_digest,
+            "reason": reason,
+        }
+        await _record({
+            "trace_id": trace_id,
+            "step": "plan-approval",
+            "workflow": run.workflow,
+            **run.approval,
+        })
+
+        if decision == "reject":
+            run.status = "rejected"
+            run.outputs = {
+                "error": "held plan rejected by the accountable reviewer",
+                "plan_governance": run.governance,
+                "approval": run.approval,
+            }
+            await _record({
+                "trace_id": trace_id,
+                "step": "rejected",
+                "workflow": run.workflow,
+                "plan_digest": run.plan_digest,
+                "actor_id": PLAN_APPROVER_ID,
+            })
+            await _record({
+                "trace_id": trace_id,
+                "step": "finish",
+                "workflow": run.workflow,
+                "outputs": run.outputs,
+            })
+            return JSONResponse(_run_snapshot(run))
+
+        run.status = "approved"
+        await _record({
+            "trace_id": trace_id,
+            "step": "resume",
+            "workflow": run.workflow,
+            "plan_digest": run.plan_digest,
+            "actor_id": PLAN_APPROVER_ID,
+        })
+        await _execute_prepared_run(run)
+        return JSONResponse(_run_snapshot(run))
 
 
 @app.post("/trace-events")

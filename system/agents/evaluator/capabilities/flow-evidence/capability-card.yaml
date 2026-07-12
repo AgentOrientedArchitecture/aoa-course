@@ -1,0 +1,32 @@
+id: evaluator-flow-evidence
+version: 0.1.0
+kind: au
+purpose: |
+  Evaluate post-execution trace evidence for employment-shaped resolved plans:
+  governance decision, exact-digest approval, event order, resume, and observed
+  completion. Cite Article 14 from the course wiki. Emits flow evidence only,
+  never a legal, compliance, or effective-oversight verdict.
+inputs:
+  - name: plans
+    type: array
+    required: true
+outputs:
+  - name: plan_findings
+    type: array
+  - name: summary
+    type: object
+constraints:
+  - The output is a single JSON object.
+  - Findings assess observed plan and trace evidence only, not individual card completeness.
+  - Employment-shaped plans are checked for a pre-execution hold, exact-digest approval, governance and approval order, resume, and successful completion.
+  - Every finding carries the complete retrieved Article 14 passage, or is marked corpus_silent.
+  - Green means the specified execution evidence was observed, never that human oversight was effective or Article 14 was satisfied.
+  - No output may state or imply legal permission or a compliance determination.
+evaluation_signals:
+  - valid_output_shape
+  - plan_sequence_assessed
+  - all_findings_cited
+  - corpus_present
+  - latency_p95_under(20s)
+provenance:
+  model: none

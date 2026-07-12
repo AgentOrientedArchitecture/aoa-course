@@ -31,7 +31,16 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
-SUPPORTED_WORKFLOWS = ("cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query", "estate-check")
+SUPPORTED_WORKFLOWS = (
+    "agent-card-check",
+    "cv-fit",
+    "flow-audit",
+    "cv-fit-interview",
+    "knowledge-ingest",
+    "wiki-graph",
+    "knowledge-query",
+    "estate-check",
+)
 
 
 def _configured_workflows() -> list[str]:
@@ -195,6 +204,39 @@ async def get_capability(capability_id: str) -> JSONResponse:
         return JSONResponse(r.json())
 
 
+@app.get("/api/runs/{trace_id}")
+async def get_run(trace_id: str) -> JSONResponse:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(f"{PLANNER_URL}/runs/{trace_id}")
+            response.raise_for_status()
+            return JSONResponse(response.json())
+        except httpx.HTTPStatusError as exc:
+            return JSONResponse(
+                {"error": exc.response.text}, status_code=exc.response.status_code
+            )
+        except httpx.HTTPError as exc:
+            return JSONResponse({"error": repr(exc)}, status_code=502)
+
+
+@app.post("/api/runs/{trace_id}/approval")
+async def approve_run(trace_id: str, request: Request) -> JSONResponse:
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=PLANNER_REQUEST_TIMEOUT) as client:
+        try:
+            response = await client.post(
+                f"{PLANNER_URL}/runs/{trace_id}/approval", json=body
+            )
+            response.raise_for_status()
+            return JSONResponse(response.json())
+        except httpx.HTTPStatusError as exc:
+            return JSONResponse(
+                {"error": exc.response.text}, status_code=exc.response.status_code
+            )
+        except httpx.HTTPError as exc:
+            return JSONResponse({"error": repr(exc)}, status_code=502)
+
+
 @app.get("/api/wiki/graph")
 async def get_wiki_graph() -> JSONResponse:
     """Return a typed graph projection of the local wiki store."""
@@ -305,8 +347,8 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind == "knowledge-query":
         return await _submit_knowledge_query(inputs, files)
 
-    if kind == "estate-check":
-        return await _submit_estate_check()
+    if kind in ("agent-card-check", "flow-audit", "estate-check"):
+        return await _submit_estate_read(kind)
 
     # cv-fit and cv-fit-interview take the same CV + JD inputs; they differ only
     # in the workflow the planner runs (the interview variant adds the
@@ -346,6 +388,18 @@ async def _submit_cv_fit(
 
     planner_body = {
         "kind": kind,
+        "use_context": {
+            "domain": "employment",
+            "data_subjects": ["candidates"],
+            "data_classification": "personal",
+            "output_use": (
+                "interview-preparation" if kind == "cv-fit-interview"
+                else "candidate-screening"
+            ),
+            "decision_effect": "recommendation",
+            "autonomy": "advisory",
+            "course_simulation": True,
+        },
         "inputs": {"cv_path": str(cv_path), "jd_path": str(jd_path)},
     }
     result = await _post_planner_intent(planner_body)
@@ -399,11 +453,10 @@ async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] 
     return JSONResponse(result)
 
 
-async def _submit_estate_check() -> JSONResponse:
-    """Run the estate scan. No upload: the scan reads the estate's own
-    governance artefacts (cards, lifecycle, traces) via tool-filesystem."""
+async def _submit_estate_read(kind: str) -> JSONResponse:
+    """Run a read-only evidence workflow over cards and planner traces."""
     planner_body = {
-        "kind": "estate-check",
+        "kind": kind,
         "inputs": {"estate_root": "/data/estate"},
     }
     result = await _post_planner_intent(planner_body)

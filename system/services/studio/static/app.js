@@ -6,7 +6,16 @@
 
 const $ = (id) => document.getElementById(id);
 
-const WORKFLOWS = ["cv-fit", "cv-fit-interview", "knowledge-ingest", "wiki-graph", "knowledge-query", "estate-check"];
+const WORKFLOWS = [
+  "agent-card-check",
+  "cv-fit",
+  "flow-audit",
+  "cv-fit-interview",
+  "knowledge-ingest",
+  "wiki-graph",
+  "knowledge-query",
+  "estate-check",
+];
 
 // cv-fit-interview reuses the CV + JD form panel of cv-fit; it only differs in the
 // workflow the planner runs (it adds the EVE interviewer as a final step).
@@ -28,7 +37,7 @@ const state = {
   lifecycle: emptyLifecycle(),
   wikiGraph: { nodes: [], edges: [] },
   selectedWikiNode: null,
-  mode: "cv-fit",
+  mode: configuredWorkflows[0] || "cv-fit",
   cvName: "",                  // last filename loaded into the CV box
   jdName: "",                  // last filename loaded into the JD box
   noteName: "",                // last filename loaded into the note box
@@ -51,6 +60,9 @@ function emptyLifecycle() {
     tasks: [],
     taskById: new Map(),
     plan: [],
+    governance: null,
+    planDigest: "",
+    approval: null,
     result: null,
     error: "",
   };
@@ -395,6 +407,44 @@ function applyLifecycleEvent(record) {
     }
     return;
   }
+  if (record.step === "plan-governance") {
+    life.governance = {
+      decision: record.decision || "",
+      plan_digest: record.plan_digest || "",
+      findings: record.findings || [],
+      evaluation_markdown: record.evaluation_markdown || "",
+      signals: record.signals || {},
+    };
+    life.planDigest = record.plan_digest || life.planDigest;
+    return;
+  }
+  if (record.step === "hold") {
+    life.status = "held";
+    life.planDigest = record.plan_digest || life.planDigest;
+    if (life.governance && !life.governance.evaluation_markdown) {
+      life.governance.evaluation_markdown = record.evaluation_markdown || "";
+    }
+    return;
+  }
+  if (record.step === "plan-approval") {
+    life.approval = {
+      decision: record.decision || "",
+      actor_id: record.actor_id || "",
+      approved_at: record.approved_at || record.ts || "",
+      plan_digest: record.plan_digest || "",
+      reason: record.reason || "",
+    };
+    life.status = record.decision === "reject" ? "rejected" : "approved";
+    return;
+  }
+  if (record.step === "resume" || record.step === "governance-release") {
+    life.status = "running";
+    return;
+  }
+  if (record.step === "rejected") {
+    life.status = "rejected";
+    return;
+  }
   if (record.step === "invoke") {
     const task = ensureTask(record.task || record.capability);
     task.status = "running";
@@ -456,6 +506,7 @@ function renderLifecycle() {
   renderTraceSummary();
   renderResponsibilityWalk();
   renderPlanner(life);
+  renderPlanGovernance(life);
   renderTasks(life);
   renderResult(life);
 }
@@ -699,11 +750,14 @@ function truncate(value, max) {
 
 function lifecycleIntentTitle(life) {
   const kind = (life.intent && life.intent.kind) || life.workflow || state.mode;
+  if (kind === "agent-card-check") return "Inspect individual agent-card evidence";
   if (kind === "cv-fit") return "Evaluate a CV against a job description";
   if (kind === "cv-fit-interview") return "Evaluate a CV, then generate interview questions";
   if (kind === "knowledge-ingest") return "Ingest source material into the AOA wiki";
   if (kind === "wiki-graph") return "Inspect the AOA wiki graph";
   if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
+  if (kind === "flow-audit") return "Audit post-execution flow evidence";
+  if (kind === "estate-check") return "Inspect component and end-to-end plan evidence";
   return "No run yet";
 }
 
@@ -713,6 +767,7 @@ function renderLifecycleRail(life) {
     ["context", "Capabilities", life.capabilityContext.length > 0],
     ["proposal", "Plan proposal", Boolean(life.proposal || life.fallbackReason || life.source === "deterministic")],
     ["validation", "Validation", Boolean(life.validation || life.fallbackReason || life.source === "deterministic")],
+    ["governance", "Plan governance", Boolean(life.governance)],
     ["work", "Work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))],
     ["result", "Result", Boolean(life.result)],
   ];
@@ -721,6 +776,9 @@ function renderLifecycleRail(life) {
   for (const [key, label, done] of stages) {
     const li = document.createElement("li");
     li.className = done ? "done" : "pending";
+    if (key === "governance" && life.status === "held") {
+      li.className = "held";
+    }
     if (key === "work" && life.tasks.some((task) => task.status === "running")) {
       li.className = "active";
     }
@@ -801,6 +859,13 @@ function isResponsibilityRecord(record) {
     "start",
     "capability-context",
     "plan-proposal",
+    "governance-invoke",
+    "plan-governance",
+    "hold",
+    "plan-approval",
+    "resume",
+    "governance-release",
+    "rejected",
     "select",
     "lookup",
     "invoke",
@@ -834,6 +899,27 @@ function traceEventView(record) {
   if (step === "plan-proposal") {
     const validation = record.validation && record.validation.valid ? "validated" : record.fallback_reason ? "fallback" : "pending validation";
     return traceView(layer, status, "Planner proposed route", `${record.source || "planner"} plan, ${validation}`, latency);
+  }
+  if (step === "governance-invoke") {
+    return traceView("governance", status, `Evaluating resolved plan`, record.capability || "plan governance", record.plan_digest || "");
+  }
+  if (step === "plan-governance") {
+    return traceView("governance", status, `Plan decision: ${record.decision || "unknown"}`, record.workflow || "workflow", record.plan_digest || "");
+  }
+  if (step === "hold") {
+    return traceView("governance", "held", "Execution held", "Accountable approval is required before application work", record.plan_digest || "");
+  }
+  if (step === "plan-approval") {
+    return traceView("governance", "done", `Plan ${record.decision || "reviewed"}`, record.actor_id || "accountable reviewer", record.plan_digest || "");
+  }
+  if (step === "resume") {
+    return traceView("governance", "done", "Approved plan released", record.actor_id || "accountable reviewer", record.plan_digest || "");
+  }
+  if (step === "governance-release") {
+    return traceView("governance", "done", "Plan released automatically", record.decision || "proceed", record.plan_digest || "");
+  }
+  if (step === "rejected") {
+    return traceView("governance", "error", "Plan rejected", record.actor_id || record.decision || "policy", record.plan_digest || "");
   }
   if (step === "select") {
     const hash = record.card && record.card.provenance && record.card.provenance.skills_hash;
@@ -884,6 +970,7 @@ function traceView(layer, status, title, detail, meta) {
     orchestrator: "Run",
     au: "AU",
     tool: "Tool",
+    governance: "Governance",
     result: "Result",
   };
   return {
@@ -900,6 +987,7 @@ function traceLayer(step) {
   if (step === "start") return "intent";
   if (step === "capability-context" || step === "lookup" || step === "select") return "registry";
   if (step === "plan-proposal") return "planner";
+  if (["governance-invoke", "plan-governance", "hold", "plan-approval", "resume", "governance-release", "rejected"].includes(step)) return "governance";
   if (step === "au-start" || step === "au-finish" || step === "au-error") return "au";
   if (step === "tool-invoke" || step === "tool-response" || step === "tool-error") return "tool";
   if (step === "finish") return "result";
@@ -996,6 +1084,83 @@ function renderPlanner(life) {
   }
 }
 
+function renderPlanGovernance(life) {
+  const stateLabel = $("governance-state");
+  const body = $("governance-body");
+  const approve = $("governance-approve");
+  const actionStatus = $("governance-action-status");
+  if (!stateLabel || !body || !approve) return;
+
+  if (!life.governance) {
+    stateLabel.textContent = "waiting";
+    body.className = "result-body muted-block";
+    body.textContent = "No resolved plan has been evaluated yet.";
+    approve.hidden = true;
+    return;
+  }
+
+  stateLabel.textContent = life.governance.decision || "evaluated";
+  body.className = "result-body";
+  body.innerHTML = "";
+  const markdown = life.governance.evaluation_markdown || "";
+  if (markdown) body.appendChild(renderMarkdown(markdown));
+  else {
+    const pre = document.createElement("pre");
+    pre.className = "json-view";
+    pre.innerHTML = highlightJson(life.governance);
+    body.appendChild(pre);
+  }
+
+  if (life.approval) {
+    const approval = document.createElement("p");
+    approval.className = "approval-evidence";
+    approval.textContent = `${life.approval.decision} by ${life.approval.actor_id} for plan ${life.approval.plan_digest}`;
+    body.appendChild(approval);
+  }
+  approve.hidden = life.status !== "held";
+  approve.disabled = false;
+  if (life.status === "held") actionStatus.textContent = "Execution is paused before the first application AU.";
+  else if (life.approval) actionStatus.textContent = "Approval recorded on this trace.";
+  else actionStatus.textContent = "";
+}
+
+
+async function approveHeldPlan() {
+  const life = state.lifecycle;
+  const button = $("governance-approve");
+  const status = $("governance-action-status");
+  if (!state.currentTraceId || life.status !== "held" || !life.planDigest) return;
+
+  button.disabled = true;
+  status.textContent = "Recording approval and executing the frozen plan…";
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(state.currentTraceId)}/approval`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        decision: "approve",
+        plan_digest: life.planDigest,
+        reason: "Approved interactively in the course Studio after reviewing the resolved plan.",
+      }),
+    });
+    const run = await response.json();
+    if (!response.ok) {
+      status.textContent = `error: ${run.error || response.statusText}`;
+      return;
+    }
+    life.status = run.status || life.status;
+    life.approval = run.approval || life.approval;
+    if (run.status === "done" && run.outputs) life.result = run.outputs;
+    status.textContent = run.status === "done" ? "Approved plan completed." : `run ${run.status}`;
+    renderLifecycle();
+  } catch (error) {
+    status.textContent = `error: ${error}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+
 function renderTasks(life) {
   $("task-count").textContent = String(life.tasks.length);
   const list = $("task-list");
@@ -1043,7 +1208,9 @@ function renderResult(life) {
   if (!life.result) {
     resultState.textContent = life.status === "running" ? "waiting" : life.status;
     body.className = "result-body muted-block";
-    body.textContent = "No result yet.";
+    body.textContent = life.status === "held"
+      ? "The plan is held. Review the governance report and approve the exact plan before work begins."
+      : "No result yet.";
     return;
   }
   const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || life.result.findings_markdown || "";
@@ -1086,6 +1253,24 @@ function pickPayload(record) {
     };
   }
   if (record.step === "plan") return { plan: record.plan };
+  if (record.step === "governance-invoke") return { plan_digest: record.plan_digest, inputs: record.inputs };
+  if (record.step === "plan-governance") {
+    return {
+      decision: record.decision,
+      plan_digest: record.plan_digest,
+      findings: record.findings,
+      signals: record.signals,
+    };
+  }
+  if (["hold", "plan-approval", "resume", "governance-release", "rejected"].includes(record.step)) {
+    return {
+      decision: record.decision,
+      actor_id: record.actor_id,
+      plan_digest: record.plan_digest,
+      approval_required: record.approval_required,
+      reason: record.reason,
+    };
+  }
   if (record.step === "lookup") return record.card;
   if (record.step === "invoke") return record.inputs;
   if (record.step === "au-start") {
@@ -1134,32 +1319,90 @@ function pickMarkdown(record) {
   if (record.step === "response" || record.step === "finish") {
     return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || outputs.findings_markdown || "";
   }
+  if (record.step === "plan-governance" || record.step === "hold") {
+    return record.evaluation_markdown || "";
+  }
   return "";
 }
 
 function renderMarkdown(markdown) {
   const root = document.createElement("div");
   root.className = "rendered-markdown";
+  const lines = markdown.split("\n");
   let list = null;
+  let index = 0;
 
-  for (const rawLine of markdown.split("\n")) {
-    const line = rawLine.trim();
+  while (index < lines.length) {
+    const line = lines[index].trim();
     if (!line) {
       list = null;
+      index += 1;
       continue;
     }
-    if (line.startsWith("## ")) {
+
+    if (line.startsWith("|") && index + 1 < lines.length) {
+      const header = markdownTableCells(line);
+      const separator = markdownTableCells(lines[index + 1].trim());
+      if (header.length && separator.length === header.length && separator.every(isMarkdownTableSeparator)) {
+        list = null;
+        const wrapper = document.createElement("div");
+        wrapper.className = "markdown-table-wrap";
+        const table = document.createElement("table");
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        for (const cell of header) {
+          const th = document.createElement("th");
+          th.innerHTML = renderInlineMarkdown(cell);
+          headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        index += 2;
+        while (index < lines.length && lines[index].trim().startsWith("|")) {
+          const row = document.createElement("tr");
+          for (const cell of markdownTableCells(lines[index].trim())) {
+            const td = document.createElement("td");
+            td.innerHTML = renderInlineMarkdown(cell);
+            row.appendChild(td);
+          }
+          tbody.appendChild(row);
+          index += 1;
+        }
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        root.appendChild(wrapper);
+        continue;
+      }
+    }
+
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
       list = null;
-      const h = document.createElement("h4");
-      h.textContent = line.slice(3);
+      const level = Math.min(6, heading[1].length + 2);
+      const h = document.createElement(`h${level}`);
+      h.innerHTML = renderInlineMarkdown(heading[2]);
       root.appendChild(h);
+      index += 1;
       continue;
     }
-    if (line.startsWith("# ")) {
+    if (line.startsWith(">")) {
       list = null;
-      const h = document.createElement("h3");
-      h.textContent = line.slice(2);
-      root.appendChild(h);
+      const quote = document.createElement("blockquote");
+      while (index < lines.length && lines[index].trim().startsWith(">")) {
+        const quoteLine = lines[index].trim().replace(/^>\s?/, "");
+        const p = document.createElement("p");
+        p.innerHTML = renderInlineMarkdown(quoteLine);
+        quote.appendChild(p);
+        index += 1;
+      }
+      root.appendChild(quote);
+      continue;
+    }
+    if (line === "---") {
+      list = null;
+      root.appendChild(document.createElement("hr"));
+      index += 1;
       continue;
     }
     if (line.startsWith("- ")) {
@@ -1170,18 +1413,49 @@ function renderMarkdown(markdown) {
       const li = document.createElement("li");
       li.innerHTML = renderInlineMarkdown(line.slice(2));
       list.appendChild(li);
+      index += 1;
       continue;
     }
     list = null;
     const p = document.createElement("p");
     p.innerHTML = renderInlineMarkdown(line);
     root.appendChild(p);
+    index += 1;
   }
   return root;
 }
 
+function markdownTableCells(line) {
+  const text = line.replace(/^\|/, "").replace(/\|$/, "");
+  const cells = [];
+  let cell = "";
+  let escaped = false;
+  for (const char of text) {
+    if (escaped) {
+      cell += char;
+      escaped = false;
+    } else if (char === "\\") {
+      escaped = true;
+    } else if (char === "|") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function isMarkdownTableSeparator(cell) {
+  return /^:?-{3,}:?$/.test(cell);
+}
+
 function renderInlineMarkdown(text) {
-  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return escapeHtml(text)
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>");
 }
 
 function setDetailText(text) {
@@ -1276,6 +1550,10 @@ async function submitIntent() {
     const body = await resp.json();
     if (!resp.ok) {
       status.textContent = `error: ${body.error || resp.statusText}`;
+    } else if (body.status === "held") {
+      status.textContent = `approval required · trace ${body.trace_id}`;
+    } else if (body.outputs && body.outputs.error) {
+      status.textContent = `error: ${body.outputs.error}`;
     } else {
       status.textContent = `done · trace ${body.trace_id}`;
     }
@@ -1319,9 +1597,9 @@ function buildIntentPayload(status) {
     };
   }
 
-  if (state.mode === "estate-check") {
-    // No inputs: the scan reads the estate's own governance artefacts.
-    return { kind: "estate-check" };
+  if (["agent-card-check", "flow-audit", "estate-check"].includes(state.mode)) {
+    // No learner inputs: these workflows read the estate's governance artefacts.
+    return { kind: state.mode };
   }
 
   const question = $("intent-question").value.trim();
@@ -1408,6 +1686,18 @@ function setupModeTabs() {
 }
 
 function applyWorkflowConfig() {
+  const session4Stages = ["agent-card-check", "cv-fit", "flow-audit"];
+  if (session4Stages.every((mode) => enabledWorkflows.has(mode))) {
+    const stageLabels = {
+      "agent-card-check": "1. Agent card check",
+      "cv-fit": "2. CV fit",
+      "flow-audit": "3. Flow audit",
+    };
+    for (const [mode, label] of Object.entries(stageLabels)) {
+      const btn = document.querySelector(`[data-mode="${mode}"]`);
+      if (btn) btn.textContent = label;
+    }
+  }
   for (const btn of document.querySelectorAll("[data-mode]")) {
     btn.hidden = !enabledWorkflows.has(btn.dataset.mode);
   }
@@ -1429,11 +1719,14 @@ function setMode(mode) {
   }
   $("lifecycle").classList.toggle("hidden", mode === "wiki-graph");
   const labels = {
-    "cv-fit": "Run cv-fit",
+    "agent-card-check": "Run agent card check",
+    "cv-fit": "Run CV fit",
     "cv-fit-interview": "Run cv-fit + interview",
     "knowledge-ingest": "Run ingest",
     "wiki-graph": "Refresh graph",
     "knowledge-query": "Run query",
+    "flow-audit": "Run flow audit",
+    "estate-check": "Run estate check",
   };
   $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";
@@ -1466,6 +1759,7 @@ window.addEventListener("DOMContentLoaded", () => {
   applyWorkflowConfig();
   setupModeTabs();
   $("intent-submit").addEventListener("click", submitIntent);
+  $("governance-approve").addEventListener("click", approveHeldPlan);
   const reset = $("wiki-reset");
   if (reset) reset.addEventListener("click", resetWikiStore);
   setupFileDrop();

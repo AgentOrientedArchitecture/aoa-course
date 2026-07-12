@@ -33,6 +33,10 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _report_answer(inputs, ctx)
     if capability_id == "reporter-ingest-summary":
         return await _report_ingest_summary(inputs, ctx)
+    if capability_id == "reporter-agent-evidence":
+        return await _report_agent_evidence(inputs, ctx)
+    if capability_id == "reporter-flow-audit":
+        return await _report_flow_audit(inputs, ctx)
     if capability_id == "reporter-findings":
         return await _report_estate_findings(inputs, ctx)
     return error_envelope(f"reporter does not back capability {capability_id!r}")
@@ -394,19 +398,166 @@ _ARTICLE_ORDER = ["Art 9", "Art 10", "Art 11", "Art 12", "Art 13", "Art 14", "Ar
 _BANNED_WORDS = ("compliant", "complies", "certified")
 
 
-async def _report_estate_findings(inputs: dict, ctx: Context) -> dict:
+async def _report_agent_evidence(inputs: dict, ctx: Context) -> dict:
     inventory = inputs.get("inventory")
     findings_obj = inputs.get("findings")
     if not isinstance(inventory, list):
         return error_envelope("inventory (array) is required")
     if not isinstance(findings_obj, dict):
         return error_envelope("findings (object) is required")
-    findings = [f for f in findings_obj.get("findings") or [] if isinstance(f, dict)]
-    summary = findings_obj.get("summary") or {}
 
-    markdown = _findings_markdown(inventory, findings, summary)
+    findings = [
+        finding
+        for finding in findings_obj.get("findings") or []
+        if isinstance(finding, dict) and not _is_plan_finding(finding)
+    ]
+    summary = findings_obj.get("summary") or {}
+    if not isinstance(summary, dict):
+        summary = {}
+
+    lines: list[str] = ["# Agent card evidence check", "", _SCOPE_BANNER]
+    lines.append(
+        f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** - "
+        f"{summary.get('annex_iii_candidates', 0)} Annex III candidates for contextual legal review. "
+        f"Card findings: {summary.get('red', 0)} red / "
+        f"{summary.get('amber', 0)} amber / {summary.get('green', 0)} green / "
+        f"{summary.get('unknown', 0)} corpus-silent."
+    )
+    lines.append("")
+    _append_component_evidence(lines, findings, heading="Agent card evidence")
+    _append_corpus_gaps(lines, findings)
+    lines.append(_FOOTER)
+    markdown = "\n".join(lines)
+    lowered = markdown.lower()
+    all_findings_rendered = all(
+        str(finding.get("capability_id") or "?") in markdown
+        and str(finding.get("article") or "?") in markdown
+        for finding in findings
+    )
+    return {
+        "outputs": {"findings_markdown": markdown},
+        "signals": {
+            "valid_output_shape": True,
+            "has_markdown": bool(markdown.strip()),
+            "no_compliance_verdict": not any(
+                word in lowered for word in _BANNED_WORDS
+            ),
+            "all_findings_rendered": all_findings_rendered,
+        },
+    }
+
+
+async def _report_flow_audit(inputs: dict, ctx: Context) -> dict:
+    plans = inputs.get("plans")
+    findings_obj = inputs.get("findings")
+    if not isinstance(plans, list):
+        return error_envelope("plans (array) is required")
+    if not isinstance(findings_obj, dict):
+        return error_envelope("findings (object) is required")
+
+    plan_findings = _plan_findings(findings_obj, [], [])
+    audited_plans = [
+        plan
+        for index, plan in enumerate(plans)
+        if isinstance(plan, dict) and _findings_for_plan(plan, index, plan_findings)
+    ]
+    summary = findings_obj.get("summary") or {}
+    if not isinstance(summary, dict):
+        summary = {}
+
+    counts = summary.get("plan_counts") or {}
+    if not isinstance(counts, dict):
+        counts = {}
+    lines: list[str] = ["# Flow audit - execution evidence", "", _SCOPE_BANNER]
+    lines.append(
+        f"Observed **{summary.get('plans_observed', len(plans))} plans/traces** and assessed "
+        f"**{summary.get('employment_plans_assessed', len(audited_plans))} employment-shaped flows**. "
+        f"Flow findings: {counts.get('red', 0)} red / {counts.get('amber', 0)} amber / "
+        f"{counts.get('green', 0)} green / {counts.get('unknown', 0)} corpus-silent."
+    )
+    lines.append("")
+    _append_plan_governance(
+        lines,
+        audited_plans,
+        plan_findings,
+        heading="Flow audit evidence",
+        intro=(
+            "Post-execution evidence checks the observed governance decision, exact-digest "
+            "approval, event order, resume, and completion for employment-shaped flows."
+        ),
+        include_green_details=True,
+    )
+    _append_corpus_gaps(lines, plan_findings)
+    lines.append(_FOOTER)
+    markdown = "\n".join(lines)
+    lowered = markdown.lower()
+    all_plans_rendered = all(
+        _plan_label(plan, index) in markdown
+        for index, plan in enumerate(audited_plans)
+    )
+    all_findings_rendered = all(
+        _flow_finding_rendered(finding, markdown)
+        for finding in plan_findings
+    )
+    return {
+        "outputs": {"findings_markdown": markdown},
+        "signals": {
+            "valid_output_shape": True,
+            "has_markdown": bool(markdown.strip()),
+            "no_compliance_verdict": not any(
+                word in lowered for word in _BANNED_WORDS
+            ),
+            "all_plans_rendered": all_plans_rendered,
+            "all_findings_rendered": all_findings_rendered,
+        },
+    }
+
+
+async def _report_estate_findings(inputs: dict, ctx: Context) -> dict:
+    inventory = inputs.get("inventory")
+    plans = inputs.get("plans")
+    findings_obj = inputs.get("findings")
+    if not isinstance(inventory, list):
+        return error_envelope("inventory (array) is required")
+    if not isinstance(plans, list):
+        return error_envelope("plans (array) is required")
+    if not isinstance(findings_obj, dict):
+        return error_envelope("findings (object) is required")
+
+    raw_findings = [
+        finding
+        for finding in findings_obj.get("findings") or []
+        if isinstance(finding, dict)
+    ]
+    findings = [finding for finding in raw_findings if not _is_plan_finding(finding)]
+    plan_findings = _plan_findings(findings_obj, raw_findings, plans)
+    summary = findings_obj.get("summary") or {}
+    if not isinstance(summary, dict):
+        summary = {}
+
+    markdown = _findings_markdown(inventory, plans, findings, plan_findings, summary)
     lowered = markdown.lower()
     no_verdict = not any(word in lowered for word in _BANNED_WORDS)
+    all_plans_rendered = all(
+        _plan_label(plan, index) in markdown
+        for index, plan in enumerate(plans)
+        if isinstance(plan, dict)
+    )
+    all_component_findings_rendered = all(
+        str(finding.get("capability_id") or "?") in markdown
+        and str(finding.get("article") or "?") in markdown
+        for finding in findings
+    )
+    all_plan_findings_rendered = all(
+        str(
+            finding.get("trace_id")
+            or finding.get("plan_id")
+            or finding.get("plan_digest")
+            or finding.get("finding_id")
+            or ""
+        ) in markdown
+        for finding in plan_findings
+    )
 
     return {
         "outputs": {"findings_markdown": markdown},
@@ -414,78 +565,41 @@ async def _report_estate_findings(inputs: dict, ctx: Context) -> dict:
             "valid_output_shape": True,
             "has_markdown": bool(markdown.strip()),
             "no_compliance_verdict": no_verdict,
-            "all_findings_rendered": True,
+            "all_plans_rendered": all_plans_rendered,
+            "all_findings_rendered": (
+                all_component_findings_rendered and all_plan_findings_rendered
+            ),
         },
     }
 
 
-def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> str:
+def _findings_markdown(
+    inventory: list,
+    plans: list,
+    findings: list[dict],
+    plan_findings: list[dict],
+    summary: dict,
+) -> str:
     lines: list[str] = ["# Estate check - EU AI Act findings", "", _SCOPE_BANNER]
 
     lines.append(
-        f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** - "
+        f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** and observed "
+        f"**{len(plans)} end-to-end plans/traces** - "
         f"{summary.get('annex_iii_candidates', 0)} Annex III candidates for legal review. "
-        f"Findings: {summary.get('red', 0)} red / {summary.get('amber', 0)} amber / "
-        f"{summary.get('green', 0)} green / {summary.get('unknown', 0)} corpus-silent."
+        f"Component findings: {summary.get('red', 0)} red / "
+        f"{summary.get('amber', 0)} amber / {summary.get('green', 0)} green / "
+        f"{summary.get('unknown', 0)} corpus-silent."
     )
     lines.append("")
 
-    # Posture table
-    by_cap: dict[str, dict[str, dict]] = {}
-    risk_by_cap: dict[str, str] = {}
-    for f in findings:
-        cap = f.get("capability_id", "?")
-        by_cap.setdefault(cap, {})[f.get("article", "?")] = f
-        risk_by_cap[cap] = f.get("risk_tier", "")
-    lines.append("## Posture")
-    lines.append("")
-    lines.append("| AU | risk tier | " + " | ".join(_ARTICLE_ORDER) + " |")
-    lines.append("|---|---|" + "---|" * len(_ARTICLE_ORDER))
-    for cap in sorted(by_cap):
-        marks = []
-        for art in _ARTICLE_ORDER:
-            f = by_cap[cap].get(art)
-            marks.append(_SEVERITY_MARK.get(f.get("severity"), "?") if f else "-")
-        risk = (
-            "**Annex III candidate**"
-            if risk_by_cap.get(cap, "").startswith("Annex III candidate")
-            else "no employment marker found"
-        )
-        lines.append(f"| `{cap}` | {risk} | " + " | ".join(marks) + " |")
-    lines.append("")
-    lines.append("_Green means evidence present - never obligation satisfied. Art 10 is capped at amber by construction._")
-    lines.append("")
+    _append_plan_governance(lines, plans, plan_findings)
+    _append_component_evidence(lines, findings)
 
-    # Per-finding detail for non-green findings
-    attention = [f for f in findings if f.get("severity") in ("red", "amber")]
-    if attention:
-        lines.append("## Findings needing attention")
-        lines.append("")
-        for f in sorted(attention, key=lambda x: (x.get("severity") != "red", x.get("capability_id", ""), x.get("article", ""))):
-            mark = _SEVERITY_MARK.get(f.get("severity"), "")
-            lines.append(f"### {mark} {f.get('capability_id')} - {f.get('article')} ({f.get('obligation')})")
-            lines.append("")
-            lines.append(f"- **Checked:** {f.get('checked', '')}")
-            ev = f.get("evidence") or {}
-            lines.append(f"- **Evidence:** {ev.get('kind', '')} - `{ev.get('ref', '')}` = `{ev.get('value')}`")
-            cit = f.get("regulation_citation") or {}
-            if cit:
-                quote = str(cit.get("quote") or "").strip()
-                source = str(cit.get("source_path") or "").strip()
-                reference = f"`{cit.get('passage_id', '')}`"
-                if source:
-                    reference += f" from `{source}`"
-                lines.append(f"- **Regulation:** {reference}")
-                if quote:
-                    lines.append(f"  > {quote}")
-            if f.get("gap"):
-                lines.append(f"- **Gap:** {f['gap']}")
-            if f.get("remediation_hint"):
-                lines.append(f"- **Next step:** {f['remediation_hint']}")
-            lines.append("")
-
-    # Corpus gaps
-    silent = sorted({f.get("article", "?") for f in findings if f.get("corpus_silent")})
+    silent = sorted({
+        f.get("article", "?")
+        for f in findings + plan_findings
+        if f.get("corpus_silent")
+    })
     if silent:
         lines.append("## Corpus gaps")
         lines.append("")
@@ -498,6 +612,482 @@ def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> 
 
     lines.append(_FOOTER)
     return "\n".join(lines)
+
+
+def _append_plan_governance(
+    lines: list[str],
+    plans: list,
+    plan_findings: list[dict],
+    heading: str = "End-to-end plan governance",
+    intro: str = (
+        "Plan-level evidence evaluates observed composition and declared use context; "
+        "it is the primary governance view in this report."
+    ),
+    include_green_details: bool = False,
+) -> None:
+    lines += [f"## {heading}", ""]
+    lines.append(intro)
+    lines.append("")
+
+    if not plans:
+        lines.append(
+            "No plans/traces were observed. End-to-end composition and use-context "
+            "appropriateness therefore cannot be established from this estate scan."
+        )
+        lines.append("")
+        return
+
+    for index, plan in enumerate(plans):
+        if not isinstance(plan, dict):
+            plan = {"plan_id": f"plan-{index + 1}", "value": plan}
+        matched = _findings_for_plan(plan, index, plan_findings)
+        lines += [f"### {_plan_label(plan, index)}", ""]
+        lines.append("| Plan field / evaluator check | Observed value / posture |")
+        lines.append("|---|---|")
+        lines.append(
+            f"| Workflow | {_markdown_cell(_plan_value(plan, matched, 'workflow'))} |"
+        )
+        if plan.get("plan_digest"):
+            lines.append(f"| Plan digest | `{_markdown_cell(plan['plan_digest'])}` |")
+        lines.append(
+            f"| Resolved composition | {_markdown_cell(_plan_composition(plan, matched))} |"
+        )
+        lines.append(
+            f"| Use context | {_markdown_cell(_plan_value(plan, matched, 'use_context'))} |"
+        )
+        governance = plan.get("governance") if isinstance(plan.get("governance"), dict) else {}
+        decision = governance.get("decision") or "not observed"
+        lines.append(f"| Operational gate decision | `{_markdown_cell(decision)}` |")
+        hold = plan.get("hold") if isinstance(plan.get("hold"), dict) else {}
+        lines.append(
+            f"| Hold observed | {'yes' if hold else 'no'} |"
+        )
+        approval = plan.get("approval") if isinstance(plan.get("approval"), dict) else {}
+        if approval:
+            approval_value = {
+                "decision": approval.get("decision"),
+                "actor_id": approval.get("actor_id"),
+                "timestamp": approval.get("timestamp"),
+                "plan_digest": approval.get("plan_digest"),
+            }
+            lines.append(f"| Approval evidence | {_markdown_cell(approval_value)} |")
+        else:
+            lines.append("| Approval evidence | not observed |")
+        resume = plan.get("resume") if isinstance(plan.get("resume"), dict) else {}
+        lines.append(
+            f"| Resume evidence | {_markdown_cell(resume or 'not observed')} |"
+        )
+        lines.append(
+            f"| Governance before application | {_order_evidence(plan.get('governance_preceded_application_invoke'))} |"
+        )
+        lines.append(
+            f"| Approval before application | {_order_evidence(plan.get('approval_preceded_application_invoke'))} |"
+        )
+        lines.append(
+            f"| Resume before application | {_order_evidence(plan.get('resume_preceded_application_invoke'))} |"
+        )
+        lines.append(
+            f"| First application invocation | "
+            f"{_markdown_cell(plan.get('first_application_invoke_at') or 'not observed')} |"
+        )
+        lines.append(
+            f"| Execution status | `{_markdown_cell(plan.get('execution_status') or 'unknown')}` |"
+        )
+        if matched:
+            for finding_index, finding in enumerate(matched):
+                severity = str(finding.get("severity") or "unknown").lower()
+                mark = _SEVERITY_MARK.get(severity, _SEVERITY_MARK["unknown"])
+                check = _plan_check_label(finding, finding_index)
+                lines.append(
+                    f"| {_markdown_cell(check)} | {_markdown_cell(f'{mark} {severity}')} |"
+                )
+        elif plan.get("severity"):
+            severity = str(plan["severity"]).lower()
+            mark = _SEVERITY_MARK.get(severity, _SEVERITY_MARK["unknown"])
+            lines.append(f"| Plan evidence finding | {mark} {_markdown_cell(severity)} |")
+        lines.append("")
+    lines.append(
+        "_Green means evaluator evidence is present for the observed composition; "
+        "it is not a legal or deployment determination._"
+    )
+    lines.append("")
+
+    attention = [
+        finding
+        for finding in plan_findings
+        if include_green_details
+        or str(finding.get("severity") or "unknown").lower() != "green"
+    ]
+    if not attention:
+        return
+
+    detail_heading = "Flow evidence details" if include_green_details else "Non-green plan details"
+    lines += [f"### {detail_heading}", ""]
+    for index, finding in enumerate(attention):
+        severity = str(finding.get("severity") or "unknown").lower()
+        mark = _SEVERITY_MARK.get(severity, _SEVERITY_MARK["unknown"])
+        label = _plan_finding_label(finding, index)
+        lines += [f"#### {mark} {label}", ""]
+        if finding.get("checked"):
+            lines.append(f"- **Checked:** {finding['checked']}")
+        _append_evidence(lines, finding.get("evidence"))
+        _append_regulation_citations(lines, finding)
+        if finding.get("gap"):
+            lines.append(f"- **Gap:** {finding['gap']}")
+        if finding.get("remediation_hint"):
+            lines.append(f"- **Next step:** {finding['remediation_hint']}")
+        if finding.get("control"):
+            lines.append(f"- **Control:** {finding['control']}")
+        if finding.get("interpretation"):
+            lines.append(f"- **Boundary:** {finding['interpretation']}")
+        lines.append("")
+
+
+def _order_evidence(value: object) -> str:
+    if value is True:
+        return "yes"
+    if value is False:
+        return "no"
+    return "not observed"
+
+
+def _flow_finding_rendered(finding: dict, markdown: str) -> bool:
+    identity = str(
+        finding.get("trace_id")
+        or finding.get("plan_id")
+        or finding.get("plan_digest")
+        or finding.get("finding_id")
+        or ""
+    )
+    checked = str(finding.get("checked") or "")
+    citation = finding.get("regulation_citation")
+    citation_parts: list[str] = []
+    if isinstance(citation, dict):
+        citation_parts = [
+            str(citation.get(key) or "")
+            for key in ("passage_id", "source_path", "quote")
+            if citation.get(key)
+        ]
+    return (
+        bool(identity and checked)
+        and identity in markdown
+        and checked in markdown
+        and all(part in markdown for part in citation_parts)
+    )
+
+
+def _append_component_evidence(
+    lines: list[str],
+    findings: list[dict],
+    heading: str = "Component evidence appendix",
+) -> None:
+    by_cap: dict[str, dict[str, dict]] = {}
+    risk_by_cap: dict[str, str] = {}
+    for finding in findings:
+        cap = str(finding.get("capability_id") or "?")
+        by_cap.setdefault(cap, {})[str(finding.get("article") or "?")] = finding
+        risk_by_cap[cap] = str(finding.get("risk_tier") or "")
+
+    lines += [f"## {heading}", ""]
+    lines.append(
+        "Individual AU evidence does not establish composition/use-context "
+        "appropriateness; it records component-level evidence hooks only."
+    )
+    lines.append("")
+    lines.append("| AU | risk tier | " + " | ".join(_ARTICLE_ORDER) + " |")
+    lines.append("|---|---|" + "---|" * len(_ARTICLE_ORDER))
+    for cap in sorted(by_cap):
+        marks = []
+        for article in _ARTICLE_ORDER:
+            finding = by_cap[cap].get(article)
+            marks.append(
+                _SEVERITY_MARK.get(finding.get("severity"), "?") if finding else "-"
+            )
+        risk = (
+            "**Annex III candidate**"
+            if risk_by_cap.get(cap, "").startswith("Annex III candidate")
+            else "no employment marker found"
+        )
+        lines.append(f"| `{cap}` | {risk} | " + " | ".join(marks) + " |")
+    lines.append("")
+    lines.append(
+        "_Green means evidence present - never obligation satisfied. "
+        "Art 10 is capped at amber by construction._"
+    )
+    lines.append("")
+
+    attention = [
+        finding
+        for finding in findings
+        if finding.get("severity") in ("red", "amber", "unknown")
+    ]
+    if not attention:
+        return
+
+    lines += ["### Component findings needing attention", ""]
+    for finding in sorted(
+        attention,
+        key=lambda item: (
+            {"red": 0, "amber": 1, "unknown": 2}.get(item.get("severity"), 3),
+            item.get("capability_id", ""),
+            item.get("article", ""),
+        ),
+    ):
+        mark = _SEVERITY_MARK.get(finding.get("severity"), "")
+        lines.append(
+            f"#### {mark} {finding.get('capability_id')} - "
+            f"{finding.get('article')} ({finding.get('obligation')})"
+        )
+        lines.append("")
+        lines.append(f"- **Checked:** {finding.get('checked', '')}")
+        _append_evidence(lines, finding.get("evidence"))
+        _append_regulation_citations(lines, finding)
+        if finding.get("gap"):
+            lines.append(f"- **Gap:** {finding['gap']}")
+        if finding.get("remediation_hint"):
+            lines.append(f"- **Next step:** {finding['remediation_hint']}")
+        lines.append("")
+
+
+def _append_corpus_gaps(lines: list[str], findings: list[dict]) -> None:
+    silent = sorted({
+        finding.get("article", "?")
+        for finding in findings
+        if finding.get("corpus_silent")
+    })
+    if not silent:
+        return
+    lines += ["## Corpus gaps", ""]
+    lines.append(
+        "The regulations corpus is silent for: " + ", ".join(silent) +
+        ". These findings abstain until the relevant regulation note is ingested."
+    )
+    lines.append("")
+
+
+def _is_plan_finding(finding: dict) -> bool:
+    scope = str(finding.get("scope") or finding.get("finding_scope") or "").lower()
+    if scope in {"plan", "trace", "composition", "end-to-end"}:
+        return True
+    return any(
+        finding.get(key) not in (None, "")
+        for key in ("trace_id", "plan_id", "plan_digest")
+    ) and not finding.get("capability_id")
+
+
+def _plan_findings(
+    findings_obj: dict,
+    raw_findings: list[dict],
+    plans: list,
+) -> list[dict]:
+    collected: list[dict] = [
+        finding for finding in raw_findings if _is_plan_finding(finding)
+    ]
+    for key in ("plan_findings", "plan_evaluations"):
+        values = findings_obj.get(key)
+        if isinstance(values, list):
+            collected.extend(value for value in values if isinstance(value, dict))
+
+    evaluated_plans = findings_obj.get("plans")
+    if isinstance(evaluated_plans, list):
+        for index, evaluation in enumerate(evaluated_plans):
+            if isinstance(evaluation, dict):
+                collected.extend(_expand_plan_evaluation(evaluation, index))
+
+    for index, plan in enumerate(plans):
+        if not isinstance(plan, dict):
+            continue
+        embedded = plan.get("findings")
+        if isinstance(embedded, list):
+            collected.extend(
+                _inherit_plan_identity(finding, plan, index)
+                for finding in embedded
+                if isinstance(finding, dict)
+            )
+        elif plan.get("severity"):
+            collected.append(_inherit_plan_identity(plan, plan, index))
+
+    unique: list[dict] = []
+    seen: set[str] = set()
+    for finding in collected:
+        marker = json.dumps(finding, sort_keys=True, default=str)
+        if marker not in seen:
+            unique.append(finding)
+            seen.add(marker)
+    return unique
+
+
+def _expand_plan_evaluation(evaluation: dict, index: int) -> list[dict]:
+    nested = evaluation.get("findings")
+    if isinstance(nested, list):
+        return [
+            _inherit_plan_identity(finding, evaluation, index)
+            for finding in nested
+            if isinstance(finding, dict)
+        ]
+    return [_inherit_plan_identity(evaluation, evaluation, index)]
+
+
+def _inherit_plan_identity(finding: dict, plan: dict, index: int) -> dict:
+    inherited = dict(finding)
+    for key in ("trace_id", "plan_id", "plan_digest", "workflow"):
+        if not inherited.get(key) and plan.get(key):
+            inherited[key] = plan[key]
+    inherited.setdefault("plan_index", index)
+    return inherited
+
+
+def _findings_for_plan(
+    plan: dict,
+    index: int,
+    plan_findings: list[dict],
+) -> list[dict]:
+    identities = {
+        str(plan.get(key))
+        for key in ("trace_id", "plan_id", "plan_digest")
+        if plan.get(key) not in (None, "")
+    }
+    matched = []
+    for finding in plan_findings:
+        finding_ids = {
+            str(finding.get(key))
+            for key in ("trace_id", "plan_id", "plan_digest")
+            if finding.get(key) not in (None, "")
+        }
+        if identities & finding_ids or finding.get("plan_index") == index:
+            matched.append(finding)
+    return matched
+
+
+def _plan_label(plan: dict, index: int) -> str:
+    trace_id = str(plan.get("trace_id") or "").strip()
+    plan_id = str(plan.get("plan_id") or plan.get("plan_digest") or "").strip()
+    if trace_id and plan_id and plan_id != trace_id:
+        return f"`{trace_id}` / `{plan_id}`"
+    identity = trace_id or plan_id or f"plan-{index + 1}"
+    return f"`{identity}`"
+
+
+def _plan_finding_label(finding: dict, index: int) -> str:
+    identity = (
+        finding.get("trace_id")
+        or finding.get("plan_id")
+        or finding.get("plan_digest")
+        or finding.get("finding_id")
+        or f"plan-finding-{index + 1}"
+    )
+    subject = finding.get("article") or finding.get("obligation") or finding.get("check")
+    return f"{identity} - {subject}" if subject else str(identity)
+
+
+def _plan_check_label(finding: dict, index: int) -> str:
+    return str(
+        finding.get("article")
+        or finding.get("obligation")
+        or finding.get("check")
+        or finding.get("finding_id")
+        or f"Evaluator check {index + 1}"
+    )
+
+
+def _plan_value(plan: dict, findings: list[dict], key: str) -> object:
+    if plan.get(key) not in (None, "", [], {}):
+        return plan[key]
+    for finding in findings:
+        if finding.get(key) not in (None, "", [], {}):
+            return finding[key]
+        evidence = finding.get("evidence")
+        if isinstance(evidence, dict) and evidence.get(key) not in (None, "", [], {}):
+            return evidence[key]
+    return "not supplied"
+
+
+def _plan_composition(plan: dict, findings: list[dict]) -> object:
+    for key in (
+        "capability_ids",
+        "resolved_composition",
+        "capabilities",
+        "composition",
+        "resolved_plan",
+        "plan",
+    ):
+        value = _plan_value(plan, findings, key)
+        if value != "not supplied":
+            if isinstance(value, list):
+                capabilities = [
+                    str(
+                        item.get("capability")
+                        or item.get("capability_id")
+                        or item.get("id")
+                        or ""
+                    )
+                    if isinstance(item, dict)
+                    else str(item)
+                    for item in value
+                ]
+                capabilities = [item for item in capabilities if item]
+                if capabilities:
+                    return " -> ".join(capabilities)
+            return value
+    return "not supplied"
+
+
+def _markdown_cell(value: object) -> str:
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+    else:
+        text = str(value)
+    return text.replace("|", "\\|").replace("\r", " ").replace("\n", " ").strip()
+
+
+def _append_evidence(lines: list[str], evidence: object) -> None:
+    if evidence in (None, "", [], {}):
+        return
+    if isinstance(evidence, dict) and any(
+        key in evidence for key in ("kind", "ref", "value")
+    ):
+        kind = str(evidence.get("kind") or "").strip()
+        ref = str(evidence.get("ref") or "").strip()
+        value = _display_value(evidence.get("value"))
+        prefix = " - ".join(part for part in (kind, f"`{ref}`" if ref else "") if part)
+        rendered = f"{prefix} = `{value}`" if prefix else f"`{value}`"
+        lines.append(f"- **Evidence:** {rendered}")
+        return
+    lines.append(f"- **Evidence:** `{_display_value(evidence)}`")
+
+
+def _display_value(value: object) -> str:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+    return str(value)
+
+
+def _append_regulation_citations(lines: list[str], finding: dict) -> None:
+    citations: list[object] = []
+    singular = finding.get("regulation_citation")
+    if singular:
+        citations.append(singular)
+    for key in ("regulation_citations", "citations"):
+        value = finding.get(key)
+        if isinstance(value, list):
+            citations.extend(value)
+        elif value:
+            citations.append(value)
+
+    for citation in citations:
+        if not isinstance(citation, dict):
+            lines.append(f"- **Regulation:** {citation}")
+            continue
+        passage_id = str(citation.get("passage_id") or "").strip()
+        source = str(citation.get("source_path") or citation.get("source") or "").strip()
+        quote = str(citation.get("quote") or citation.get("passage") or "").strip()
+        reference = f"`{passage_id}`" if passage_id else "evaluator-supplied passage"
+        if source:
+            reference += f" from `{source}`"
+        lines.append(f"- **Regulation:** {reference}")
+        if quote:
+            for quote_line in quote.splitlines():
+                lines.append(f"  > {quote_line}" if quote_line else "  >")
 
 
 if __name__ == "__main__":

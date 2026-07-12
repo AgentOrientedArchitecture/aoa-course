@@ -1,0 +1,33 @@
+id: evaluator-agent-evidence
+version: 0.1.0
+kind: au
+purpose: |
+  Evaluate the evidence hooks declared by individual Agentic Unit capability
+  cards against selected EU AI Act Articles 9-14 and 72, with complete
+  regulation passages retrieved from the course wiki. Emits component evidence
+  findings only, never a classification, legal permission, or compliance verdict.
+inputs:
+  - name: inventory
+    type: array
+    required: true
+outputs:
+  - name: findings
+    type: array
+  - name: summary
+    type: object
+constraints:
+  - The output is a single JSON object.
+  - Findings are component-card evidence only and do not assess a resolved plan or execution trace.
+  - Every finding carries a complete retrieved regulation citation, or is marked corpus_silent with severity unknown.
+  - Green means declared evidence is present, never that an obligation is satisfied or a control is effective.
+  - Article 10 findings are capped at amber because declared boundaries do not establish data governance quality.
+  - Annex III marker matches are candidates for contextual legal assessment, not classifications.
+  - No output may state or imply legal permission or a compliance determination.
+evaluation_signals:
+  - valid_output_shape
+  - risk_marker_assessed
+  - all_findings_cited
+  - corpus_present
+  - latency_p95_under(20s)
+provenance:
+  model: none

@@ -2,14 +2,14 @@
 
 A small, container-shaped, readable AOA system. This is a reference
 implementation for learning the shape of AOA, not a deployment platform. It
-keeps the moving parts explicit: for Sessions 1 and 2, three workflows, three
-agent codebases, nine AU capabilities, three deterministic tools, and three
-plumbing services. The
-parser codebase is deployed as separate governed parser runtimes so Session 2
-can show that new Agent IDs plus new capability contracts and `instructions.md` files
-create materially different agents without changing the parser code. AU-to-AU
-orchestration uses A2A Agent Cards and JSON-RPC `message/send`; deterministic
-tools expose MCP tools behind small registered AOA bridges.
+keeps the moving parts explicit: Sessions 1 and 2 establish three workflows,
+three agent codebases, nine AU capabilities, three deterministic tools, and
+three plumbing services. The parser codebase is deployed as separate governed
+parser runtimes so Session 2 can show that new Agent IDs plus new capability
+contracts and `instructions.md` files create materially different agents
+without changing parser code. AU-to-AU orchestration uses A2A Agent Cards and
+JSON-RPC `message/send`; deterministic tools expose MCP tools behind small
+registered AOA bridges.
 
 Session 3 adds a fourth workflow authored with
 [Vercel EVE](https://github.com/vercel/eve). The learner accepts the TypeScript
@@ -18,9 +18,18 @@ registry, A2A surface, and studio. Course runtime infrastructure lives under
 `agents-eve/runtime/`; learner files live under `agents-eve/workshop/`. See
 [`EVE.md`](EVE.md).
 
+Session 4 adds two evidence workflows around CV fit and a cross-workflow
+control plane. Studio exposes exactly `agent-card-check`, `cv-fit`, and
+`flow-audit`. The planner uses deterministic course plans, computes a digest
+after concrete capability resolution, and invokes
+`evaluator-plan-governance` before any application lookup or invocation. CV
+employment use is held for exact-digest human approval; the evidence workflows
+auto-proceed. The wiki store remains a hidden knowledge source for verbatim
+regulation citations.
+
 ## What the system does
 
-Four workflows run through one registry:
+Six workflows run through one registry:
 
 **CV evaluation** (Session 1):
 
@@ -70,7 +79,48 @@ with passage-id citations. For this reference implementation the final wiki
 answer is deliberately deterministic over retrieved evidence, so the demo shows
 grounding rather than a model free-writing from prior knowledge.
 
-## Six things this system demonstrates
+**Agent card check** (Session 4) reads current declared evidence:
+
+```text
+parser-estate → evaluator-agent-evidence → reporter-agent-evidence
+```
+
+`parser-estate` reads the registry card inventory through `tool-filesystem`.
+`evaluator-agent-evidence` evaluates declarations and retrieves verbatim
+regulation passages from the hidden wiki store. `reporter-agent-evidence`
+renders card evidence and citations. Green means declared evidence only, not an
+implemented control or legal conclusion.
+
+**Flow audit** (Session 4) reads post-execution evidence:
+
+```text
+parser-estate → evaluator-flow-evidence → reporter-flow-audit
+```
+
+`parser-estate` reconstructs observed planner JSONL records.
+`evaluator-flow-evidence` evaluates only evidence for the gate, exact digest,
+event ordering, resume, and completion. `reporter-flow-audit` renders that
+execution evidence without mixing in card declarations.
+
+Every Session 4 workflow passes through this post-resolution gate first:
+
+```mermaid
+flowchart TD
+    A[Resolve concrete plan] --> B[Compute plan digest]
+    B --> C[evaluator-plan-governance]
+    C -->|proceed| D[Application lookup and invoke]
+    C -->|require-human-approval| E[Hold]
+    E -->|approve exact digest| F[Record approval and resume]
+    F --> D
+    C -->|reject| G[Stop]
+```
+
+The CV-fit Studio intent declares employment/candidate use, so the gate returns
+`require-human-approval`. The governance AU itself runs in the control plane,
+but no application AU runs before approval. Agent card check and Flow audit do
+not carry that employment composition and auto-proceed under the course policy.
+
+## Seven things this system demonstrates
 
 Each is something you can see on screen as you build:
 
@@ -79,18 +129,21 @@ Each is something you can see on screen as you build:
 3. **One codebase can become more than one governed agent.** `cv-parser` and `wiki-parser` run the same parser image, same `agent.py`, same model, and same document-text tool. Different Agent IDs, capability cards, and `instructions.md` files make them different governed agents with different contracts.
 4. **Identity and behaviour are separate.** `agent_id` is the stable governed runtime actor shown in the registry and trace. Registry lifecycle actors such as `published_by` and `approved_by` show who moved a card through governance. `instructions.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation.
 5. **The architecture is indifferent to where reasoning happens.** Switch from a local smaller model to a hosted OpenAI-compatible endpoint through `.env`; nothing else changes.
-6. **Intent is a first-class surface.** The studio is how a human hands intent into the system. The architecture is a layered handover: intent → capability-aware planning → validation → discovery/selection → A2A orchestration → tool.
+6. **Intent and use context are first-class surfaces.** The studio is how a human hands intent and declared use context into the system. The architecture is a layered handover: intent → planning/validation → discovery/selection → resolved plan and digest → composition governance → A2A orchestration → tool.
+7. **Declarations, release, execution evidence, and legal claims are independent.** Agent card evidence describes one capability's public declaration; `evaluator-plan-governance` releases or holds one resolved composition; Flow audit reports post-execution evidence. None establishes legal compliance or effective human oversight.
 
 ## The agent set
 
-Three agent codebases, deployed as distinct governed runtimes:
+Three Python agent codebases, deployed as five distinct governed runtimes by
+Session 4:
 
 | Runtime | Codebase | Capabilities |
 |---|---|---|
 | `cv-parser` | `parser` | `parser-cv` |
 | `wiki-parser` | `parser` | `parser-notes`, `parser-query` |
-| `evaluator` | `evaluator` | `evaluator-cv`, `evaluator-promote`, `evaluator-wiki-query` |
-| `reporter` | `reporter` | `reporter-cv-fit`, `reporter-answer`, `reporter-ingest-summary` |
+| `estate-parser` | `parser` | `parser-estate` |
+| `evaluator` | `evaluator` | `evaluator-cv`, `evaluator-promote`, `evaluator-wiki-query`, `evaluator-plan-governance`, `evaluator-agent-evidence`, `evaluator-flow-evidence` |
+| `reporter` | `reporter` | `reporter-cv-fit`, `reporter-answer`, `reporter-ingest-summary`, `reporter-agent-evidence`, `reporter-flow-audit` |
 
 Session 3 adds one more governed runtime, authored with EVE (TypeScript/Node)
 instead of the Python scaffold:
@@ -117,7 +170,7 @@ Plus, in `tools/`:
 
 Every AU has four addressable parts plus a stamped runtime identity:
 
-1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only and exposed at `/cards/<id>`.
+1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only in the container, exposed at `/cards/<id>`, and **hot-reloaded** when its host file changes.
 2. **`instructions.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
 3. **`tools.yaml`** — the capability ids this agent will call. May reference other AUs or pure tools. May be empty.
 4. **`agent.py`** — the wiring. Built on the shared FastAPI scaffold in `agents/_base/`.
@@ -140,8 +193,8 @@ require rerunning `session3-adopt`.
 | Service | Job |
 |---|---|
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Stamps demo governance lifecycle actors (`published_by`, `approved_by`, reviewer/deprecation fields). Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
-| **planner** | Receives intents from the studio. Gives the planner model compact registry context, validates the proposed plan, falls back if needed, sequences AU invocations with A2A `message/send`, and calls registered tool bridges for deterministic MCP-backed tools. Records each step to `traces/<event-id>.jsonl`. |
-| **studio** | Browser surface at `localhost:8080`. Three panes — registry, trace, capability card — plus an intent submission box and file drop. Subscribes to traces and registry changes via SSE. |
+| **planner** | Receives intents from Studio. Builds and validates a plan, resolves concrete cards, computes the plan digest, invokes the configured composition-governance AU, holds/releases/rejects before application lookup, and sequences released AU work with A2A `message/send`. Records all control and application events to `traces/<event-id>.jsonl`. |
+| **studio** | Browser surface at `localhost:8080`. Shows registry, resolved work, plan-governance report/digest, responsibility trace, details, and result; submits exact-digest approval for held runs and subscribes to registry/trace SSE. |
 
 ## Container topology
 
@@ -155,6 +208,7 @@ docker-compose.yml services:
   studio               FastAPI    8080
   cv-parser            FastAPI    8888 (host: 7301)
   wiki-parser          FastAPI    8888 (host: 7304)
+  estate-parser        FastAPI    8888 (host: 7306; Session 4)
   evaluator            FastAPI    8888 (host: 7302)
   reporter             FastAPI    8888 (host: 7303)
   tool-filesystem      MCP        7401
@@ -164,17 +218,21 @@ docker-compose.yml services:
 ```
 
 Session 1 starts the CV-only subset: registry, planner, studio,
-tool-document-text, `cv-parser`, evaluator, and reporter. Session 2 starts the
-full set above, including `wiki-parser`. Session 3 begins differently:
+tool-document-text, `cv-parser`, evaluator, and reporter. Session 2 adds
+`wiki-parser` and the knowledge tools. Session 3 begins differently:
 `session3-up` runs only the native EVE workshop, and `session3-adopt` then starts
 the AOA services and generic EVE bridge around the learner's accepted files.
-Optional Ollama runs only when the `local` profile is enabled.
+Session 4 adds `estate-parser`, enables the plan-governance, agent-evidence,
+and flow-evidence capabilities, exposes read-only registry/trace mounts to
+`tool-filesystem`, limits Studio to the three learner-facing workflows, and sets
+the planner strategy to deterministic. Optional Ollama runs only when the
+`local` profile is enabled.
 
 Every agent container has the same shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
 exposes `/a2a`, `/.well-known/agent-card.json`, `/invoke`, and `/cards/<id>`,
-and watches mounted `instructions.md` files for hot reload. Read one agent and
-you've read them all.
+and watches mounted capability cards and `instructions.md` files for hot
+reload. Read one agent and you've read them all.
 
 ## A2A surface
 
@@ -197,7 +255,21 @@ sends compact AU capability summaries to the planner model and asks for a JSON
 task plan. The runtime validates that the plan uses registered capabilities,
 maps required inputs, references only available prior outputs, and ends in a
 markdown-producing result. If validation fails, the deterministic course plan
-is used. When a registered card includes `a2a_endpoint`, the planner sends a
+is used; Session 4 skips model planning and uses deterministic plans directly.
+
+After discovery binds every task to a card, the planner records the concrete
+plan and computes a 16-character SHA-256 digest over canonical workflow, intent,
+resolved dataflow, and each selected card's governance snapshot (identity,
+version, purpose, contracts, constraints, signals, lifecycle, provenance, and
+endpoints). It invokes `evaluator-plan-governance` with that snapshot before any
+application `lookup` or `invoke`. Employment-shaped CV plans are held. Studio
+Studio submits approval for the exact digest; a mismatch is rejected with HTTP `409`.
+The planner also rejects approval if a selected card's governance snapshot changed
+while held, so the learner must resolve and review a new plan. Accepted approval
+plus resume remain on the same trace. Agent card check
+and Flow audit record automatic `governance-release`.
+
+When a released application card includes `a2a_endpoint`, the planner sends a
 JSON-RPC 2.0 request to that endpoint:
 
 ```json
@@ -300,7 +372,7 @@ A browser surface at `localhost:8080` with two roles:
   id, Agent ID, lifecycle status, publisher/approver actors, version, kind
   (`au` or `tool`), and current `skills_hash`. Updates as capabilities
   register, deregister, or change.
-- **Intent Studio pane.** The currently-running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, task plan, work status, and rendered result. Raw event payloads are still available in an expandable details section.
+- **Intent Studio pane.** The currently running flow as a visual lifecycle: intent, available capability context, planner proposal, validation/fallback, resolved task plan, plan-governance report and digest, hold/approval/resume, work status, and rendered result. Raw event payloads remain available in an expandable details section.
 - **Right detail pane.** Click any registry entry to see its capability card, or
   click a wiki graph node to inspect that document, concept, passage, or open
   question.
@@ -309,14 +381,22 @@ A browser surface at `localhost:8080` with two roles:
 
 - **Submit an intent.** Free-form text, sent to the planner.
 - **Choose a mode.** CV fit for Session 1; ingest, graph, and wiki query for
-  Session 2; CV fit + interview after Session 3 adoption.
+  Session 2; CV fit + interview after Session 3 adoption; exactly Agent card
+  check, CV fit, and Flow audit in Session 4.
+- **Approve a held plan.** Review the governance report and digest, then click
+  **Approve this plan and run**. This releases that digest only.
 - **Drop a file.** Drag a CV, job description, or research note into the relevant field.
 - **Inspect the wiki graph.** The Session 2 wiki store projects its raw,
   promoted, and indexed knowledge into typed graph nodes. Documents, concepts,
   passages, and open questions use different shapes and colours. The graph is
   its own mode, not part of the CV workflow.
 
-The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs. Runtime data is bind-mounted into the repo for inspection: `system/inbox/` holds submitted inputs, `system/wiki/` holds the wiki `raw/`, `promoted/`, and `index.json` layers, `system/services/planner/traces/` holds JSONL traces, and `system/services/registry/data/cards.json` holds the live registry state.
+The studio is for observing and driving the system. In the cut-down knowledge-management workflows, the ingest summary and grounded answer appear as final trace outputs. In Session 4, Agent card check and Flow audit auto-proceed while CV employment use is held before application work; the wiki store is hidden but still supplies verbatim citations. Runtime data is bind-mounted into the repo for inspection: `system/inbox/` holds submitted inputs, `system/wiki/` holds the wiki `raw/`, `promoted/`, and `index.json` layers, `system/services/planner/traces/` holds JSONL traces, and `system/services/registry/data/cards.json` holds the live registry state.
+
+Held runs are different: their executable `PreparedRun` objects and locks live
+only in planner memory. Restarting planner leaves trace files but loses the
+active run needed to approve/resume. This course implementation is not
+production workflow persistence, crash recovery, or crash-idempotent resume.
 
 ## Running locally
 
@@ -346,6 +426,23 @@ For Session 3, pre-build with `session3-build`, open only the native EVE
 workshop with `session3-up`, and start the composed AOA system only after native
 acceptance with `session3-adopt`. These are the public Session 3 entry points;
 the guided sequence is in [`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
+
+For Session 4, start the deterministic three-stage stack and seed the hidden
+regulations corpus.
+
+macOS or Linux:
+
+```bash
+./scripts/session4-up.sh
+./scripts/session4-seed.sh
+```
+
+Windows Command Prompt:
+
+```bat
+scripts\session4-up.bat
+scripts\session4-seed.bat
+```
 
 Open `http://localhost:8080` after starting an AOA stack and you'll see the
 registry pane populate as agents and tools register.
