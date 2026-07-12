@@ -41,6 +41,7 @@ the enacted text and current guidance.
 
 ## Citations
 
-Every finding cites the top regulation passage returned by the wiki store for
-that article. If retrieval returns nothing above threshold, set corpus_silent
-and do not paraphrase the law from memory.
+Every finding cites the complete top regulation passage returned by the wiki
+store for that article. Preserve the retrieved passage verbatim; never truncate
+it mid-sentence or mid-paragraph. If retrieval returns nothing above threshold,
+set corpus_silent and do not paraphrase the law from memory.

@@ -271,7 +271,7 @@ async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
         citations[key] = (
             {
                 "passage_id": passages[0]["passage_id"],
-                "quote": str(passages[0].get("quote") or "")[:400],
+                "quote": str(passages[0].get("quote") or "").strip(),
                 "source_path": passages[0].get("source_path", ""),
             }
             if passages

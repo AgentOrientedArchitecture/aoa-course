@@ -45,6 +45,9 @@ scripts\session4-seed.bat
 
 Then open `http://localhost:8080`, select **Estate check**, and run the scan.
 
+Estate reports render the complete retrieved regulation passage rather than a
+character-truncated excerpt, so each finding has a readable citation paragraph.
+
 The regulations corpus is curated from the verbatim EUR-Lex text of Regulation
 (EU) 2024/1689 (`regulations-seed/`), and seeds through the same `write_ingest`
 path the Session 2 wiki uses. **Keeping the corpus current IS the wiki demo's
@@ -64,10 +67,17 @@ require?" from the same corpus.
    `evaluator-cv` shows **Art 14 red** (no
    oversight declaration) and **Art 72 red** (draft, unapproved).
 4. **Fix the estate live, two governance surfaces:**
-   - Edit `system/agents/evaluator/capabilities/cv/capability-card.yaml` —
-     add a constraint such as *"Verdicts at the strong/no boundary escalate to
-     a human reviewer before any downstream action."* The card hot-reloads and
-     re-registers; watch the registry pane.
+   - Edit `system/agents/evaluator/capabilities/cv/capability-card.yaml` and add
+     this item under `constraints` without removing the existing entries:
+
+     ```yaml
+     - A human reviewer must approve every verdict before it informs candidate screening, interview, or employment action.
+     ```
+
+     The card hot-reloads and re-registers; watch the registry pane. Re-run the
+     estate check: `evaluator-cv` Article 14 changes from red to green because the
+     declared oversight evidence changed. Green means evidence present, not that
+     the protocol is implemented effectively or the obligation is satisfied.
    - `./scripts/session4-approve.sh` — the `card_approved` governance event
      appears in the Studio.
 5. Re-run the Estate check: Art 14 and Art 72 flip green. **The evidence hooks

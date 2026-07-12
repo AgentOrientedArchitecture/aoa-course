@@ -18,7 +18,7 @@ outputs:
     type: object
 constraints:
   - The output is a single JSON object.
-  - Findings carry evidence pointers and regulation citations (passage ids); a finding with no retrievable regulation passage is marked corpus_silent with severity unknown, never invented from model memory.
+  - Findings carry evidence pointers and complete retrieved regulation citations (passage ids and verbatim passages); a finding with no retrievable regulation passage is marked corpus_silent with severity unknown, never invented from model memory.
   - Severity green means evidence present, never obligation satisfied; Article 10 findings are capped at amber by construction.
   - No output may state or imply a compliance determination.
   - Annex III marker matches are candidates for contextual legal assessment, not classifications.

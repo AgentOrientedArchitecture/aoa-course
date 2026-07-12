@@ -470,7 +470,14 @@ def _findings_markdown(inventory: list, findings: list[dict], summary: dict) -> 
             lines.append(f"- **Evidence:** {ev.get('kind', '')} - `{ev.get('ref', '')}` = `{ev.get('value')}`")
             cit = f.get("regulation_citation") or {}
             if cit:
-                lines.append(f"- **Regulation:** `{cit.get('passage_id', '')}` - \"{cit.get('quote', '')[:220]}\"")
+                quote = str(cit.get("quote") or "").strip()
+                source = str(cit.get("source_path") or "").strip()
+                reference = f"`{cit.get('passage_id', '')}`"
+                if source:
+                    reference += f" from `{source}`"
+                lines.append(f"- **Regulation:** {reference}")
+                if quote:
+                    lines.append(f"  > {quote}")
             if f.get("gap"):
                 lines.append(f"- **Gap:** {f['gap']}")
             if f.get("remediation_hint"):

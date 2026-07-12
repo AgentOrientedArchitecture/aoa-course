@@ -20,6 +20,7 @@ constraints:
   - The report opens with the fixed scope banner and closes with the evidence-by-construction footer.
   - The report never contains the words compliant, complies, or certified.
   - Annex III marker matches are rendered as candidates for contextual legal assessment, not classifications.
+  - Regulation citations include the complete retrieved passage and are never character-truncated.
   - Deterministic template; no model call is made.
 evaluation_signals:
   - valid_output_shape

@@ -13,7 +13,8 @@ not re-score, re-classify, or soften findings.
    12, 13, 14, 72), cells showing green/amber/red/unknown.
 3. Per-finding sections for every non-green finding: severity, article and
    obligation, what was checked, evidence pointer, regulation citation
-   (passage id + quote), gap statement, remediation hint.
+   (passage id + complete retrieved quote), gap statement, remediation hint.
+   Never truncate a regulation quote mid-sentence or mid-paragraph.
 4. Corpus gaps: articles where the regulations corpus was silent.
 5. Footer (verbatim): "AOA does not confer permission or compliance; it makes
    evidence hooks and control surfaces explicit."

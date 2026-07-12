@@ -31,7 +31,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "Get-ChildItem -LiteralPath $seedDir -Filter '*.promotion.json' | Sort-Object Name | ForEach-Object {" ^
   "  $sidecar = Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json;" ^
   "  $body = @{ inputs = @{ op = 'write_ingest'; promotion = $sidecar.promotion; source_path = ('/data/inbox/regulations/' + $sidecar.source_file) } } | ConvertTo-Json -Depth 100;" ^
-  "  $result = Invoke-RestMethod -Method Post -Uri $bridge -ContentType 'application/json' -Body $body -TimeoutSec 30;" ^
+  "  $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body);" ^
+  "  $result = Invoke-RestMethod -Method Post -Uri $bridge -ContentType 'application/json; charset=utf-8' -Body $bodyBytes -TimeoutSec 30;" ^
   "  $stored = $result.outputs.stored;" ^
   "  $documentId = if ($null -ne $stored.document_id) { $stored.document_id } else { '?' };" ^
   "  $passageCount = if ($null -ne $stored.passage_count) { $stored.passage_count } else { 0 };" ^
