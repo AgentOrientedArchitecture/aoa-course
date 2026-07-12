@@ -28,10 +28,18 @@ if /I "%AOA_LOCAL%"=="true" set "LOCAL_ARGS=--profile local"
 
 set "COMPOSE=docker compose %ENV_ARGS% %LOCAL_ARGS% -f system/docker-compose.yml -f system/docker-compose.session3.yml -f system/docker-compose.session3-lab.yml"
 
+rem Install dependencies into the bind-mounted learner workspace from the
+rem pinned container cache; no host Node installation is required.
+%COMPOSE% run --rm --no-deps eve-workshop-native npm install --offline --no-audit --no-fund
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+%COMPOSE% build eve-workshop-native
+if errorlevel 1 exit /b %ERRORLEVEL%
+
 %COMPOSE% ^
   --profile session3 ^
   --profile session3-lab-wrapped ^
-  up --build --force-recreate -d --remove-orphans %*
+  up --no-build --force-recreate -d --remove-orphans %*
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 set "READY=0"

@@ -8,11 +8,13 @@
 // tool-free and portable across every provider the course supports, including
 // OpenAI-compatible endpoints that do not accept the `tool` message role.
 import { spawn } from "node:child_process";
-import path from "node:path";
 import { Client } from "eve/client";
 
 const APP_ROOT = process.env.EVE_APP_ROOT || "/app";
-const EVE_BIN = path.join(APP_ROOT, "node_modules", ".bin", "eve");
+// Launch the image-owned CLI. Executables installed into a Windows bind mount
+// can stall under Docker Desktop, while this pinned binary still loads the
+// learner project and its dependencies from APP_ROOT.
+const EVE_BIN = process.env.EVE_BIN || "/app/node_modules/.bin/eve";
 
 let client;
 

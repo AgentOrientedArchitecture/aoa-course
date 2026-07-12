@@ -25,7 +25,6 @@ services:
       - "7310:3000"
     volumes:
       - ./agents-eve/workshop:/workshop
-      - eve-workshop-node-modules:/workshop/node_modules
     environment:
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
@@ -48,7 +47,6 @@ services:
       - "7311:8888"
     volumes:
       - ./agents-eve/workshop:/workshop
-      - eve-workshop-node-modules:/workshop/node_modules
     environment:
       EVE_APP_ROOT: /workshop
       CARD_PATH: /workshop/capability-card.yaml
@@ -68,6 +66,3 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-
-volumes:
-  eve-workshop-node-modules:

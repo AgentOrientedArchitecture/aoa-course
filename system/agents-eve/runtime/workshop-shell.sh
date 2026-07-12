@@ -12,6 +12,12 @@ You are inside the pinned EVE container. The current directory is mounted from:
 AOA is not running yet. First create and prove the standalone EVE agent.
 EOF
 
+if [ -f agent/instructions.md ] && [ ! -x node_modules/.bin/eve ]; then
+  echo
+  echo "Restoring the pinned workshop dependencies from the offline image cache..."
+  npm install --offline --no-audit --no-fund
+fi
+
 if [ -f agent/instructions.md ]; then
   cat <<'EOF'
 

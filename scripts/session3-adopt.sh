@@ -39,10 +39,18 @@ files=(
   -f system/docker-compose.session3-lab.yml
 )
 
+# Dependencies are installed into the bind-mounted learner workspace by the
+# pinned container, never by a host Node installation. This also upgrades
+# workshops created before node_modules stopped using a named volume.
+"${compose[@]}" "${files[@]}" run --rm --no-deps \
+  eve-workshop-native npm install --offline --no-audit --no-fund
+
+"${compose[@]}" "${files[@]}" build eve-workshop-native
+
 "${compose[@]}" "${files[@]}" \
   --profile session3 \
   --profile session3-lab-wrapped \
-  up --build --force-recreate -d --remove-orphans "$@"
+  up --no-build --force-recreate -d --remove-orphans "$@"
 
 ready=false
 for _ in {1..120}; do
