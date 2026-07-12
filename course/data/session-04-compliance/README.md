@@ -29,11 +29,21 @@ from model memory.
 
 ## Running it
 
+On macOS or Linux:
+
 ```bash
 ./scripts/session4-up.sh       # full estate: cv-fit + wiki + estate-check
 ./scripts/session4-seed.sh     # load the regulations corpus (10 notes, 38 passages)
-# open http://localhost:8080 → "Estate check" tab → Run
 ```
+
+On Windows Command Prompt:
+
+```bat
+scripts\session4-up.bat
+scripts\session4-seed.bat
+```
+
+Then open `http://localhost:8080`, select **Estate check**, and run the scan.
 
 The regulations corpus is curated from the verbatim EUR-Lex text of Regulation
 (EU) 2024/1689 (`regulations-seed/`), and seeds through the same `write_ingest`
@@ -44,7 +54,9 @@ require?" from the same corpus.
 
 ## The demo arc (~12 min)
 
-1. `./scripts/session4-reset.sh && ./scripts/session4-seed.sh` — opening state.
+1. Reset and seed the opening state with
+   `./scripts/session4-reset.sh && ./scripts/session4-seed.sh` on macOS/Linux,
+   or run `scripts\session4-seed.bat` on Windows after resetting the demo state.
 2. Run one CV-fit from the Studio (needs a model provider) — creates trace
    evidence, so Article 12 has something to find.
 3. Run the Estate check. The CV-fit trio is flagged **Annex III candidate -

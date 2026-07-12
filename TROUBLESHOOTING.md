@@ -90,6 +90,12 @@ The regulations corpus isn't seeded. Run:
 ./scripts/session4-seed.sh
 ```
 
+On Windows Command Prompt:
+
+```bat
+scripts\session4-seed.bat
+```
+
 ## Session 4: Article 12 is red for everything
 
 Correct behaviour, not a bug: Art 12 (record-keeping) goes green only when

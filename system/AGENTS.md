@@ -273,7 +273,7 @@ hooks related to selected EU AI Act obligations. Conventions it adds:
 - `reporter-findings` is deterministic and machine-checks its own language
   rule via the `no_compliance_verdict` signal.
 - The regulations corpus lives in the wiki store; seed with
-  `scripts/session4-seed.sh`, reset the demo state with
+  `scripts/session4-seed.sh` or `scripts\session4-seed.bat`, reset the demo state with
   `scripts/session4-reset.sh`, approve the staged card with
   `scripts/session4-approve.sh`.
 - Capability-card edits now hot-reload exactly like `instructions.md` edits:

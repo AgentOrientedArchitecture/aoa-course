@@ -145,6 +145,7 @@ scripts\session3-build.bat    rem pre-work: images only
 scripts\session3-up.bat       rem interactive native EVE workshop
 scripts\session3-adopt.bat    rem create the AOA card and start the estate
 scripts\session4-up.bat
+scripts\session4-seed.bat
 scripts\logs.bat
 scripts\down.bat
 ```
