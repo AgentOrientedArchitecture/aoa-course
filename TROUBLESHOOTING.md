@@ -32,14 +32,31 @@ editing capability ids.
 
 Nine times out of ten this is `.env`:
 
+First run the Docker-based provider check. It uses the same image, environment,
+SDKs, provider adapter, and container network as the course agents—no host
+Python, Node, or `curl` is needed:
+
+```bash
+./scripts/test_model_provider.sh
+```
+
+On Windows Command Prompt:
+
+```bat
+scripts\test_model_provider.bat
+```
+
+A successful check ends with `result=PASS`. If it fails, check:
+
 - **Hosted (SambaNova / NVIDIA):** `PROVIDER=openai`, the provider's exact
   model id in `MODEL`, key in `AOA_OPENAI_API_KEY`, and `OPENAI_BASE_URL`
-  ending in `/v1` (not `/chat/completions`). Verify with
-  `bash scripts/test_model_provider.sh` — expect `status=200` and `{"ok":true}`.
+  ending in `/v1` (not `/chat/completions`).
 - **Local Ollama on the host:** `PROVIDER=ollama`,
   `OLLAMA_HOST=http://host.docker.internal:11434`, and a model that appears in
-  `ollama list`. If you want the bundled Ollama container instead, set
-  `AOA_LOCAL=1` and `OLLAMA_HOST=http://ollama:11434`.
+  `ollama list`. On Linux Docker Engine, Ollama must listen on an interface the
+  Docker bridge can reach; alternatively use the bundled Ollama container. If
+  using the bundled container, set `OLLAMA_HOST=http://ollama:11434` and start
+  its `local` profile as directed by the test's failure hint.
 - `model_not_found` in a trace means the `MODEL` id doesn't exist at the
   provider — ids differ per provider (`gpt-oss:120b` vs `openai/gpt-oss-120b`).
 

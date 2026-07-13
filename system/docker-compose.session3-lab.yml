@@ -19,6 +19,8 @@ services:
       dockerfile: runtime/Dockerfile
     image: aoa-course/eve-workshop:0.17.1
     container_name: aoa-eve-workshop-native
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     working_dir: /workshop
     command: ["/app/workshop-shell.sh"]
     ports:
@@ -41,6 +43,8 @@ services:
       dockerfile: runtime/Dockerfile
     image: aoa-course/eve-workshop:0.17.1
     container_name: aoa-eve-workshop-wrapped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     working_dir: /workshop
     command: ["node", "/app/adapter/generic-boot.mjs"]
     ports:

@@ -3,8 +3,8 @@
 Before the first hands-on session, install the base tooling, set up one working
 model provider, and verify that the course stack can call it. The runtime
 supports local Ollama and OpenAI-compatible hosted APIs through `.env` files in
-the repo root. Session 3's EVE dependencies run inside Docker; no host Node/npm
-installation is required.
+the repo root. The provider test and Session 3's EVE dependencies run inside
+Docker; no host Python, Node/npm, or `curl` installation is required.
 
 ---
 
@@ -68,11 +68,18 @@ OPENAI_BASE_URL=https://api.sambanova.ai/v1/
 Then verify it:
 
 ```bash
-bash scripts/test_model_provider.sh
+./scripts/test_model_provider.sh
 ```
 
-Expected result: `status=200` and a short JSON response containing
-`{"ok":true}`.
+On Windows Command Prompt:
+
+```bat
+scripts\test_model_provider.bat
+```
+
+The test builds the evaluator image and calls the configured model through the
+same provider adapter and container network used by the agents. A successful
+check ends with `result=PASS`.
 
 ---
 
@@ -104,11 +111,16 @@ NVIDIA model IDs are provider-prefixed. For this course, use
 Then verify it:
 
 ```bash
-bash scripts/test_model_provider.sh
+./scripts/test_model_provider.sh
 ```
 
-Expected result: `status=200` and a short JSON response containing
-`{"ok":true}`.
+On Windows Command Prompt:
+
+```bat
+scripts\test_model_provider.bat
+```
+
+A successful check ends with `result=PASS`.
 
 ---
 
@@ -145,12 +157,21 @@ MODEL=gpt-oss:20b
 OLLAMA_HOST=http://host.docker.internal:11434
 ```
 
-Then verify Ollama by starting the stack and checking the service logs:
+Then verify Ollama through the same Docker runtime used by the agents:
 
 ```bash
-./scripts/session1-up.sh
-./scripts/logs.sh
+./scripts/test_model_provider.sh
 ```
+
+On Windows Command Prompt:
+
+```bat
+scripts\test_model_provider.bat
+```
+
+A successful check ends with `result=PASS`. On Linux Docker Engine, host Ollama
+must listen on an interface reachable from Docker; use the bundled Ollama
+container instead if you do not want to expose the host service to the bridge.
 
 ---
 
@@ -214,8 +235,10 @@ If you use one of these, create your own `.env` from `.env.example`, set
 `PROVIDER=openai`, set the provider base URL and key, then run:
 
 ```bash
-bash scripts/test_model_provider.sh
+./scripts/test_model_provider.sh
 ```
+
+On Windows Command Prompt, run `scripts\test_model_provider.bat`.
 
 ---
 
@@ -225,7 +248,9 @@ bash scripts/test_model_provider.sh
 - [ ] Choose SambaNova, NVIDIA, or local Ollama on the host.
 - [ ] Copy the matching example file to `.env`.
 - [ ] Add your hosted API key if using SambaNova or NVIDIA.
-- [ ] Run `bash scripts/test_model_provider.sh` if using SambaNova or NVIDIA.
+- [ ] Run the Docker-based provider test for hosted APIs or Ollama:
+      `./scripts/test_model_provider.sh` (Windows:
+      `scripts\test_model_provider.bat`).
 - [ ] Run the Session 1, 2, and 4 start commands once at home, shutting each
       stack down afterwards; run `session3-build` for Session 3.
 - [ ] Start any session stack and open the studio.

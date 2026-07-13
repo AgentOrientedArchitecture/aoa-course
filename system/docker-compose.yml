@@ -47,6 +47,8 @@ services:
       context: ./services/planner
     image: aoa-course/planner:latest
     container_name: aoa-planner
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7200:7200"
     volumes:
@@ -165,6 +167,8 @@ services:
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-cv-parser
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7301:8888"
     volumes:
@@ -205,6 +209,8 @@ services:
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-wiki-parser
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7304:8888"
     volumes:
@@ -245,6 +251,8 @@ services:
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-estate-parser
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7306:8888"
     volumes:
@@ -285,6 +293,8 @@ services:
       dockerfile: evaluator/Dockerfile
     image: aoa-course/evaluator:latest
     container_name: aoa-evaluator
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7302:8888"
     volumes:
@@ -323,6 +333,8 @@ services:
       dockerfile: reporter/Dockerfile
     image: aoa-course/reporter:latest
     container_name: aoa-reporter
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "7303:8888"
     volumes:

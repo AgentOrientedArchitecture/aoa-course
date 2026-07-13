@@ -13,7 +13,7 @@ WORKDIR /app
 COPY _base/requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
-COPY _base/base.py _base/model.py _base/registry_client.py _base/json_utils.py /app/_base/
+COPY _base/base.py _base/model.py _base/provider_test.py _base/registry_client.py _base/json_utils.py /app/_base/
 RUN touch /app/_base/__init__.py
 
 COPY evaluator/agent.py /app/agent.py
