@@ -118,6 +118,7 @@ class ToolHandle:
             "boundary": "tool",
             "transport": "http",
             "inputs_shape": _shape_summary(inputs),
+            **_tool_trace_request(self.capability_id, inputs),
         })
         t0 = time.perf_counter()
         try:
@@ -150,6 +151,7 @@ class ToolHandle:
             "outputs_shape": _shape_summary(envelope.get("outputs", {})),
             "signals": envelope.get("signals", {}),
             "latency_seconds": time.perf_counter() - t0,
+            **_tool_trace_response(self.capability_id, envelope),
         })
         return envelope
 
@@ -443,6 +445,50 @@ def _description_from_purpose(card: dict[str, Any]) -> str:
     if not purpose:
         return f"Capability {card.get('id', 'unknown')}"
     return " ".join(purpose.split())
+
+
+def _tool_trace_request(capability_id: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    """Expose inspectable wiki searches without copying arbitrary tool inputs."""
+    if capability_id != "tool-wiki-store":
+        return {}
+    operation = str(inputs.get("op") or "").strip()
+    evidence: dict[str, Any] = {"operation": operation}
+    if operation == "search":
+        evidence.update({
+            "query": str(inputs.get("query") or ""),
+            "limit": inputs.get("limit"),
+        })
+    return evidence
+
+
+def _tool_trace_response(
+    capability_id: str, envelope: dict[str, Any]
+) -> dict[str, Any]:
+    """Retain the top wiki citation used by governance evidence evaluators."""
+    if capability_id != "tool-wiki-store":
+        return {}
+    outputs = envelope.get("outputs")
+    passages = outputs.get("passages") if isinstance(outputs, dict) else None
+    if not isinstance(passages, list):
+        return {}
+    top = next((item for item in passages if isinstance(item, dict)), None)
+    if top is None:
+        return {"passages_returned": 0, "citations": []}
+    citation = {
+        key: top.get(key)
+        for key in (
+            "passage_id",
+            "source_path",
+            "quote",
+            "score",
+            "matched_terms",
+        )
+        if top.get(key) not in (None, "")
+    }
+    return {
+        "passages_returned": len(passages),
+        "citations": [citation] if citation else [],
+    }
 
 
 def _shape_summary(value: Any, depth: int = 0) -> Any:

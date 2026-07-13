@@ -424,6 +424,7 @@ async def _report_agent_evidence(inputs: dict, ctx: Context) -> dict:
         f"{summary.get('unknown', 0)} corpus-silent."
     )
     lines.append("")
+    _append_knowledge_usage(lines, summary, "agent-card evidence")
     _append_component_evidence(lines, findings, heading="Agent card evidence")
     _append_corpus_gaps(lines, findings)
     lines.append(_FOOTER)
@@ -450,10 +451,13 @@ async def _report_agent_evidence(inputs: dict, ctx: Context) -> dict:
 async def _report_flow_audit(inputs: dict, ctx: Context) -> dict:
     plans = inputs.get("plans")
     findings_obj = inputs.get("findings")
+    audit_scope = inputs.get("audit_scope")
     if not isinstance(plans, list):
         return error_envelope("plans (array) is required")
     if not isinstance(findings_obj, dict):
         return error_envelope("findings (object) is required")
+    if not isinstance(audit_scope, dict):
+        audit_scope = {}
 
     plan_findings = _plan_findings(findings_obj, [], [])
     audited_plans = [
@@ -469,6 +473,19 @@ async def _report_flow_audit(inputs: dict, ctx: Context) -> dict:
     if not isinstance(counts, dict):
         counts = {}
     lines: list[str] = ["# Flow audit - execution evidence", "", _SCOPE_BANNER]
+    if audit_scope.get("include_legacy"):
+        lines.append(
+            "**Audit scope:** current result-governance traces plus "
+            f"**{audit_scope.get('legacy_employment_plans_included', 0)} legacy employment traces**."
+        )
+    else:
+        hidden = int(audit_scope.get("legacy_employment_plans_excluded") or 0)
+        lines.append(
+            "**Audit scope:** current `human-review-before-release` traces only. "
+            f"**{hidden} legacy employment traces hidden**; enable **Show legacy history** "
+            "in Studio to include them."
+        )
+    lines.append("")
     lines.append(
         f"Observed **{summary.get('plans_observed', len(plans))} plans/traces** and assessed "
         f"**{summary.get('employment_plans_assessed', len(audited_plans))} employment-shaped flows**. "
@@ -482,11 +499,12 @@ async def _report_flow_audit(inputs: dict, ctx: Context) -> dict:
         plan_findings,
         heading="Flow audit evidence",
         intro=(
-            "Post-execution evidence checks the observed governance decision, exact-digest "
-            "approval, event order, resume, and completion for employment-shaped flows."
+            "Post-execution evidence checks selected-card eligibility, draft creation, "
+            "exact-result review, and review-before-release or quarantine for employment-shaped flows."
         ),
         include_green_details=True,
     )
+    _append_knowledge_usage(lines, summary, "flow evidence")
     _append_corpus_gaps(lines, plan_findings)
     lines.append(_FOOTER)
     markdown = "\n".join(lines)
@@ -657,41 +675,65 @@ def _append_plan_governance(
         )
         governance = plan.get("governance") if isinstance(plan.get("governance"), dict) else {}
         decision = governance.get("decision") or "not observed"
-        lines.append(f"| Operational gate decision | `{_markdown_cell(decision)}` |")
-        hold = plan.get("hold") if isinstance(plan.get("hold"), dict) else {}
-        lines.append(
-            f"| Hold observed | {'yes' if hold else 'no'} |"
+        card_eligibility = (
+            governance.get("card_eligibility")
+            if isinstance(governance.get("card_eligibility"), dict)
+            else {}
         )
-        approval = plan.get("approval") if isinstance(plan.get("approval"), dict) else {}
-        if approval:
-            approval_value = {
-                "decision": approval.get("decision"),
-                "actor_id": approval.get("actor_id"),
-                "timestamp": approval.get("timestamp"),
-                "plan_digest": approval.get("plan_digest"),
-            }
-            lines.append(f"| Approval evidence | {_markdown_cell(approval_value)} |")
-        else:
-            lines.append("| Approval evidence | not observed |")
-        resume = plan.get("resume") if isinstance(plan.get("resume"), dict) else {}
+        lines.append(f"| Plan eligibility decision | `{_markdown_cell(decision)}` |")
         lines.append(
-            f"| Resume evidence | {_markdown_cell(resume or 'not observed')} |"
+            f"| Selected evaluator eligible | {_markdown_cell(card_eligibility.get('eligible', 'not observed'))} |"
         )
         lines.append(
-            f"| Governance before application | {_order_evidence(plan.get('governance_preceded_application_invoke'))} |"
+            f"| Matched card constraint | {_markdown_cell(card_eligibility.get('matched_constraint') or 'not observed')} |"
         )
         lines.append(
-            f"| Approval before application | {_order_evidence(plan.get('approval_preceded_application_invoke'))} |"
+            f"| Result release policy | {_markdown_cell(plan.get('release_policy') or governance.get('release_policy') or 'not observed')} |"
         )
         lines.append(
-            f"| Resume before application | {_order_evidence(plan.get('resume_preceded_application_invoke'))} |"
+            f"| Eligibility before application | {_order_evidence(plan.get('eligibility_preceded_application_invoke'))} |"
         )
         lines.append(
-            f"| First application invocation | "
-            f"{_markdown_cell(plan.get('first_application_invoke_at') or 'not observed')} |"
+            f"| First application invocation | {_markdown_cell(plan.get('first_application_invoke_at') or 'not observed')} |"
         )
         lines.append(
-            f"| Execution status | `{_markdown_cell(plan.get('execution_status') or 'unknown')}` |"
+            f"| Application complete before draft | {_order_evidence(plan.get('application_completed_before_draft'))} |"
+        )
+        draft = plan.get("draft") if isinstance(plan.get("draft"), dict) else {}
+        lines.append(
+            f"| Draft result digest | `{_markdown_cell(draft.get('result_digest') or 'not observed')}` |"
+        )
+        result_hold = plan.get("result_hold") if isinstance(plan.get("result_hold"), dict) else {}
+        lines.append(f"| Draft held for review | {'yes' if result_hold else 'no'} |")
+        review = plan.get("review") if isinstance(plan.get("review"), dict) else {}
+        lines.append(f"| Human result review | {_markdown_cell(review or 'not observed')} |")
+        lines.append(
+            f"| Draft before review | {_order_evidence(plan.get('draft_preceded_review'))} |"
+        )
+        release = plan.get("release") if isinstance(plan.get("release"), dict) else {}
+        quarantine = plan.get("quarantine") if isinstance(plan.get("quarantine"), dict) else {}
+        release_summary = {
+            key: release.get(key)
+            for key in ("timestamp", "result_digest", "actor_id")
+            if release.get(key)
+        }
+        lines.append(
+            f"| Result release | {_markdown_cell(release_summary or 'not observed')} |"
+        )
+        lines.append(
+            f"| Result quarantine | {_markdown_cell(quarantine or 'not observed')} |"
+        )
+        lines.append(
+            f"| Review before release | {_order_evidence(plan.get('review_preceded_release'))} |"
+        )
+        lines.append(
+            f"| Review before quarantine | {_order_evidence(plan.get('review_preceded_quarantine'))} |"
+        )
+        lines.append(
+            f"| Released result matches approved draft | {_order_evidence(plan.get('released_result_matches_draft'))} |"
+        )
+        lines.append(
+            f"| Final flow status | `{_markdown_cell(plan.get('execution_status') or 'unknown')}` |"
         )
         if matched:
             for finding_index, finding in enumerate(matched):
@@ -846,6 +888,58 @@ def _append_component_evidence(
             lines.append(f"- **Gap:** {finding['gap']}")
         if finding.get("remediation_hint"):
             lines.append(f"- **Next step:** {finding['remediation_hint']}")
+        lines.append("")
+
+
+def _append_knowledge_usage(lines: list[str], summary: dict, scope: str) -> None:
+    knowledge = summary.get("knowledge_evidence")
+    if not isinstance(knowledge, dict):
+        return
+    queries = knowledge.get("queries") if isinstance(knowledge.get("queries"), dict) else {}
+    passage_ids = (
+        knowledge.get("passage_ids")
+        if isinstance(knowledge.get("passage_ids"), dict)
+        else {}
+    )
+    citations = (
+        knowledge.get("citations")
+        if isinstance(knowledge.get("citations"), dict)
+        else {}
+    )
+    lines += ["## Wiki governance evidence", ""]
+    lines.append(
+        f"The deterministic {scope} policy does not contain regulation text. It calls "
+        f"`{knowledge.get('tool') or 'tool-wiki-store'}` and preserves the returned passage evidence."
+    )
+    lines.append("")
+    lines.append("| Evidence target | Wiki query | Retrieved passage | Source |")
+    lines.append("|---|---|---|---|")
+    for label, query in queries.items():
+        citation = citations.get(label) if isinstance(citations.get(label), dict) else {}
+        lines.append(
+            f"| {_markdown_cell(label)} | `{_markdown_cell(query)}` | "
+            f"`{_markdown_cell(passage_ids.get(label) or 'corpus silent')}` | "
+            f"`{_markdown_cell(citation.get('source_path') or 'not observed')}` |"
+        )
+    lines.append("")
+    lines.append(
+        "The responsibility trace shows each corresponding wiki query and returned citation."
+    )
+    lines.append("")
+    for label in queries:
+        citation = citations.get(label)
+        if not isinstance(citation, dict):
+            continue
+        quote = str(citation.get("quote") or "").strip()
+        if not quote:
+            continue
+        lines += [f"### Retrieved {label} passage", ""]
+        lines.append(
+            f"`{citation.get('passage_id')}` from `{citation.get('source_path')}`"
+        )
+        lines.append("")
+        for quote_line in quote.splitlines():
+            lines.append(f"> {quote_line}" if quote_line else ">")
         lines.append("")
 
 

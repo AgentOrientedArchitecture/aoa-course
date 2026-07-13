@@ -3,9 +3,9 @@ version: 0.1.0
 kind: au
 purpose: |
   Render a post-execution flow audit from evaluator-supplied plan findings,
-  showing governance, exact-digest approval, event order, resume, and completion
-  evidence. The report contains no component-card matrix and makes no legal or
-  compliance determination.
+  showing selected-card eligibility, eligibility-before-invocation, immutable
+  draft creation, exact-result review, release or quarantine order, and released
+  payload identity. The report contains no component-card matrix or legal verdict.
 inputs:
   - name: plans
     type: array
@@ -13,15 +13,22 @@ inputs:
   - name: findings
     type: object
     required: true
+  - name: audit_scope
+    type: object
+    required: false
 outputs:
   - name: findings_markdown
     type: string
 constraints:
   - The output is a single JSON object.
+  - The report states whether only the current result-governance model is shown or legacy history was requested, including the count of hidden or included legacy employment traces.
   - The report renders one evidence table per observed employment-shaped plan or trace.
   - It contains flow evidence only and no component-card appendix.
-  - Regulation citations include complete evaluator-supplied passages and are never truncated.
-  - Green means the specified execution evidence was observed, not that oversight was effective or an obligation was satisfied.
+  - It renders card eligibility, proceed before application invocation, application complete before draft, exact result_digest review with notes, review before release or quarantine, and released-payload identity.
+  - Approval is shown as release of the exact approved draft; rejection is shown as quarantine with no release.
+  - Legacy hold, plan-approval, and resume evidence is not presented as satisfying the current model.
+  - Article 14 evidence retains the evaluator-supplied query, passage ID, source, and complete quote without truncation.
+  - Green means only that the specified declared and observed evidence is present, never compliance or effective oversight.
   - The report never contains the words compliant, complies, or certified.
   - Deterministic template; no model call is made.
 evaluation_signals:

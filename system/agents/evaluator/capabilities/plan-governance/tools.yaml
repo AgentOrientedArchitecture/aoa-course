@@ -1,1 +1,2 @@
-needs: []
+needs:
+  - tool-wiki-store

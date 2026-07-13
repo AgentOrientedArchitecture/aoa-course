@@ -31,6 +31,9 @@ REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/"
 PLANNER_URL = os.environ.get("PLANNER_URL", "http://planner:7200").rstrip("/")
 PORT = int(os.environ.get("STUDIO_PORT", "8080"))
 PLANNER_REQUEST_TIMEOUT = float(os.environ.get("PLANNER_REQUEST_TIMEOUT", "420"))
+ALLOW_WIKI_RESET = os.environ.get("STUDIO_ALLOW_WIKI_RESET", "true").strip().lower() in {
+    "1", "true", "yes", "on",
+}
 SUPPORTED_WORKFLOWS = (
     "agent-card-check",
     "cv-fit",
@@ -61,6 +64,12 @@ BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _sanitize_name(name: str) -> str:
@@ -177,7 +186,10 @@ async def index(request: Request) -> HTMLResponse:
             "request": request,
             "registry_url": REGISTRY_URL,
             "planner_url": PLANNER_URL,
-            "studio_config": {"workflows": ENABLED_WORKFLOWS},
+            "studio_config": {
+                "workflows": ENABLED_WORKFLOWS,
+                "allow_wiki_reset": ALLOW_WIKI_RESET,
+            },
         },
     )
 
@@ -219,13 +231,14 @@ async def get_run(trace_id: str) -> JSONResponse:
             return JSONResponse({"error": repr(exc)}, status_code=502)
 
 
+@app.post("/api/runs/{trace_id}/review")
 @app.post("/api/runs/{trace_id}/approval")
-async def approve_run(trace_id: str, request: Request) -> JSONResponse:
+async def review_run(trace_id: str, request: Request) -> JSONResponse:
     body = await request.json()
     async with httpx.AsyncClient(timeout=PLANNER_REQUEST_TIMEOUT) as client:
         try:
             response = await client.post(
-                f"{PLANNER_URL}/runs/{trace_id}/approval", json=body
+                f"{PLANNER_URL}/runs/{trace_id}/review", json=body
             )
             response.raise_for_status()
             return JSONResponse(response.json())
@@ -277,6 +290,8 @@ async def get_wiki_graph() -> JSONResponse:
 @app.post("/api/wiki/reset")
 async def reset_wiki() -> JSONResponse:
     """Clear the local wiki store so Session 2 can be replayed."""
+    if not ALLOW_WIKI_RESET:
+        raise HTTPException(status_code=403, detail="wiki reset is disabled in this session")
     if "wiki-graph" not in ENABLED_WORKFLOWS:
         raise HTTPException(status_code=404, detail="wiki graph workflow is not enabled")
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -326,6 +341,7 @@ async def submit_intent(request: Request) -> JSONResponse:
                 "cv_name",
                 "jd_name",
                 "note_name",
+                "include_legacy",
             )
         }
         files = {
@@ -348,7 +364,7 @@ async def submit_intent(request: Request) -> JSONResponse:
         return await _submit_knowledge_query(inputs, files)
 
     if kind in ("agent-card-check", "flow-audit", "estate-check"):
-        return await _submit_estate_read(kind)
+        return await _submit_estate_read(kind, inputs)
 
     # cv-fit and cv-fit-interview take the same CV + JD inputs; they differ only
     # in the workflow the planner runs (the interview variant adds the
@@ -453,11 +469,16 @@ async def _submit_knowledge_query(inputs: dict[str, Any], files: dict[str, Any] 
     return JSONResponse(result)
 
 
-async def _submit_estate_read(kind: str) -> JSONResponse:
+async def _submit_estate_read(kind: str, inputs: dict[str, Any]) -> JSONResponse:
     """Run a read-only evidence workflow over cards and planner traces."""
+    planner_inputs: dict[str, Any] = {"estate_root": "/data/estate"}
+    if kind == "flow-audit":
+        planner_inputs["include_legacy"] = _as_bool(inputs.get("include_legacy"))
+    elif kind == "estate-check":
+        planner_inputs["include_legacy"] = True
     planner_body = {
         "kind": kind,
-        "inputs": {"estate_root": "/data/estate"},
+        "inputs": planner_inputs,
     }
     result = await _post_planner_intent(planner_body)
     if isinstance(result, JSONResponse):

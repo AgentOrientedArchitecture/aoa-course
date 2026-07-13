@@ -1,98 +1,118 @@
 # studio
 
 Studio is the browser surface at `http://localhost:8080`. It submits course
-intents, merges registry and planner event streams, and renders the correlated
-trace. Session 4 exposes exactly Agent card check, CV fit, and Flow audit, and
-uses Studio as the human interaction point for a held CV-fit plan.
+intents, merges registry and planner events, and renders the correlated trace.
+Session 4 has exactly three core governance stages: **Agent card check**, **CV
+fit**, and **Flow audit**. Optional **Graph** and **Ask** utilities support
+evidence exploration; they are not additional governance stages.
 
-## Observation
+## What Studio shows
 
-- **Registry** lists registered capability ID, Agent ID, lifecycle actors and
-  status, version, kind, and current `skills_hash`. It also shows recent card
-  lifecycle events.
-- **Intent Studio** renders intent, capability context, resolved tasks, **Plan
-  governance**, the responsibility walk, evidence, and the final result.
-- **Plan governance** displays the deterministic evaluator's Markdown report,
-  decision, and plan digest. For a held CV-fit run it shows **Approve this plan
-  and run** and states that execution is paused before the first application AU.
-- **Details** displays a selected capability card, governance actor, or wiki
-  graph node.
-- **Wiki graph** projects the Session 2 store as documents, concepts, passages,
-  and open questions. Graph inspection and reset are direct UI controls, not AU
-  workflows.
+- **Registry** lists registered capabilities, Agent IDs, lifecycle actors and
+  status, version, kind, and current `skills_hash`.
+- **Intent Studio** renders intent, capability context, resolved tasks,
+  eligibility, application work, held draft, human review, release/quarantine,
+  evidence, and final result.
+- **Eligibility** displays the deterministic evaluator's decision, selected-card
+  evidence, `plan_digest`, and inspectable wiki queries and citations.
+- **Result review** displays the actual immutable draft and `result_digest`.
+  Approve and Reject remain hidden until the draft exists; reviewer notes are
+  required.
+- **Details** displays selected cards and raw event payloads.
+- **Graph** is an optional Session 4 utility that visualizes the seeded EU AI
+  Act wiki.
+- **Ask** is an optional Session 4 utility that runs the grounded
+  `knowledge-query` workflow and exposes passage citations and tool retrieval.
+- **Flow audit history** defaults to employment traces carrying the current
+  `human-review-before-release` result-governance model. The **Show legacy
+  history** checkbox includes persisted older employment traces and reports the
+  included count.
+- The wiki remains an explicit governance/evidence knowledge plane visible
+  through tool calls, queries, passage IDs, sources, complete quotes, and
+  bind-mounted wiki files. Wiki reset is disabled in Session 4 to protect this
+  corpus; rerun the Session 4 seed script if evidence is missing.
 
-Raw event payloads remain available in expandable details.
+## Session 4 learner arc
 
-## Session 4 behavior
+### 1. Agent card check
 
-The Session 4 mode switch exposes exactly:
+`parser-estate → evaluator-agent-evidence → reporter-agent-evidence` starts with
+`evaluator-cv` Article 14 red. The learner can inspect the visible
+`tool-wiki-store` call and the exact query, passage ID, source, and complete
+quote. Running CV fit at this point is rejected before application AU `lookup`
+or `invoke`.
 
-```text
-agent-card-check,cv-fit,flow-audit
-```
+### 2. CV fit and exact-result review
 
-### Agent card check
+After the learner adds the required review-before-use constraint to the
+`evaluator-cv` card, the registry hot-reloads it. Rerunning Agent card check turns
+that declaration green; green means declaration observed only.
 
-Agent card check runs
-`parser-estate → evaluator-agent-evidence → reporter-agent-evidence`. It shows
-current declared card evidence and verbatim regulation citations retrieved from
-the wiki store. The wiki remains a hidden knowledge source, not a Session 4
-mode.
+CV fit then applies deterministic pre-execution eligibility. The policy decides;
+the wiki supplies Annex III employment and Article 14 rationale. Missing either
+citeable passage fails closed. If eligible, the application AUs run to a frozen
+draft and Studio displays `result-draft` and `result-hold`.
 
-After the learner adds the Article 14 oversight constraint to the
-`evaluator-cv` capability card, the registry pane shows the card hot reload.
-Rerunning Agent card check shows the declaration and evidence improve. Green
-means declared evidence only, not legal compliance or an effective control.
+The reviewer must inspect the actual output, add notes, and approve or reject its
+exact `result_digest`:
 
-### CV fit
+- Approve records `result-review` and `result-release`; the released payload is
+  identical to the draft.
+- Reject records `result-review` and `result-quarantine`; no employment result is
+  released.
+- A missing note or different digest is rejected.
 
-Studio sends a declared employment use context with the input paths. After the
-planner resolves the concrete plan, `evaluator-plan-governance` returns
-`require-human-approval`. Studio renders the report and digest; no application
-AU has been looked up or invoked. Clicking **Approve this plan and run** posts
-approval for that exact digest. The same trace records `plan-approval`,
-`resume`, application execution, and the result.
+Current CV application AUs are read/compute/draft only. Holding a result cannot
+reverse side effects already performed by an application AU.
 
-The planner rejects a different or stale digest with HTTP `409`; Studio displays
-the returned error and does not release the held plan.
+### 3. Flow audit
 
-### Flow audit
+`parser-estate → evaluator-flow-evidence → reporter-flow-audit` checks observed
+eligibility, event order, exact-result review, release or quarantine, and
+released-payload equality. Its rationale includes a complete Article 14 wiki
+citation.
 
-Flow audit runs
-`parser-estate → evaluator-flow-evidence → reporter-flow-audit` after execution.
-It reports only observed evidence for the gate, exact digest, event order,
-resume, and completion. It does not treat an Agent card declaration as proof
-that execution occurred.
+Older employment traces remain persisted but are hidden by default. Select the
+**Show legacy history** checkbox to include them; the panel reports the included
+count.
+Red legacy rows mean evidence required by the current model is absent, not
+necessarily that the old execution failed. Legacy `hold`, `plan-approval`, and
+`resume` events do not satisfy result review without `result-draft`,
+`result-hold`, and an exact-digest `result-review`.
 
-Agent card check and Flow audit auto-proceed under the deterministic course
-policy. Card evidence, operational release, and execution evidence are distinct.
-None establishes legal permission, legal compliance or certification, or proof
-of effective human oversight.
+These are operational course signals, not legal permission, certification, a
+legal compliance determination, or proof of effective human oversight.
+
+## Optional evidence exploration
+
+Use **Graph** to inspect the seeded EU AI Act wiki. Use **Ask** to ask questions
+about the EU AI Act through the grounded knowledge-query workflow and inspect
+its passage citations and tool retrieval. These utilities are not extra stages
+in the governance learning arc.
 
 ## Course-state limitation
 
-Studio proxies active-run reads and approvals to planner memory. If the planner
-restarts, an existing held trace remains as JSONL evidence but is no longer an
-active run that Studio can approve or resume. Submit a new intent and review its
-new digest. This is not production persistence or crash-idempotent workflow
-recovery.
+Studio proxies active-run reads and result reviews to planner memory. If the
+planner restarts, the trace JSONL remains but an existing held draft can no
+longer be reviewed. Submit a new intent and review its new draft. This is not
+production persistence or crash-idempotent workflow recovery.
 
 ## Internals
 
 The backend (`studio.py`) is a thin FastAPI proxy:
 
-- subscribes to `registry/stream` and `planner/events`, then re-emits one SSE
-  stream on `/events`;
+- subscribes to registry and planner event streams, then emits one SSE stream on
+  `/events`;
 - persists submitted text/files to `system/inbox/` and forwards intent paths to
   the planner;
-- proxies active-run reads and exact-digest approval requests;
+- proxies active-run reads and exact-result review requests;
 - serves `templates/index.html` and `static/`.
 
 The frontend is plain HTML and ES modules with no build step. The responsibility
-walk includes governance invocation/decision, hold, approval, resume,
-automatic release, application AU/tool boundaries, and completion. The backend
-may retain additional compatibility routes, but Session 4 presents only its
-three learner-facing modes.
+walk includes eligibility, application AU/tool boundaries, result draft/hold,
+human review, release/quarantine, and completion. Compatibility approval routes
+may remain, but they submit result-review fields and do not turn legacy plan
+approval into result review.
 
 ## Endpoints
 
@@ -100,24 +120,17 @@ three learner-facing modes.
 |---|---|---|
 | `GET` | `/` | Studio page |
 | `GET` | `/events` | merged registry and planner SSE stream |
-| `POST` | `/api/intent` | proxied planner result after input persistence |
-| `GET` | `/api/runs/{trace_id}` | active in-memory planner run |
-| `POST` | `/api/runs/{trace_id}/approval` | proxied exact-digest approval/rejection result |
+| `POST` | `/api/intent` | proxied planner response after input persistence |
+| `GET` | `/api/runs/{trace_id}` | active in-memory planner run and held draft |
+| `POST` | `/api/runs/{trace_id}/review` | exact-`result_digest` approval/rejection with required notes |
+| `POST` | `/api/runs/{trace_id}/approval` | compatibility alias for result review |
 | `GET` | `/api/capabilities` | initial registry snapshot |
 | `GET` | `/api/capabilities/{capability_id}` | one capability card |
-| `GET` | `/api/wiki/graph` | read-only wiki graph projection |
-| `POST` | `/api/wiki/reset` | clear local wiki state for replay |
+| `GET` | `/api/wiki/graph` | wiki graph projection, including the seeded Session 4 EU AI Act corpus |
+| `POST` | `/api/wiki/reset` | clear local wiki state where enabled; disabled in Session 4 |
 | `GET` | `/healthz` | `{ "ok": true }` |
 
 ## Running locally
-
-Studio runs on port `8080` and expects:
-
-```text
-REGISTRY_URL=http://registry:7100
-PLANNER_URL=http://planner:7200
-STUDIO_WORKFLOWS=agent-card-check,cv-fit,flow-audit
-```
 
 Start and seed Session 4 from the repository root.
 

@@ -250,6 +250,66 @@ _CONSEQUENTIAL_OUTPUT_NAMES = {
     "questions",
     "report_markdown",
 }
+_RESULT_REVIEW_POLICY = "human-review-before-release"
+
+
+def _human_review_before_use_constraint(card: dict) -> str:
+    """Return the selected card constraint that makes a CV verdict draft-only."""
+    for value in card.get("constraints") or []:
+        text = str(value).strip()
+        lowered = text.lower()
+        if (
+            "every verdict" in lowered
+            and "draft" in lowered
+            and "approved" in lowered
+            and "human reviewer" in lowered
+            and "before" in lowered
+            and any(
+                marker in lowered
+                for marker in ("candidate screening", "interview", "employment action")
+            )
+        ):
+            return text
+    return ""
+
+
+def _employment_card_eligibility(capability_cards: list) -> dict:
+    evaluator_cards = [
+        card
+        for card in capability_cards
+        if isinstance(card, dict)
+        and str(card.get("id") or "").lower().startswith("evaluator-cv")
+    ]
+    if not evaluator_cards:
+        return {
+            "eligible": False,
+            "capability_id": "evaluator-cv",
+            "matched_constraint": "",
+            "reason": "The resolved employment plan has no selected evaluator-cv card snapshot.",
+        }
+    card = evaluator_cards[0]
+    lifecycle = card.get("lifecycle") if isinstance(card.get("lifecycle"), dict) else {}
+    status = str(lifecycle.get("status") or "approved")
+    matched = _human_review_before_use_constraint(card)
+    eligible = status == "approved" and bool(matched)
+    if status != "approved":
+        reason = f"{card.get('id')} lifecycle status is {status}, not approved."
+    elif not matched:
+        reason = (
+            f"{card.get('id')} does not declare every verdict draft-only and subject "
+            "to human approval before candidate screening, interview, or employment action."
+        )
+    else:
+        reason = "The selected evaluator card declares the required review-before-use boundary."
+    return {
+        "eligible": eligible,
+        "capability_id": card.get("id"),
+        "version": card.get("version"),
+        "lifecycle_status": status,
+        "constraints": card.get("constraints") or [],
+        "matched_constraint": matched,
+        "reason": reason,
+    }
 
 
 def _plan_policy_assessment(
@@ -338,6 +398,7 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
     use_context = inputs.get("use_context")
     resolved_plan = inputs.get("resolved_plan")
     capability_cards = inputs.get("capability_cards")
+    release_policy = inputs.get("release_policy")
     plan_digest = str(inputs.get("plan_digest") or "").strip()
 
     if not workflow:
@@ -348,6 +409,8 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
         return error_envelope("resolved_plan (non-empty array) is required")
     if not isinstance(capability_cards, list):
         return error_envelope("capability_cards (array) is required")
+    if not isinstance(release_policy, dict):
+        return error_envelope("release_policy (object) is required")
     if not plan_digest:
         return error_envelope("plan_digest is required")
 
@@ -355,50 +418,87 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
         workflow, use_context, resolved_plan, capability_cards
     )
     employment_shaped = policy["employment_shaped"]
-    decision = "require-human-approval" if employment_shaped else "proceed"
+    card_eligibility = _employment_card_eligibility(capability_cards)
+    review_control_present = (
+        release_policy.get("mode") == _RESULT_REVIEW_POLICY
+    )
+    governance_queries = {
+        "Annex III": _ARTICLE_QUERIES["Annex III"],
+        "Art 14": _ARTICLE_QUERIES["Art 14"],
+    }
+    citations = await _retrieve_regulation_citations(ctx, governance_queries)
+    if citations is None:
+        citations = {key: None for key in governance_queries}
+    knowledge_evidence_present = all(citations.get(key) for key in governance_queries)
+    eligible = (
+        bool(card_eligibility["eligible"])
+        and review_control_present
+        and knowledge_evidence_present
+        if employment_shaped
+        else True
+    )
+    decision = "proceed" if eligible else "reject"
+    result_review_required = bool(employment_shaped)
 
     capabilities = [
         str(step.get("capability") or "")
         for step in resolved_plan
         if isinstance(step, dict) and step.get("capability")
     ]
-    findings = [{
-        "finding_id": f"{workflow}/composition",
-        "severity": "amber" if employment_shaped else "green",
+    gaps: list[str] = []
+    if employment_shaped and not card_eligibility["eligible"]:
+        gaps.append(str(card_eligibility["reason"]))
+    if employment_shaped and not review_control_present:
+        gaps.append(
+            "The resolved plan does not declare a human-review-before-release result control."
+        )
+    if employment_shaped and not knowledge_evidence_present:
+        missing = ", ".join(key for key in governance_queries if not citations.get(key))
+        gaps.append(
+            f"The governance wiki has no citeable passage for: {missing}. Seed the Session 4 corpus before retrying."
+        )
+    finding = {
+        "finding_id": f"{workflow}/eligibility",
+        "severity": "green" if eligible else "red",
         "checked": (
-            "workflow, declared use context, resolved task purposes/capabilities/input mappings, "
-            "and selected card output contracts"
+            "employment use context, selected evaluator-card review-before-use declaration, "
+            "and a post-result human-review-before-release control"
         ),
         "evidence": {
             "workflow": workflow,
             "capabilities": capabilities,
             "use_context": use_context,
             "resolved_plan": resolved_plan,
-            "selected_cards": [
-                {
-                    "id": card.get("id"),
-                    "version": card.get("version"),
-                    "agent_id": card.get("agent_id"),
-                    "outputs": card.get("outputs") or [],
-                }
-                for card in capability_cards
-                if isinstance(card, dict)
-            ],
+            "release_policy": release_policy,
+            "card_eligibility": card_eligibility,
+            "knowledge_evidence": {
+                "tool": "tool-wiki-store",
+                "queries": governance_queries,
+                "citations": citations,
+            },
             "employment_reasons": policy["employment_reasons"],
             "consequence_reasons": policy["consequence_reasons"],
             "plan_digest": plan_digest,
         },
+        "gap": " ".join(gaps),
+        "regulation_citations": [
+            citation for citation in citations.values() if citation
+        ],
+        "corpus_silent": not knowledge_evidence_present,
         "control": (
-            "Record accountable human approval for this exact plan digest before invoking any application AU."
+            "Run the application AUs only to a draft, then hold the exact result digest for human review before release."
+            if eligible and employment_shaped
+            else "Do not invoke application AUs until every context-blocking card and plan-control gap is fixed."
             if employment_shaped
-            else "No pre-execution human approval is required by the course composition policy."
+            else "No employment-specific result review is required by this course policy."
         ),
-    }]
+    }
+    findings = [finding]
 
     lines = [
-        "# Pre-execution plan governance",
+        "# Pre-execution plan eligibility",
         "",
-        "> **Operational execution decision only. This is not legal permission or a legal determination.**",
+        "> **Operational eligibility decision only. This is not legal permission or a legal determination.**",
         "",
         f"- **Workflow:** `{workflow}`",
         f"- **Plan digest:** `{plan_digest}`",
@@ -406,24 +506,56 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
         f"- **Decision:** **{decision}**",
         "",
     ]
-    if employment_shaped:
+    if employment_shaped and not eligible:
         lines += [
-            "## Why execution is held",
+            "## Plan blocked",
             "",
-            "The resolved plan combines candidate or employment context with scoring, evaluation, recommendation, screening, or interview-oriented outputs.",
-            "Individually governed AUs do not make that end-to-end composition safe to execute automatically.",
+            "This employment composition contains context-blocking evidence gaps:",
             "",
-            "## Required control",
+            *[f"- {gap}" for gap in gaps],
             "",
-            "An accountable human must approve this exact resolved plan before the first application AU runs.",
-            "The approval is recorded on the same trace and applies only to the displayed plan digest.",
+            "Fix the selected capability card or release control, let it hot-reload, and submit a new CV-fit intent.",
+            "No application AU has been invoked.",
+        ]
+    elif employment_shaped:
+        lines += [
+            "## Eligibility passed",
+            "",
+            f"`{card_eligibility.get('capability_id')}` declares:",
+            "",
+            f"> {card_eligibility.get('matched_constraint')}",
+            "",
+            "The plan may execute only to a draft. A human must review the actual evaluation and approve its exact result digest before release.",
         ]
     else:
         lines += [
             "## Policy result",
             "",
-            "No consequential employment composition was found by the deterministic course policy, so execution may proceed.",
+            "No consequential employment composition was found, so this course policy allows automatic completion.",
         ]
+    if employment_shaped:
+        lines += [
+            "",
+            "## Governance knowledge used",
+            "",
+            "The eligibility rule is deterministic; the regulatory rationale is retrieved through `tool-wiki-store` so its source remains inspectable in the trace.",
+            "",
+        ]
+        for label, query in governance_queries.items():
+            citation = citations.get(label)
+            lines.append(f"### {label}")
+            lines.append("")
+            lines.append(f"- **Wiki query:** `{query}`")
+            if citation:
+                lines.append(
+                    f"- **Passage:** `{citation.get('passage_id')}` from `{citation.get('source_path')}`"
+                )
+                lines.append("")
+                for quote_line in str(citation.get("quote") or "").splitlines():
+                    lines.append(f"> {quote_line}" if quote_line else ">")
+            else:
+                lines.append("- **Passage:** corpus silent")
+            lines.append("")
     evaluation_markdown = "\n".join(lines).strip() + "\n"
     lowered = evaluation_markdown.lower()
 
@@ -431,12 +563,22 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
         "outputs": {
             "decision": decision,
             "plan_digest": plan_digest,
+            "result_review_required": result_review_required,
+            "card_eligibility": card_eligibility,
+            "release_policy": release_policy,
+            "knowledge_evidence": {
+                "tool": "tool-wiki-store",
+                "queries": governance_queries,
+                "citations": citations,
+            },
             "findings": findings,
             "evaluation_markdown": evaluation_markdown,
         },
         "signals": {
             "valid_output_shape": True,
             "resolved_plan_assessed": True,
+            "card_eligibility_assessed": True,
+            "result_release_control_assessed": True,
             "decision_supported": bool(findings),
             "no_compliance_verdict": not any(
                 word in lowered for word in ("compliant", "complies", "certified")
@@ -575,6 +717,15 @@ def _component_evidence(
         "annex_iii_candidates": annex_iii_candidates,
         **counts,
         "corpus_present": all(citations.get(article) for article in _OBLIGATIONS),
+        "knowledge_evidence": {
+            "tool": "tool-wiki-store",
+            "queries": _ARTICLE_QUERIES,
+            "passage_ids": {
+                key: citation.get("passage_id") if citation else None
+                for key, citation in citations.items()
+            },
+            "citations": citations,
+        },
     }
     return findings, summary
 
@@ -595,6 +746,15 @@ def _flow_evidence(
         "employment_plans_assessed": len(plan_findings),
         "plan_counts": counts,
         "corpus_present": article_14_citation is not None,
+        "knowledge_evidence": {
+            "tool": "tool-wiki-store",
+            "queries": {"Art 14": _ARTICLE_QUERIES["Art 14"]},
+            "passage_ids": {
+                "Art 14": article_14_citation.get("passage_id")
+                if article_14_citation else None
+            },
+            "citations": {"Art 14": article_14_citation},
+        },
     }
     return plan_findings, summary
 
@@ -708,80 +868,132 @@ def _plan_governance_finding(plan: dict, citation: dict | None) -> dict:
     trace_id = str(plan.get("trace_id") or "unknown")
     plan_digest = str(plan.get("plan_digest") or "")
     governance = plan.get("governance") if isinstance(plan.get("governance"), dict) else {}
-    hold = plan.get("hold") if isinstance(plan.get("hold"), dict) else {}
-    approval = plan.get("approval") if isinstance(plan.get("approval"), dict) else {}
-    resume = plan.get("resume") if isinstance(plan.get("resume"), dict) else {}
     decision = str(governance.get("decision") or "")
+    release_policy = (
+        plan.get("release_policy")
+        if isinstance(plan.get("release_policy"), dict)
+        else governance.get("release_policy")
+        if isinstance(governance.get("release_policy"), dict)
+        else {}
+    )
+    card_eligibility = (
+        governance.get("card_eligibility")
+        if isinstance(governance.get("card_eligibility"), dict)
+        else _employment_card_eligibility(
+            plan.get("capability_cards")
+            if isinstance(plan.get("capability_cards"), list)
+            else []
+        )
+    )
+    draft = plan.get("draft") if isinstance(plan.get("draft"), dict) else {}
+    result_hold = plan.get("result_hold") if isinstance(plan.get("result_hold"), dict) else {}
+    review = plan.get("review") if isinstance(plan.get("review"), dict) else {}
+    release = plan.get("release") if isinstance(plan.get("release"), dict) else {}
+    quarantine = plan.get("quarantine") if isinstance(plan.get("quarantine"), dict) else {}
     execution_status = str(plan.get("execution_status") or "unknown")
     invoked_at = str(plan.get("first_application_invoke_at") or "")
-    approval_digest = str(approval.get("plan_digest") or "")
-    hold_digest = str(hold.get("plan_digest") or "")
-    resume_digest = str(resume.get("plan_digest") or "")
-    hold_recorded = bool(hold)
-    approval_recorded = approval.get("decision") == "approve"
-    resume_recorded = bool(resume)
-    digest_match = bool(
-        plan_digest
-        and hold_digest == plan_digest
-        and approval_digest == plan_digest
-        and resume_digest == plan_digest
+    result_digest = str(draft.get("result_digest") or "")
+    review_digest = str(review.get("result_digest") or "")
+    review_decision = str(review.get("decision") or "")
+    controlled_rejection = (
+        decision == "reject"
+        and not invoked_at
+        and not release
+        and execution_status == "plan-rejected"
     )
-    governance_preceded = plan.get("governance_preceded_application_invoke") is not False
-    approval_preceded = plan.get("approval_preceded_application_invoke") is True
-    resume_preceded = plan.get("resume_preceded_application_invoke") is True
-    finished = execution_status == "finished"
 
     severity = "green"
     checked = (
-        "pre-execution governance decision, exact-digest approval, event order, "
-        "and observed application completion"
+        "selected-card eligibility, governance before application work, draft creation after "
+        "application completion, exact-result review, and review-before-release or quarantine"
     )
     gap = ""
     remediation = ""
-    if decision == "proceed":
-        severity = "red"
-        gap = "The employment-shaped plan was released automatically instead of requiring accountable review."
-        remediation = "Require approval for the exact resolved plan digest before any application AU invocation."
-    elif decision != "require-human-approval":
+    outcome = execution_status
+    if controlled_rejection:
+        outcome = "ineligible plan correctly blocked"
+    elif decision != "proceed":
         severity = "red" if invoked_at else "amber"
-        gap = "No observed pre-execution decision required human approval for this employment-shaped plan."
-        remediation = "Run the plan through the composition governance evaluator before application execution."
-    elif invoked_at and not governance_preceded:
+        gap = "The employment plan has no observed proceed decision before application work."
+        remediation = "Resolve a new plan and run the pre-execution eligibility evaluator."
+    elif not card_eligibility.get("eligible"):
         severity = "red"
-        gap = "An application AU invocation was observed before the governance decision."
-        remediation = "Move the governance gate between resolved-plan recording and the first application invocation."
-    elif not hold_recorded:
-        severity = "red" if invoked_at else "amber"
-        gap = "No hold record binds this employment-shaped plan before approval or execution."
-        remediation = "Record a hold for the exact resolved plan digest before accepting approval."
-    elif not approval_recorded:
-        severity = "red" if invoked_at else "amber"
-        gap = (
-            "Application execution was observed without an approval record."
-            if invoked_at
-            else "The plan was held and no approval has yet been recorded."
-        )
-        remediation = "Record an accountable approve/reject decision for the exact held plan digest."
-    elif not resume_recorded:
-        severity = "red" if invoked_at else "amber"
-        gap = "Approval was recorded, but no same-trace resume record was observed."
-        remediation = "Record resume for the approved digest before invoking any application AU."
-    elif not digest_match:
+        gap = "The selected evaluator card was not eligible for this employment composition."
+        remediation = "Add the required review-before-use constraint, then resolve a new plan."
+    elif release_policy.get("mode") != _RESULT_REVIEW_POLICY:
         severity = "red"
-        gap = "The approval, hold, or resume evidence does not bind to the resolved plan digest."
-        remediation = "Reject stale approvals and approve only the exact digest shown in the governance report."
-    elif invoked_at and not approval_preceded:
+        gap = "The plan did not declare a human-review-before-release result control."
+        remediation = "Bind the post-result release policy into the resolved plan."
+    elif plan.get("eligibility_preceded_application_invoke") is not True:
         severity = "red"
-        gap = "An application AU invocation was observed before the approval event."
-        remediation = "Keep application execution paused until approval is durably recorded on the same trace."
-    elif invoked_at and not resume_preceded:
+        gap = "Application invocation was not proven to follow the eligibility decision."
+        remediation = "Evaluate and record plan eligibility before the first application invocation."
+    elif not draft:
+        severity = "red" if release else "amber"
+        gap = "No held draft and result digest were observed after application execution."
+        remediation = "Freeze the completed AU output as a draft and compute its result digest."
+    elif plan.get("application_completed_before_draft") is not True:
         severity = "red"
-        gap = "An application AU invocation was observed before the same-trace resume event."
-        remediation = "Resume the approved plan before invoking the first application AU."
-    elif not invoked_at or not finished:
-        severity = "amber"
-        gap = "Approval evidence is present, but completed application execution is not yet observed."
-        remediation = "Complete or investigate the run, then repeat the estate check."
+        gap = "The draft was not proven to follow completion of the application AU sequence."
+        remediation = "Create the reviewable draft only after all application responses are recorded."
+    elif not result_hold:
+        severity = "red" if release else "amber"
+        gap = "The result was not held for review before release."
+        remediation = "Record a result hold for the exact draft digest."
+    elif not review:
+        severity = "red" if release or quarantine else "amber"
+        gap = "The draft is held and awaiting a human result review."
+        remediation = "Review the actual draft and approve or reject its exact result digest."
+    elif not result_digest or review_digest != result_digest:
+        severity = "red"
+        gap = "The human review does not bind to the held draft result digest."
+        remediation = "Accept review only for the exact result digest currently held."
+    elif plan.get("draft_preceded_review") is not True:
+        severity = "red"
+        gap = "The human review was not proven to follow creation of the draft."
+        remediation = "Expose the completed draft before recording review."
+    elif review_decision == "approve":
+        if quarantine:
+            severity = "red"
+            gap = "An approved result was quarantined instead of released."
+            remediation = "Release only the approved draft payload."
+        elif not release:
+            severity = "amber"
+            gap = "Approval is recorded but result release is not observed."
+            remediation = "Release the exact approved draft payload."
+        elif plan.get("review_preceded_release") is not True:
+            severity = "red"
+            gap = "Result release was not proven to follow human approval."
+            remediation = "Record review before release."
+        elif plan.get("released_result_matches_draft") is not True:
+            severity = "red"
+            gap = "The released result does not match the approved draft and digest."
+            remediation = "Release the immutable payload bound to the reviewed result digest."
+        elif execution_status != "released":
+            severity = "amber"
+            gap = "Release evidence exists but the final flow status is not released."
+            remediation = "Complete the release record and flow finish event."
+    elif review_decision == "reject":
+        if release:
+            severity = "red"
+            gap = "A human-rejected draft was released."
+            remediation = "Quarantine rejected results and emit no released output."
+        elif not quarantine:
+            severity = "amber"
+            gap = "Rejection is recorded but quarantine is not observed."
+            remediation = "Quarantine the exact rejected result digest."
+        elif plan.get("review_preceded_quarantine") is not True:
+            severity = "red"
+            gap = "Quarantine was not proven to follow human rejection."
+            remediation = "Record review before quarantine."
+        elif execution_status != "quarantined":
+            severity = "amber"
+            gap = "Quarantine evidence exists but the final flow status is not quarantined."
+            remediation = "Complete the quarantine and flow finish event."
+    else:
+        severity = "red"
+        gap = "The result review decision is missing or unrecognised."
+        remediation = "Record an approve or reject decision with reviewer notes."
 
     evidence = {
         "trace_id": trace_id,
@@ -789,21 +1001,36 @@ def _plan_governance_finding(plan: dict, citation: dict | None) -> dict:
         "use_context": plan.get("use_context") or {},
         "capability_ids": plan.get("capability_ids") or [],
         "plan_digest": plan_digest,
+        "release_policy": release_policy,
+        "card_eligibility": card_eligibility,
         "governance_decision": decision or "not observed",
-        "hold_digest": hold_digest or "not observed",
-        "approval": approval or "not observed",
-        "resume": resume or "not observed",
-        "governance_preceded_application_invoke": governance_preceded,
-        "approval_preceded_application_invoke": approval_preceded,
-        "resume_preceded_application_invoke": resume_preceded,
-        "first_application_invoke_at": invoked_at or "not observed",
+        "knowledge_evidence": governance.get("knowledge_evidence") or {},
+        "eligibility_preceded_application_invoke": plan.get("eligibility_preceded_application_invoke"),
+        "application_completed_before_draft": plan.get("application_completed_before_draft"),
+        "draft": (
+            {key: draft.get(key) for key in ("timestamp", "plan_digest", "result_digest")}
+            if draft else "not observed"
+        ),
+        "result_hold": result_hold or "not observed",
+        "review": review or "not observed",
+        "release": (
+            {key: release.get(key) for key in ("timestamp", "plan_digest", "result_digest", "actor_id")}
+            if release else "not observed"
+        ),
+        "quarantine": quarantine or "not observed",
+        "draft_preceded_review": plan.get("draft_preceded_review"),
+        "review_preceded_release": plan.get("review_preceded_release"),
+        "review_preceded_quarantine": plan.get("review_preceded_quarantine"),
+        "released_result_matches_draft": plan.get("released_result_matches_draft"),
         "execution_status": execution_status,
+        "outcome": outcome,
     }
     return {
-        "finding_id": f"{trace_id}/plan-governance",
+        "finding_id": f"{trace_id}/result-governance",
         "scope": "plan",
         "trace_id": trace_id,
         "plan_digest": plan_digest,
+        "result_digest": result_digest,
         "workflow": plan.get("workflow", ""),
         "article": "Art 14",
         "obligation": "human oversight",
@@ -815,8 +1042,8 @@ def _plan_governance_finding(plan: dict, citation: dict | None) -> dict:
         "gap": gap,
         "remediation_hint": remediation,
         "interpretation": (
-            "This is operational evidence about a course execution gate. It does not establish "
-            "effective human oversight, satisfy Article 14, or confer legal permission."
+            "This is operational evidence about card eligibility and review-before-release. "
+            "It does not establish effective human oversight, satisfy Article 14, or confer legal permission."
         ),
     }
 
@@ -864,12 +1091,12 @@ def _obligation_check(article: str, item: dict) -> tuple[str, bool, dict]:
              "value": {"constraints": fields.get("has_constraints"), "signals": len(signals)}},
         )
     if article == "Art 14":
-        present = bool(item.get("oversight_declared"))
+        present = bool(item.get("human_review_before_use_declared"))
         return (
-            "the card declares a human oversight or escalation boundary",
+            "the card declares every verdict draft-only until human review before employment use",
             present,
             {"kind": "card_field", "ref": "constraints",
-             "value": (item.get("oversight_evidence") or [None])[0]},
+             "value": item.get("human_review_before_use_evidence")},
         )
     if article == "Art 72":
         present = lifecycle.get("status") == "approved" and bool(signals)
@@ -889,7 +1116,7 @@ def _gap_for(article: str, cap_id: str) -> str:
         "Art 11": "The card is missing one or more of purpose, inputs, outputs, constraints, version.",
         "Art 12": f"No trace evidence found for {cap_id}; run the workflow so records exist.",
         "Art 13": "Constraints or evaluation signals are not declared on the card.",
-        "Art 14": "No human oversight or escalation declaration on the card.",
+        "Art 14": "No declaration makes every verdict draft-only until human review before employment use.",
         "Art 72": "The capability is not approved in the registry lifecycle, or declares no observed signals.",
     }
     return gaps.get(article, "Evidence absent.")
@@ -902,7 +1129,7 @@ def _remediation_for(article: str) -> str:
         "Art 11": "Complete the capability card: purpose, inputs, outputs, constraints, version.",
         "Art 12": "Exercise the capability through the planner so traces exist; keep trace retention on.",
         "Art 13": "Declare constraints and evaluation signals on the card (hot-reloads and re-registers).",
-        "Art 14": "Add an oversight/escalation constraint to capability-card.yaml (hot-reloads and re-registers).",
+        "Art 14": "Declare that every verdict is a draft requiring human review before candidate screening, interview, or employment action (hot-reloads and re-registers).",
         "Art 72": "Approve the card via the registry lifecycle and keep observed signals flowing.",
     }
     return hints.get(article, "")

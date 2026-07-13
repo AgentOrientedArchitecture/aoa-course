@@ -37,8 +37,9 @@ PLANNER_STRATEGY = os.environ.get("PLANNER_STRATEGY", "hybrid").strip().lower()
 PLANNER_MODEL_TIMEOUT = float(os.environ.get("PLANNER_MODEL_TIMEOUT_SECONDS", "60"))
 PLANNER_MODEL_MAX_TOKENS = int(os.environ.get("PLANNER_MODEL_MAX_TOKENS", "2048"))
 PLAN_GOVERNANCE_CAPABILITY = os.environ.get("PLAN_GOVERNANCE_CAPABILITY", "").strip()
-PLAN_APPROVER_ID = os.environ.get(
-    "PLAN_APPROVER_ID", "urn:aoa:human:course-plan-approver"
+RESULT_REVIEWER_ID = os.environ.get(
+    "RESULT_REVIEWER_ID",
+    os.environ.get("PLAN_APPROVER_ID", "urn:aoa:human:course-result-reviewer"),
 ).strip()
 
 
@@ -92,10 +93,13 @@ class PreparedRun:
     intent: dict[str, Any]
     resolved_steps: list[ResolvedStep]
     plan_digest: str
+    release_policy: dict[str, Any]
     governance: dict[str, Any] | None = None
     status: str = "preparing"
+    draft_outputs: dict[str, Any] | None = None
+    result_digest: str = ""
+    review: dict[str, Any] | None = None
     outputs: dict[str, Any] | None = None
-    approval: dict[str, Any] | None = None
 
 
 WORKFLOWS: dict[str, Workflow] = {
@@ -383,19 +387,22 @@ WORKFLOWS: dict[str, Workflow] = {
                 purpose="Reconstruct observed resolved plans and execution evidence from traces.",
                 discovery={
                     "kind": "au",
-                    "text": "scan estate traces plan governance approval resume completion",
+                    "text": "scan estate traces plan eligibility result draft human review release quarantine",
                     "required_inputs": [{"name": "estate_root", "type": "string"}],
                     "required_outputs": [{"name": "plans"}],
                 },
-                input_map={"estate_root": "inputs.estate_root"},
+                input_map={
+                    "estate_root": "inputs.estate_root",
+                    "include_legacy": "inputs.include_legacy",
+                },
                 selected_capability="parser-estate",
             ),
             TaskSpec(
                 id="evaluate-flow-evidence",
-                purpose="Evaluate post-execution plan governance, approval, order, resume, and completion evidence.",
+                purpose="Evaluate card eligibility, result-review integrity, event order, and controlled release or quarantine.",
                 discovery={
                     "kind": "au",
-                    "text": "evaluate flow trace plan governance exact digest approval order completion",
+                    "text": "evaluate flow trace eligibility exact result digest review release quarantine order",
                     "required_inputs": [{"name": "plans", "type": "array"}],
                     "required_outputs": [
                         {"name": "plan_findings"},
@@ -410,7 +417,7 @@ WORKFLOWS: dict[str, Workflow] = {
                 purpose="Render a post-execution flow audit without component-card findings.",
                 discovery={
                     "kind": "au",
-                    "text": "write flow audit markdown governance approval execution evidence",
+                    "text": "write flow audit markdown eligibility result review release quarantine evidence",
                     "required_inputs": [
                         {"name": "plans", "type": "array"},
                         {"name": "findings", "type": "object"},
@@ -420,6 +427,7 @@ WORKFLOWS: dict[str, Workflow] = {
                 input_map={
                     "plans": "scan-flow-evidence.outputs.plans",
                     "findings": "evaluate-flow-evidence.outputs",
+                    "audit_scope": "scan-flow-evidence.outputs.audit_scope",
                 },
                 selected_capability="reporter-flow-audit",
             ),
@@ -1036,10 +1044,28 @@ def _resolved_plan_payload(resolved_steps: list[ResolvedStep]) -> list[dict[str,
     ]
 
 
+def _release_policy(workflow: str, intent: dict[str, Any]) -> dict[str, Any]:
+    raw_use_context = intent.get("use_context")
+    use_context = raw_use_context if isinstance(raw_use_context, dict) else {}
+    employment_shaped = (
+        workflow.startswith("cv-fit")
+        or str(use_context.get("domain") or "").lower()
+        in {"employment", "hiring", "recruitment"}
+    )
+    if employment_shaped:
+        return {
+            "mode": "human-review-before-release",
+            "review_subject": "final application result",
+            "release_condition": "approve exact result digest",
+        }
+    return {"mode": "automatic"}
+
+
 def _plan_digest(workflow: str, intent: dict[str, Any], resolved_steps: list[ResolvedStep]) -> str:
     payload = {
         "workflow": workflow,
         "intent": intent,
+        "release_policy": _release_policy(workflow, intent),
         "plan": [
             {
                 "resolved_task": item,
@@ -1049,6 +1075,16 @@ def _plan_digest(workflow: str, intent: dict[str, Any], resolved_steps: list[Res
         ],
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def _freeze_json(value: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str))
+
+
+def _result_digest(plan_digest: str, outputs: dict[str, Any]) -> str:
+    payload = {"plan_digest": plan_digest, "outputs": outputs}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
@@ -1072,22 +1108,25 @@ def _governance_card_snapshot(step: ResolvedStep) -> dict[str, Any]:
 
 def _governance_fallback(run: PreparedRun, reason: str) -> dict[str, Any]:
     markdown = (
-        "# Pre-execution plan governance\n\n"
-        "> **Operational execution decision only. This is not legal permission or a legal determination.**\n\n"
-        "- **Decision:** **require-human-approval**\n"
+        "# Pre-execution plan eligibility\n\n"
+        "> **Operational eligibility decision only. This is not legal permission or a legal determination.**\n\n"
+        "- **Decision:** **reject**\n"
         f"- **Plan digest:** `{run.plan_digest}`\n"
-        f"- **Reason:** The governance evaluator could not establish an automatic release: {reason}\n\n"
-        "An accountable human must inspect and approve this exact plan before application AUs run.\n"
+        f"- **Reason:** The governance evaluator could not establish eligibility: {reason}\n\n"
+        "No application AU may run until eligibility can be evaluated successfully.\n"
     )
     return {
-        "decision": "require-human-approval",
+        "decision": "reject",
         "plan_digest": run.plan_digest,
+        "result_review_required": run.release_policy.get("mode") == "human-review-before-release",
+        "card_eligibility": {"eligible": False, "reason": reason},
+        "release_policy": run.release_policy,
         "findings": [{
             "finding_id": f"{run.workflow}/governance-evaluator",
-            "severity": "amber",
+            "severity": "red",
             "checked": "pre-execution governance evaluator availability and output",
             "evidence": {"reason": reason, "plan_digest": run.plan_digest},
-            "control": "Require accountable human approval before execution.",
+            "control": "Reject execution until eligibility can be established.",
         }],
         "evaluation_markdown": markdown,
     }
@@ -1102,6 +1141,9 @@ async def _evaluate_prepared_plan(
         return {
             "decision": "proceed",
             "plan_digest": run.plan_digest,
+            "result_review_required": run.release_policy.get("mode") == "human-review-before-release",
+            "card_eligibility": {},
+            "release_policy": run.release_policy,
             "findings": [],
             "evaluation_markdown": "",
         }
@@ -1127,6 +1169,7 @@ async def _evaluate_prepared_plan(
         "capability_cards": [
             _governance_card_snapshot(step) for step in run.resolved_steps
         ],
+        "release_policy": run.release_policy,
         "plan_digest": run.plan_digest,
     }
     await _record({
@@ -1145,17 +1188,21 @@ async def _evaluate_prepared_plan(
         decision_name = outputs.get("decision")
         if _response_failed(response):
             raise RuntimeError(str(outputs.get("error") or "governance evaluator failed"))
-        if decision_name not in {"proceed", "require-human-approval", "reject"}:
+        if decision_name not in {"proceed", "reject"}:
             raise RuntimeError(f"invalid governance decision: {decision_name!r}")
         if outputs.get("plan_digest") != run.plan_digest:
             raise RuntimeError("governance evaluator returned a different plan digest")
         decision = {
             "decision": decision_name,
             "plan_digest": run.plan_digest,
+            "result_review_required": bool(outputs.get("result_review_required")),
+            "card_eligibility": outputs.get("card_eligibility") or {},
+            "release_policy": outputs.get("release_policy") or run.release_policy,
+            "knowledge_evidence": outputs.get("knowledge_evidence") or {},
             "findings": outputs.get("findings") or [],
             "evaluation_markdown": str(outputs.get("evaluation_markdown") or ""),
         }
-    except Exception as exc:  # fail closed: evaluation uncertainty requires review
+    except Exception as exc:  # fail closed: eligibility uncertainty rejects execution
         logger.warning("plan governance failed closed for %s: %r", run.trace_id, exc)
         decision = _governance_fallback(run, str(exc))
         signals = {"exception": repr(exc), "evaluator_available": bool(evaluator_card)}
@@ -1179,34 +1226,15 @@ def _run_snapshot(run: PreparedRun) -> dict[str, Any]:
         "status": run.status,
         "plan_digest": run.plan_digest,
         "plan": _resolved_plan_payload(run.resolved_steps),
+        "release_policy": run.release_policy,
         "governance": run.governance,
-        "approval": run.approval,
+        "draft_outputs": run.draft_outputs or {},
+        "result_digest": run.result_digest,
+        "review": run.review,
         "outputs": run.outputs or {},
     }
 
 
-async def _changed_plan_cards(run: PreparedRun) -> list[str]:
-    """Return selected capabilities whose current governance snapshot drifted."""
-    async with httpx.AsyncClient() as client:
-        current_cards = {
-            str(card.get("id")): card
-            for card in await _registry_list(client)
-            if isinstance(card, dict) and card.get("id")
-        }
-    changed: list[str] = []
-    for step in run.resolved_steps:
-        current = current_cards.get(step.capability)
-        if current is None:
-            changed.append(step.capability)
-            continue
-        current_step = ResolvedStep(
-            task=step.task,
-            capability=step.capability,
-            card=current,
-        )
-        if _governance_card_snapshot(current_step) != _governance_card_snapshot(step):
-            changed.append(step.capability)
-    return changed
 
 
 # ----------------------------------------------------------------------
@@ -1308,8 +1336,35 @@ async def _execute_prepared_run(run: PreparedRun) -> dict[str, Any]:
             step_outputs[step.capability] = step_result
 
     final = step_outputs[run.resolved_steps[-1].task.id]
+    final_outputs = _freeze_json(final.get("outputs", {}))
+    if run.release_policy.get("mode") == "human-review-before-release":
+        run.draft_outputs = final_outputs
+        run.result_digest = _result_digest(run.plan_digest, run.draft_outputs)
+        run.status = "draft-held"
+        await _record({
+            "trace_id": run.trace_id,
+            "step": "result-draft",
+            "workflow": run.workflow,
+            "plan_digest": run.plan_digest,
+            "result_digest": run.result_digest,
+            "outputs": run.draft_outputs,
+        })
+        await _record({
+            "trace_id": run.trace_id,
+            "step": "result-hold",
+            "workflow": run.workflow,
+            "plan_digest": run.plan_digest,
+            "result_digest": run.result_digest,
+            "review_required": True,
+        })
+        return {
+            "draft_outputs": run.draft_outputs,
+            "result_digest": run.result_digest,
+            "review_required": True,
+        }
+
     run.status = "done"
-    run.outputs = final.get("outputs", {})
+    run.outputs = final_outputs
     await _record({
         "trace_id": run.trace_id,
         "step": "finish",
@@ -1323,6 +1378,12 @@ async def _run_workflow(
     workflow: Workflow, intent: dict[str, Any]
 ) -> tuple[str, str, dict[str, Any]]:
     trace_id = uuid.uuid4().hex[:12]
+    if workflow.name == "flow-audit":
+        intent_inputs = intent.get("inputs")
+        if not isinstance(intent_inputs, dict):
+            intent_inputs = {}
+            intent["inputs"] = intent_inputs
+        intent_inputs.setdefault("include_legacy", False)
 
     await _record({
         "trace_id": trace_id,
@@ -1439,6 +1500,7 @@ async def _run_workflow(
             intent=intent,
             resolved_steps=resolved_steps,
             plan_digest=_plan_digest(workflow.name, intent, resolved_steps),
+            release_policy=_release_policy(workflow.name, intent),
         )
         await _record({
             "trace_id": trace_id,
@@ -1446,34 +1508,13 @@ async def _run_workflow(
             "workflow": workflow.name,
             "use_context": intent.get("use_context") or {},
             "plan_digest": run.plan_digest,
+            "release_policy": run.release_policy,
             "plan": _resolved_plan_payload(resolved_steps),
         })
         state.runs[trace_id] = run
         state.run_locks.setdefault(trace_id, asyncio.Lock())
         run.governance = await _evaluate_prepared_plan(client, run, governance_card)
         decision = run.governance.get("decision")
-
-        if decision == "require-human-approval":
-            run.status = "held"
-            run.outputs = {
-                "plan_governance": run.governance,
-                "execution": {
-                    "status": "held",
-                    "approval_required": True,
-                    "trace_id": trace_id,
-                    "plan_digest": run.plan_digest,
-                },
-            }
-            await _record({
-                "trace_id": trace_id,
-                "step": "hold",
-                "workflow": workflow.name,
-                "decision": decision,
-                "plan_digest": run.plan_digest,
-                "approval_required": True,
-                "evaluation_markdown": run.governance.get("evaluation_markdown", ""),
-            })
-            return trace_id, run.status, run.outputs
 
         if decision == "reject":
             run.status = "rejected"
@@ -1483,10 +1524,11 @@ async def _run_workflow(
             }
             await _record({
                 "trace_id": trace_id,
-                "step": "rejected",
+                "step": "plan-rejected",
                 "workflow": workflow.name,
                 "decision": decision,
                 "plan_digest": run.plan_digest,
+                "card_eligibility": run.governance.get("card_eligibility") or {},
             })
             await _record({
                 "trace_id": trace_id,
@@ -1555,105 +1597,106 @@ async def get_run(trace_id: str) -> JSONResponse:
     return JSONResponse(_run_snapshot(run))
 
 
+@app.post("/runs/{trace_id}/review")
 @app.post("/runs/{trace_id}/approval")
-async def approve_run(trace_id: str, request: Request) -> JSONResponse:
+async def review_run(trace_id: str, request: Request) -> JSONResponse:
     run = state.runs.get(trace_id)
     if run is None:
         raise HTTPException(status_code=404, detail=f"unknown active run: {trace_id}")
     body = await request.json()
     decision = str(body.get("decision") or "approve").strip().lower()
-    expected_digest = str(body.get("plan_digest") or "").strip()
-    reason = str(body.get("reason") or "").strip()
+    expected_digest = str(body.get("result_digest") or "").strip()
+    review_notes = str(body.get("review_notes") or body.get("reason") or "").strip()
     if decision not in {"approve", "reject"}:
         raise HTTPException(status_code=400, detail="decision must be approve or reject")
-    if expected_digest != run.plan_digest:
-        raise HTTPException(
-            status_code=409,
-            detail="approval does not match the currently held plan digest",
-        )
+    if not review_notes:
+        raise HTTPException(status_code=400, detail="review_notes are required")
 
     lock = state.run_locks.setdefault(trace_id, asyncio.Lock())
     async with lock:
-        if run.status in {"done", "error", "rejected"}:
-            return JSONResponse(_run_snapshot(run))
-        if run.status != "held":
+        if run.review is not None:
+            same_review = (
+                run.review.get("decision") == decision
+                and run.review.get("result_digest") == expected_digest
+                and run.review.get("review_notes") == review_notes
+            )
+            if same_review:
+                return JSONResponse(_run_snapshot(run))
             raise HTTPException(
                 status_code=409,
-                detail=f"run is {run.status}, not held for approval",
+                detail="this result already has a different recorded review decision",
             )
+        if run.status != "draft-held":
+            raise HTTPException(
+                status_code=409,
+                detail=f"run is {run.status}, not holding a draft for result review",
+            )
+        if expected_digest != run.result_digest:
+            raise HTTPException(
+                status_code=409,
+                detail="review does not match the currently held result digest",
+            )
+        if run.draft_outputs is None:
+            raise HTTPException(status_code=409, detail="held run has no draft result")
+        if _result_digest(run.plan_digest, run.draft_outputs) != run.result_digest:
+            raise HTTPException(status_code=409, detail="held draft no longer matches its result digest")
 
-        if decision == "approve":
-            try:
-                changed_cards = await _changed_plan_cards(run)
-            except httpx.HTTPError as exc:
-                raise HTTPException(
-                    status_code=502,
-                    detail="could not revalidate the held plan against the registry",
-                ) from exc
-            if changed_cards:
-                await _record({
-                    "trace_id": trace_id,
-                    "step": "plan-approval-rejected",
-                    "workflow": run.workflow,
-                    "plan_digest": run.plan_digest,
-                    "reason": "selected capability card changed while the plan was held",
-                    "changed_capabilities": changed_cards,
-                })
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "held plan is stale because selected capability cards changed: "
-                        + ", ".join(changed_cards)
-                        + "; submit a new intent and review its new digest"
-                    ),
-                )
-
-        approved_at = _now_iso()
-        run.approval = {
+        reviewed_at = _now_iso()
+        run.review = {
             "decision": decision,
-            "actor_id": PLAN_APPROVER_ID,
-            "approved_at": approved_at,
-            "plan_digest": run.plan_digest,
-            "reason": reason,
+            "actor_id": RESULT_REVIEWER_ID,
+            "reviewed_at": reviewed_at,
+            "result_digest": run.result_digest,
+            "review_notes": review_notes,
         }
         await _record({
             "trace_id": trace_id,
-            "step": "plan-approval",
+            "step": "result-review",
             "workflow": run.workflow,
-            **run.approval,
+            "plan_digest": run.plan_digest,
+            **run.review,
         })
 
         if decision == "reject":
-            run.status = "rejected"
-            run.outputs = {
-                "error": "held plan rejected by the accountable reviewer",
-                "plan_governance": run.governance,
-                "approval": run.approval,
-            }
+            run.status = "quarantined"
             await _record({
                 "trace_id": trace_id,
-                "step": "rejected",
+                "step": "result-quarantine",
                 "workflow": run.workflow,
                 "plan_digest": run.plan_digest,
-                "actor_id": PLAN_APPROVER_ID,
+                "result_digest": run.result_digest,
+                "actor_id": RESULT_REVIEWER_ID,
             })
             await _record({
                 "trace_id": trace_id,
                 "step": "finish",
                 "workflow": run.workflow,
-                "outputs": run.outputs,
+                "outputs": {
+                    "status": "quarantined",
+                    "result_digest": run.result_digest,
+                },
             })
             return JSONResponse(_run_snapshot(run))
 
-        run.status = "approved"
+        run.outputs = _freeze_json(run.draft_outputs)
+        if _result_digest(run.plan_digest, run.outputs) != run.result_digest:
+            raise HTTPException(status_code=409, detail="release payload does not match the approved result digest")
+        run.status = "released"
         await _record({
             "trace_id": trace_id,
-            "step": "resume",
+            "step": "result-release",
             "workflow": run.workflow,
             "plan_digest": run.plan_digest,
-            "actor_id": PLAN_APPROVER_ID,
+            "result_digest": run.result_digest,
+            "actor_id": RESULT_REVIEWER_ID,
+            "outputs": run.outputs,
         })
-        await _execute_prepared_run(run)
+        await _record({
+            "trace_id": trace_id,
+            "step": "finish",
+            "workflow": run.workflow,
+            "outputs": run.outputs,
+        })
         return JSONResponse(_run_snapshot(run))
 
 
@@ -1672,7 +1715,18 @@ async def trace_event(request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="trace_id is required")
     if not isinstance(step, str) or not step.strip():
         raise HTTPException(status_code=400, detail="step is required")
-    record.setdefault("source", "agent")
+    allowed_steps = {
+        "au-start", "au-finish", "au-error",
+        "tool-invoke", "tool-response", "tool-error",
+    }
+    if step not in allowed_steps:
+        raise HTTPException(
+            status_code=400,
+            detail=f"agent trace step is not allowed: {step}",
+        )
+    if trace_id not in state.runs:
+        raise HTTPException(status_code=404, detail=f"unknown active run: {trace_id}")
+    record["source"] = "agent"
     await _record(record)
     return JSONResponse({"ok": True})
 

@@ -49,18 +49,23 @@ that the last step runs on a different runtime. See
 The reference adapters currently emit the A2A v0.3 JSON-RPC card/message shape.
 They demonstrate an outward agent boundary, not A2A v1 conformance.
 
-In **Session 4** learners compare three distinct surfaces. **Agent card
-check** runs `parser-estate → evaluator-agent-evidence →
-reporter-agent-evidence`, cites Article 14 verbatim from the hidden wiki store,
-and shows how an `evaluator-cv` card edit hot-reloads and improves declared
-evidence. **CV fit** resolves an employment composition that
-`evaluator-plan-governance` holds before application lookup or invocation;
-approving the exact digest resumes the same trace. **Flow audit** runs
-`parser-estate → evaluator-flow-evidence → reporter-flow-audit` after execution
-to report evidence for the gate, digest, ordering, resume, and completion.
-Card evidence, operational plan release, execution evidence, and legal
-compliance or effective oversight are separate claims. Green means declared
-evidence only, never legal compliance or proof of effective oversight. See
+In **Session 4** learners follow exactly three core governance stages. **Agent
+card check** starts `evaluator-cv` Article 14 red and visibly retrieves the exact
+query, passage ID, source, and complete quote from `tool-wiki-store`. A CV-fit
+attempt is rejected before application lookup or invocation. The learner adds
+the required review-before-use declaration, watches it hot-reload, and reruns
+the card check; green means declaration observed only. **CV fit** then passes
+deterministic eligibility, runs the application AUs to an immutable held draft,
+and requires a human to review the actual output, add notes, and approve or
+reject its exact `result_digest`. Approval releases the identical draft;
+rejection quarantines it. **Flow audit** checks eligibility, event order,
+exact-result review, release/quarantine, payload equality, and an Article 14
+wiki citation. It defaults to traces carrying the current
+`human-review-before-release` result-governance model. Older employment traces
+remain persisted but hidden unless the **Show legacy history** checkbox is
+selected; the panel reports how many are included. A red legacy row means current evidence is
+absent, not necessarily that the old execution failed. Legacy plan approval is
+not result-review evidence. See
 [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md).
 
 ## Run it
@@ -106,9 +111,10 @@ the CV-fit workflow:
 ./scripts/session3-adopt.sh    # create the AOA card and start the estate
 ```
 
-Session 4 starts the three-stage Studio — agent card check, CV fit, and flow
-audit — with deterministic planner routing, then seeds the hidden regulations
-corpus used for verbatim citations:
+Session 4 starts Studio with three core stages — Agent card check, CV fit, and
+Flow audit — plus optional Graph and Ask evidence exploration and deterministic
+planner routing, then seeds and verifies the inspectable regulations corpus
+used for governance evidence:
 
 ```bash
 ./scripts/session4-up.sh
@@ -161,10 +167,18 @@ host-machine Ollama path does not need `AOA_LOCAL=1`.
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and
 ask modes. Session 3 shows CV fit plus a "CV fit + interview" mode that runs the
-EVE-authored interviewer agent. Session 4 exposes exactly **Agent card check**,
-**CV fit**, and **Flow audit**. The wiki store remains a hidden knowledge source
-for verbatim regulation citations. CV fit pauses for exact-digest approval;
-the two evidence workflows auto-proceed.
+EVE-authored interviewer agent. Session 4 presents exactly three core governance
+stages — **Agent card check**, **CV fit**, and **Flow audit** — plus optional
+**Graph** and **Ask** evidence-exploration utilities. Graph visualizes the seeded
+EU AI Act wiki. Ask runs the grounded knowledge-query workflow so learners can
+inspect passage citations and tool retrieval; neither utility is another
+governance stage. Wiki reset is disabled in Session 4 to protect the governance
+corpus, so rerun the Session 4 seed script if evidence is missing. The wiki is
+an explicit governance/evidence knowledge plane: deterministic policy decides,
+while visible wiki queries and citations supply rationale. Missing Annex III
+employment or Article 14 evidence fails employment eligibility closed. Eligible
+CV fit runs only to a held draft until a human reviews the actual output and
+decides its exact `result_digest`.
 
 If something misbehaves, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
@@ -201,7 +215,7 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 | `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
 | `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
 | `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
-| `session4` (card evidence + plan release + flow audit) | Improve declared Agent card evidence, approve the exact digest for a held CV-fit composition, then audit post-execution gate and completion evidence | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, release, execution evidence, and legal claims) |
+| `session4` (card evidence + result review + flow audit) | Improve declared Agent card evidence, run eligible CV fit to a held draft, review its exact result digest, then audit release or quarantine evidence | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, deterministic eligibility, result review, execution evidence, and legal claims) |
 
 ## License
 

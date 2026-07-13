@@ -142,6 +142,24 @@ import time as _time
 _OVERSIGHT_MARKERS = ("escalat", "human review", "human oversight", "approval", "judgement boundary", "judgment boundary")
 
 
+def _human_review_before_use_constraint(constraints: list[str]) -> str:
+    for text in constraints:
+        lowered = text.lower()
+        if (
+            "every verdict" in lowered
+            and "draft" in lowered
+            and "approved" in lowered
+            and "human reviewer" in lowered
+            and "before" in lowered
+            and any(
+                marker in lowered
+                for marker in ("candidate screening", "interview", "employment action")
+            )
+        ):
+            return text
+    return ""
+
+
 async def _parse_estate(inputs: dict, ctx: Context) -> dict:
     """Inventory registered cards, lifecycle state, and trace evidence.
 
@@ -170,7 +188,28 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
         return error_envelope("cards.json did not contain a card mapping")
 
     trace_lines, trace_files = await _read_trace_lines(fs, estate_root)
-    plans = _parse_plan_traces(trace_lines)
+    all_plans = _parse_plan_traces(trace_lines)
+    include_legacy = _truthy(inputs.get("include_legacy"))
+    current_plans = [
+        plan for plan in all_plans if _is_current_result_governance_plan(plan)
+    ]
+    legacy_employment_plans = [
+        plan
+        for plan in all_plans
+        if _is_employment_plan_candidate(plan)
+        and not _is_current_result_governance_plan(plan)
+    ]
+    plans = all_plans if include_legacy else current_plans
+    audit_scope = {
+        "include_legacy": include_legacy,
+        "current_result_governance_plans": len(current_plans),
+        "legacy_employment_plans_included": (
+            len(legacy_employment_plans) if include_legacy else 0
+        ),
+        "legacy_employment_plans_excluded": (
+            0 if include_legacy else len(legacy_employment_plans)
+        ),
+    }
 
     inventory = []
     for cap_id, card in sorted(cards.items()):
@@ -181,6 +220,7 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
             c for c in constraints
             if any(marker in c.lower() for marker in _OVERSIGHT_MARKERS)
         ]
+        review_before_use = _human_review_before_use_constraint(constraints)
         purpose_l = str(card.get("purpose") or "").lower()
         oversight_in_purpose = any(m in purpose_l for m in _OVERSIGHT_MARKERS)
         lifecycle = card.get("lifecycle") or {}
@@ -218,6 +258,8 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
             ],
             "oversight_declared": bool(oversight) or oversight_in_purpose,
             "oversight_evidence": oversight[:2],
+            "human_review_before_use_declared": bool(review_before_use),
+            "human_review_before_use_evidence": review_before_use or None,
             "trace_evidence": {
                 "invocations": len(evidence_lines),
                 "trace_files_scanned": trace_files,
@@ -229,6 +271,7 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
         "plans": plans,
         "scanned_at": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
         "trace_files_scanned": trace_files,
+        "audit_scope": audit_scope,
     }
     return {
         "outputs": outputs,
@@ -236,9 +279,52 @@ async def _parse_estate(inputs: dict, ctx: Context) -> dict:
             "valid_output_shape": True,
             "cards_read": len(inventory),
             "traces_scanned": trace_files,
+            "legacy_traces_included": include_legacy,
+            "legacy_employment_plans_excluded": audit_scope["legacy_employment_plans_excluded"],
             "latency_seconds": round(_time.monotonic() - started, 2),
         },
     }
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_current_result_governance_plan(plan: dict[str, Any]) -> bool:
+    release_policy = plan.get("release_policy")
+    governance = plan.get("governance")
+    return (
+        isinstance(release_policy, dict)
+        and release_policy.get("mode") == "human-review-before-release"
+        and isinstance(governance, dict)
+        and governance.get("result_review_required") is True
+        and governance.get("decision") in {"proceed", "reject"}
+    )
+
+
+def _is_employment_plan_candidate(plan: dict[str, Any]) -> bool:
+    workflow = str(plan.get("workflow") or "").strip().lower()
+    use_context = plan.get("use_context")
+    domain = (
+        str(use_context.get("domain") or "").strip().lower()
+        if isinstance(use_context, dict)
+        else ""
+    )
+    capability_ids = {
+        str(value).strip().lower()
+        for value in plan.get("capability_ids") or []
+        if str(value).strip()
+    }
+    return (
+        workflow.startswith("cv-fit")
+        or domain in {"employment", "hiring", "recruitment"}
+        or any(
+            capability.startswith(("parser-cv", "evaluator-cv", "reporter-cv", "interviewer-"))
+            for capability in capability_ids
+        )
+    )
 
 
 def _parse_plan_traces(trace_lines: list[str]) -> list[dict[str, Any]]:
@@ -333,6 +419,11 @@ def _summarize_plan_trace(
             ):
                 capability_ids.append(capability_id)
         plan["capability_ids"] = capability_ids
+    release_policy = plan_event.get("release_policy") if isinstance(plan_event, dict) else None
+    if not isinstance(release_policy, dict) and isinstance(governance_inputs, dict):
+        release_policy = governance_inputs.get("release_policy")
+    if isinstance(release_policy, dict):
+        plan["release_policy"] = release_policy
 
     if isinstance(governance_inputs, dict) and isinstance(
         governance_inputs.get("capability_cards"), list
@@ -378,6 +469,10 @@ def _summarize_plan_trace(
                 ("decision", "decision"),
                 ("report", "evaluation_markdown"),
                 ("findings", "findings"),
+                ("card_eligibility", "card_eligibility"),
+                ("result_review_required", "result_review_required"),
+                ("release_policy", "release_policy"),
+                ("knowledge_evidence", "knowledge_evidence"),
                 ("recorded_at", "ts"),
             ),
         )
@@ -446,6 +541,65 @@ def _summarize_plan_trace(
         )
         plan["resume"] = resume
 
+    result_draft_event = next(
+        (record for record in records if record.get("step") == "result-draft"),
+        None,
+    )
+    result_hold_event = next(
+        (record for record in records if record.get("step") == "result-hold"),
+        None,
+    )
+    result_review_event = next(
+        (record for record in records if record.get("step") == "result-review"),
+        None,
+    )
+    result_release_event = next(
+        (record for record in records if record.get("step") == "result-release"),
+        None,
+    )
+    result_quarantine_event = next(
+        (record for record in records if record.get("step") == "result-quarantine"),
+        None,
+    )
+
+    if isinstance(result_draft_event, dict):
+        plan["draft"] = {
+            "timestamp": result_draft_event.get("ts"),
+            "plan_digest": result_draft_event.get("plan_digest"),
+            "result_digest": result_draft_event.get("result_digest"),
+            "outputs": result_draft_event.get("outputs") or {},
+        }
+    if isinstance(result_hold_event, dict):
+        plan["result_hold"] = {
+            "timestamp": result_hold_event.get("ts"),
+            "plan_digest": result_hold_event.get("plan_digest"),
+            "result_digest": result_hold_event.get("result_digest"),
+            "review_required": result_hold_event.get("review_required"),
+        }
+    if isinstance(result_review_event, dict):
+        plan["review"] = {
+            "decision": result_review_event.get("decision"),
+            "actor_id": result_review_event.get("actor_id"),
+            "timestamp": result_review_event.get("reviewed_at") or result_review_event.get("ts"),
+            "result_digest": result_review_event.get("result_digest"),
+            "review_notes": result_review_event.get("review_notes"),
+        }
+    if isinstance(result_release_event, dict):
+        plan["release"] = {
+            "timestamp": result_release_event.get("ts"),
+            "plan_digest": result_release_event.get("plan_digest"),
+            "result_digest": result_release_event.get("result_digest"),
+            "actor_id": result_release_event.get("actor_id"),
+            "outputs": result_release_event.get("outputs") or {},
+        }
+    if isinstance(result_quarantine_event, dict):
+        plan["quarantine"] = {
+            "timestamp": result_quarantine_event.get("ts"),
+            "plan_digest": result_quarantine_event.get("plan_digest"),
+            "result_digest": result_quarantine_event.get("result_digest"),
+            "actor_id": result_quarantine_event.get("actor_id"),
+        }
+
     governance_capabilities = {
         record.get("capability")
         for record in records
@@ -469,6 +623,11 @@ def _summarize_plan_trace(
             isinstance(governance_result, dict)
             and records.index(governance_result) < invoke_index
         )
+        plan["eligibility_preceded_application_invoke"] = (
+            isinstance(governance_result, dict)
+            and governance_result.get("decision") == "proceed"
+            and records.index(governance_result) < invoke_index
+        )
         if isinstance(approval_event, dict):
             plan["approval_preceded_application_invoke"] = (
                 records.index(approval_event) < invoke_index
@@ -477,6 +636,42 @@ def _summarize_plan_trace(
             plan["resume_preceded_application_invoke"] = (
                 records.index(resume_event) < invoke_index
             )
+
+    application_complete_event = next(
+        (record for record in reversed(records) if record.get("step") == "response"),
+        None,
+    )
+    if isinstance(application_complete_event, dict):
+        plan["application_completed_at"] = application_complete_event.get("ts")
+    if isinstance(result_draft_event, dict):
+        plan["application_completed_before_draft"] = (
+            isinstance(application_complete_event, dict)
+            and records.index(application_complete_event) < records.index(result_draft_event)
+        )
+    if isinstance(result_review_event, dict):
+        plan["draft_preceded_review"] = (
+            isinstance(result_draft_event, dict)
+            and records.index(result_draft_event) < records.index(result_review_event)
+        )
+    if isinstance(result_release_event, dict):
+        plan["review_preceded_release"] = (
+            isinstance(result_review_event, dict)
+            and records.index(result_review_event) < records.index(result_release_event)
+        )
+    if isinstance(result_quarantine_event, dict):
+        plan["review_preceded_quarantine"] = (
+            isinstance(result_review_event, dict)
+            and records.index(result_review_event) < records.index(result_quarantine_event)
+        )
+    draft_outputs = result_draft_event.get("outputs") if isinstance(result_draft_event, dict) else None
+    release_outputs = result_release_event.get("outputs") if isinstance(result_release_event, dict) else None
+    if isinstance(result_release_event, dict):
+        plan["released_result_matches_draft"] = (
+            isinstance(draft_outputs, dict)
+            and isinstance(release_outputs, dict)
+            and draft_outputs == release_outputs
+            and result_release_event.get("result_digest") == result_draft_event.get("result_digest")
+        )
 
     finish_event = next(
         (record for record in reversed(records) if record.get("step") == "finish"),
@@ -492,6 +687,11 @@ def _summarize_plan_trace(
         approval_event=approval_event,
         resume_event=resume_event,
         governance_result=governance_result,
+        result_draft_event=result_draft_event,
+        result_hold_event=result_hold_event,
+        result_review_event=result_review_event,
+        result_release_event=result_release_event,
+        result_quarantine_event=result_quarantine_event,
     )
     return plan
 
@@ -515,8 +715,25 @@ def _execution_status(
     approval_event: dict[str, Any] | None,
     resume_event: dict[str, Any] | None,
     governance_result: dict[str, Any] | None,
+    result_draft_event: dict[str, Any] | None,
+    result_hold_event: dict[str, Any] | None,
+    result_review_event: dict[str, Any] | None,
+    result_release_event: dict[str, Any] | None,
+    result_quarantine_event: dict[str, Any] | None,
 ) -> str:
     steps = {record.get("step") for record in records}
+    if "plan-rejected" in steps:
+        return "plan-rejected"
+    if isinstance(result_quarantine_event, dict):
+        return "quarantined"
+    if isinstance(result_release_event, dict):
+        return "released"
+    if isinstance(result_review_event, dict):
+        return "reviewed"
+    if isinstance(result_hold_event, dict):
+        return "draft-held"
+    if isinstance(result_draft_event, dict):
+        return "draft"
     if "rejected" in steps or (
         isinstance(approval_event, dict) and approval_event.get("decision") == "reject"
     ):

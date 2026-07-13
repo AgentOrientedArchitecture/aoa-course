@@ -3,9 +3,10 @@ version: 0.1.0
 kind: au
 purpose: |
   Evaluate post-execution trace evidence for employment-shaped resolved plans:
-  governance decision, exact-digest approval, event order, resume, and observed
-  completion. Cite Article 14 from the course wiki. Emits flow evidence only,
-  never a legal, compliance, or effective-oversight verdict.
+  selected-card eligibility, eligibility before invocation, application completion
+  before immutable draft creation, exact-result review, release or quarantine
+  order, and released-payload identity. Cite Article 14 through the wiki-store
+  governance knowledge plane.
 inputs:
   - name: plans
     type: array
@@ -17,10 +18,12 @@ outputs:
     type: object
 constraints:
   - The output is a single JSON object.
-  - Findings assess observed plan and trace evidence only, not individual card completeness.
-  - Employment-shaped plans are checked for a pre-execution hold, exact-digest approval, governance and approval order, resume, and successful completion.
-  - Every finding carries the complete retrieved Article 14 passage, or is marked corpus_silent.
-  - Green means the specified execution evidence was observed, never that human oversight was effective or Article 14 was satisfied.
+  - Findings assess observed plan and trace evidence only; selected-card eligibility is consumed as plan evidence, not re-scored as a component-card matrix.
+  - Employment flows check an eligible selected card, a proceed decision before application invocation, application completion before draft, exact result_digest review with notes, and review before release or quarantine.
+  - Approval requires release of the exact approved draft payload; rejection requires quarantine and no released result.
+  - Legacy hold, plan-approval, and resume records may be parsed but do not satisfy the current result-governance checks.
+  - Queries Article 14 through tool-wiki-store and retains the query, passage ID, source, and complete quote, or marks the finding corpus_silent.
+  - Green means only that the specified declared and observed flow evidence is present, never compliance or effective oversight.
   - No output may state or imply legal permission or a compliance determination.
 evaluation_signals:
   - valid_output_shape

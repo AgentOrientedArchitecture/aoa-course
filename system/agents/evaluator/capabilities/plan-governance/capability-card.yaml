@@ -3,9 +3,10 @@ version: 0.1.0
 kind: au
 purpose: |
   Evaluate a fully resolved multi-AU plan before application capabilities run.
-  Detect employment-shaped compositions and require an accountable human
-  approval before execution. Emits an operational gate and evidence report,
-  never a legal classification, compliance, or deployment determination.
+  Reject employment compositions whose selected evaluator card lacks the
+  required review-before-use declaration or whose plan lacks a post-result
+  review-before-release control. Retrieve the regulatory rationale from the
+  course wiki. Emits an operational eligibility decision, never a legal verdict.
 inputs:
   - name: workflow
     type: string
@@ -19,6 +20,9 @@ inputs:
   - name: capability_cards
     type: array
     required: true
+  - name: release_policy
+    type: object
+    required: true
   - name: plan_digest
     type: string
     required: true
@@ -27,20 +31,29 @@ outputs:
     type: string
   - name: plan_digest
     type: string
+  - name: result_review_required
+    type: boolean
+  - name: card_eligibility
+    type: object
+  - name: knowledge_evidence
+    type: object
   - name: findings
     type: array
   - name: evaluation_markdown
     type: string
 constraints:
   - The output is a single JSON object.
-  - decision is one of proceed, require-human-approval, or reject.
-  - Employment-shaped plans that score, rank, recommend, screen, or prepare interviews for candidates require accountable human approval before any application AU executes.
-  - The evaluator assesses declared use context, resolved task purposes/capabilities/input mappings, and selected card output contracts, not isolated capability posture.
-  - The decision is an operational execution gate only and never legal permission or a compliance determination.
+  - decision is one of proceed or reject; a human never approves an unseen plan.
+  - Employment-shaped plans may proceed only when evaluator-cv declares every verdict draft-only until human review before employment use.
+  - Employment-shaped plans must declare a human-review-before-release result policy; execution may produce a draft but may not release it automatically.
+  - Annex III and Article 14 rationale is retrieved from tool-wiki-store with complete passage ids, sources, and quotes; missing governance knowledge fails closed.
+  - The decision is an operational eligibility gate only and never legal permission or a compliance determination.
   - Deterministic; no model call is made.
 evaluation_signals:
   - valid_output_shape
   - resolved_plan_assessed
+  - card_eligibility_assessed
+  - result_release_control_assessed
   - decision_supported
   - no_compliance_verdict
   - latency_p95_under(2s)

@@ -2,10 +2,11 @@ id: evaluator-agent-evidence
 version: 0.1.0
 kind: au
 purpose: |
-  Evaluate the evidence hooks declared by individual Agentic Unit capability
-  cards against selected EU AI Act Articles 9-14 and 72, with complete
-  regulation passages retrieved from the course wiki. Emits component evidence
-  findings only, never a classification, legal permission, or compliance verdict.
+  Evaluate evidence hooks declared by individual Agentic Unit capability cards
+  against EU AI Act Articles 9-14 and 72, using the course wiki store as the
+  explicit governance knowledge plane. Emits component evidence findings only,
+  including whether evaluator-cv declares every verdict draft-only pending human
+  review before candidate or employment use.
 inputs:
   - name: inventory
     type: array
@@ -18,8 +19,10 @@ outputs:
 constraints:
   - The output is a single JSON object.
   - Findings are component-card evidence only and do not assess a resolved plan or execution trace.
-  - Every finding carries a complete retrieved regulation citation, or is marked corpus_silent with severity unknown.
-  - Green means declared evidence is present, never that an obligation is satisfied or a control is effective.
+  - Queries Articles 9-14 and 72 through tool-wiki-store; model memory is not governance evidence.
+  - Findings and summary collectively retain each query, passage ID, source, and complete quote, or mark the target corpus_silent with severity unknown.
+  - evaluator-cv Article 14 evidence is present only when the card declares every verdict draft-only until human review before candidate screening, interview, or employment action.
+  - Green means the specified declared evidence is present, never compliance, satisfaction of an obligation, or effective oversight.
   - Article 10 findings are capped at amber because declared boundaries do not establish data governance quality.
   - Annex III marker matches are candidates for contextual legal assessment, not classifications.
   - No output may state or imply legal permission or a compliance determination.

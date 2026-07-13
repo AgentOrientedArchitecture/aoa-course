@@ -8,7 +8,7 @@
 services:
   registry:
     environment:
-      REGISTRY_CARD_ALLOWLIST: tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,evaluator-cv,evaluator-plan-governance,reporter-cv-fit,parser-estate,evaluator-agent-evidence,evaluator-flow-evidence,reporter-agent-evidence,reporter-flow-audit
+      REGISTRY_CARD_ALLOWLIST: tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,reporter-cv-fit,reporter-answer,parser-estate,evaluator-agent-evidence,evaluator-flow-evidence,reporter-agent-evidence,reporter-flow-audit
 
   planner:
     environment:
@@ -16,11 +16,13 @@ services:
       # a small local model to rediscover each course workflow.
       PLANNER_STRATEGY: deterministic
       PLAN_GOVERNANCE_CAPABILITY: evaluator-plan-governance
-      PLAN_APPROVER_ID: urn:aoa:human:course-plan-approver
+      RESULT_REVIEWER_ID: urn:aoa:human:course-result-reviewer
 
   studio:
     environment:
-      STUDIO_WORKFLOWS: agent-card-check,cv-fit,flow-audit
+      # Three governance stages plus optional EU Act evidence exploration.
+      STUDIO_WORKFLOWS: agent-card-check,cv-fit,flow-audit,wiki-graph,knowledge-query
+      STUDIO_ALLOW_WIKI_RESET: "false"
 
   tool-filesystem:
     volumes:
@@ -32,8 +34,8 @@ services:
 
   evaluator:
     environment:
-      CAPABILITY_ALLOWLIST: evaluator-cv,evaluator-agent-evidence,evaluator-flow-evidence,evaluator-plan-governance
+      CAPABILITY_ALLOWLIST: evaluator-cv,evaluator-wiki-query,evaluator-agent-evidence,evaluator-flow-evidence,evaluator-plan-governance
 
   reporter:
     environment:
-      CAPABILITY_ALLOWLIST: reporter-cv-fit,reporter-agent-evidence,reporter-flow-audit
+      CAPABILITY_ALLOWLIST: reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit

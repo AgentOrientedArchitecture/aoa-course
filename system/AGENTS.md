@@ -66,9 +66,9 @@ agents/evaluator/
 Each folder contains its capability card, `instructions.md`, and `tools.yaml`.
 The three Session 4 evaluator roles are distinct:
 `evaluator-agent-evidence` assesses declared card evidence,
-`evaluator-plan-governance` controls whether an exact resolved plan may
-execute, and `evaluator-flow-evidence` assesses observed execution evidence
-after a run.
+`evaluator-plan-governance` deterministically checks whether a resolved plan is
+eligible to run to a held draft, and `evaluator-flow-evidence` assesses observed
+exact-result review and release/quarantine evidence after a run.
 
 Each container registers the capabilities allowed for that runtime at boot. The
 registry lists separate rows. The studio shows separate cards. A single
@@ -113,9 +113,11 @@ back to the deterministic course plan if needed, and binds each task to a
 concrete card. When plan governance is enabled, the planner records the
 resolved plan and digest and invokes the control-plane
 `evaluator-plan-governance` before any application-card lookup or invocation.
-Only a released plan proceeds. Once an application task is released, its
-selected card includes `a2a_endpoint`, so the planner sends an A2A JSON-RPC
-request:
+An ineligible plan is rejected before application work. An eligible employment
+plan runs application AUs only to a frozen draft; release waits for human review
+of the actual output and its exact `result_digest`. Once an application task is
+eligible to run, its selected card includes `a2a_endpoint`, so the planner sends
+an A2A JSON-RPC request:
 
 ```json
 POST http://evaluator:8888/a2a
@@ -260,9 +262,9 @@ The filesystem, document text extractor, and wiki store are MCP-backed examples.
 [`tools/document-text/`](tools/document-text/) plus
 [`tools/wiki-store/`](tools/wiki-store/).
 
-## Session 4 - card evidence, plan release, and flow audit
+## Session 4 - card evidence, result review, and flow audit
 
-Session 4 exposes exactly three learner-facing Studio workflows:
+Session 4 has exactly three core governance learning stages in Studio:
 
 ```text
 agent-card-check: parser-estate → evaluator-agent-evidence → reporter-agent-evidence
@@ -270,36 +272,61 @@ cv-fit:           parser-cv → evaluator-cv → reporter-cv-fit
 flow-audit:       parser-estate → evaluator-flow-evidence → reporter-flow-audit
 ```
 
-**Agent card check** evaluates declarations in current capability cards.
-`evaluator-agent-evidence` retrieves verbatim Article 14 and other regulation
-passages from the wiki store, which remains a hidden knowledge source in this
-session. Editing the `evaluator-cv` card constraint hot-reloads and changes this
-evidence surface. Green means declared evidence only, not an implemented or
-effective control.
+Studio also exposes optional **Graph** and **Ask** evidence-exploration
+utilities. Graph visualizes the seeded EU AI Act wiki. Ask reuses the grounded
+`knowledge-query` workflow so learners can inspect passage citations and
+`tool-wiki-store` retrieval. They are not additional governance stages. Wiki
+reset is disabled in Session 4 to protect the governance corpus; rerun the
+Session 4 seed script if evidence is missing.
 
-For **CV fit**, the deterministic control-plane AU
-`evaluator-plan-governance` runs after concrete resolution and digest creation,
-but before any application lookup or invocation. The employment use context
-returns `require-human-approval`, so no application AU runs while the plan is
-held. **Approve this plan and run** must submit the exact held digest; the same
-trace records `plan-approval` and `resume` before the frozen plan executes. A
-wrong or stale digest receives HTTP `409`.
+**Agent card check** starts with `evaluator-cv` Article 14 red.
+`evaluator-agent-evidence` visibly calls `tool-wiki-store`, and the report keeps
+the exact query, passage ID, source, and complete quote inspectable. A learner
+may try CV fit at this point and observe deterministic rejection before any
+application AU `lookup` or `invoke`.
 
-**Flow audit** is post-execution evidence only. `parser-estate` reconstructs
-planner JSONL records, `evaluator-flow-evidence` evaluates evidence for the
-gate, digest, ordering, resume, and completion, and `reporter-flow-audit`
-renders that evidence without treating card declarations as execution.
+The learner adds exactly this `evaluator-cv` constraint:
 
-These are separate claims: card evidence is a declaration, plan governance is
-an operational release decision, and flow audit is execution evidence. None
-confers legal permission, establishes legal compliance or certification, or
-proves effective human oversight.
+```yaml
+- Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
+```
 
-The digest binds workflow, intent, resolved tasks/dataflow, and the selected
-cards' identity/version, purpose, contracts, constraints, signals, lifecycle,
-provenance, and endpoints. It is a correlation mechanism, not a signature or
-authorization credential.
+The card hot-reloads. Rerunning Agent card check turns the declaration green;
+green means observed declaration only, not an implemented or effective control.
 
-Held run objects live in planner memory. A planner restart leaves trace JSONL
-evidence on disk but loses the active run required for approval or resume; this
-is not production persistence or crash-idempotent orchestration.
+For **CV fit**, `evaluator-plan-governance` makes the deterministic
+pre-execution eligibility decision. The wiki is an explicit, inspectable
+governance/evidence knowledge plane: policy decides, while wiki passages supply
+rationale. Missing Annex III employment or Article 14 evidence fails closed.
+When eligibility proceeds, application AUs run to an immutable draft and the
+planner records `result-draft`, `result-hold`, and `result_digest`. A human must
+inspect that actual output, add notes, and approve or reject the exact digest.
+Approval releases the identical draft; rejection quarantines it.
+
+Current CV application AUs are intentionally read/compute/draft only. A result
+hold cannot undo a side effect already performed by an AU.
+
+**Flow audit** reconstructs planner JSONL and checks eligibility before
+application work, application completion before the draft, exact-digest result
+review, release or quarantine ordering, and released-payload equality. It cites
+Article 14 from the wiki. By default, its panel includes only employment traces
+carrying the current `human-review-before-release` result-governance model.
+Older employment traces remain persisted but hidden; the **Show legacy
+history** checkbox includes them and reports the included count. Red legacy rows mean current
+evidence is absent, not necessarily that the old execution failed. Legacy
+`hold`, `plan-approval`, and `resume` records remain parseable but do not satisfy
+result review.
+
+Card evidence, deterministic eligibility, result review, execution evidence,
+and legal claims are separate. None confers legal permission, establishes legal
+compliance or certification, or proves effective human oversight.
+
+`plan_digest` correlates eligibility with the resolved composition.
+`result_digest` binds human review to the frozen final outputs and plan digest.
+Both are course integrity mechanisms, not signatures or authorization
+credentials.
+
+Held draft objects live in planner memory. A planner restart leaves trace JSONL
+evidence on disk but loses the active draft required for result review; submit a
+new intent. This is not production persistence or crash-idempotent
+orchestration.

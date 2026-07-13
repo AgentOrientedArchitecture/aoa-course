@@ -227,6 +227,17 @@ main {
   flex-direction: column;
   gap: 8px;
 }
+.audit-history-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.audit-history-option input {
+  margin: 0;
+}
 .hidden {
   display: none !important;
 }
@@ -305,6 +316,33 @@ main {
   opacity: 0.6;
   cursor: progress;
 }
+#result-review-controls {
+  flex-direction: column;
+  align-items: stretch;
+}
+.review-notes-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.review-notes-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.review-buttons {
+  display: flex;
+  gap: 8px;
+}
+.draft-notice {
+  padding: 8px 10px;
+  border-left: 3px solid #e0b04b;
+  background: #fff3cd;
+  color: #684500;
+  font: 12px/1.5 var(--mono);
+}
 
 .approval-evidence {
   margin-top: 12px;
@@ -379,27 +417,31 @@ button.secondary.danger {
   font: 12px/1.4 var(--mono);
 }
 .run-state.running,
-.run-state.approved,
+.run-state.reviewed,
+.run-state.released,
 .run-state.done {
   border-color: #b7dfc6;
   background: #e6f4ec;
   color: var(--ok);
 }
-.run-state.held {
+.run-state.held,
+.run-state.draft,
+.run-state.draft-held {
   border-color: #e0b04b;
   background: #fff3cd;
   color: #684500;
 }
 
 .run-state.error,
-.run-state.rejected {
+.run-state.rejected,
+.run-state.quarantined {
   border-color: #f2b8b5;
   background: #fdecea;
   color: var(--warn);
 }
 .lifecycle-rail {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 6px;
   list-style: none;
   margin: 0;
@@ -422,6 +464,16 @@ button.secondary.danger {
   border-color: #b7dfc6;
   background: #edf8f1;
   color: var(--ok);
+}
+.lifecycle-rail li.held {
+  border-color: #e0b04b;
+  background: #fff3cd;
+  color: #684500;
+}
+.lifecycle-rail li.error {
+  border-color: #f2b8b5;
+  background: #fdecea;
+  color: var(--warn);
 }
 .lifecycle-rail li.active {
   border-color: var(--accent);

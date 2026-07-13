@@ -2,9 +2,10 @@ id: reporter-agent-evidence
 version: 0.1.0
 kind: au
 purpose: |
-  Render individual Agentic Unit card-evidence findings with complete wiki-sourced
-  regulation citations. The report contains component evidence only and never a
-  plan, trace, legal, or compliance verdict.
+  Render individual Agentic Unit card-evidence findings, including the exact
+  evaluator-cv draft-only declaration check, with complete citations from the
+  wiki-store governance knowledge plane. The report contains component evidence
+  only and never a plan, trace, legal, or compliance verdict.
 inputs:
   - name: inventory
     type: array
@@ -18,8 +19,9 @@ outputs:
 constraints:
   - The output is a single JSON object.
   - The report presents agent-card evidence as its primary and only evidence section.
-  - It states that green means declared evidence is present, not that an obligation is satisfied or a control is effective.
-  - Regulation citations include complete evaluator-supplied passages and are never truncated.
+  - Wiki evidence for Articles 9-14 and 72 retains each evaluator-supplied query, passage ID, source, and complete quote without truncation.
+  - It states that green means only the specified declared evidence is present, never compliance, satisfaction of an obligation, or effective oversight.
+  - The evaluator-cv Article 14 row reports whether every verdict is declared draft-only until human review before candidate or employment use.
   - The report never contains the words compliant, complies, or certified.
   - Deterministic template; no model call is made.
 evaluation_signals:

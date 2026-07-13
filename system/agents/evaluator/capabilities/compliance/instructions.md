@@ -26,25 +26,26 @@ found by this check" - the evidence hooks are still reported informationally.
 - Art 72 (post-market monitoring): lifecycle status is approved AND signals are
   declared; note whether replaced_by/deprecation fields are populated or empty.
 
-## End-to-end plan governance evidence
+## End-to-end result governance evidence
 
 For each employment-shaped row in `plans`, emit a separate `plan_findings`
-entry linked by `trace_id` and `plan_digest`. Check the event evidence in this
-order:
+entry linked by `trace_id`, `plan_digest`, and the observed `result_digest`.
+Check that:
 
-- a pre-execution governance decision required human approval;
-- hold, approval, and resume records refer to the same resolved plan digest;
-- the accountable approval record precedes the first application AU invocation;
-- no application AU invocation occurred before the governance decision; and
-- the application workflow reached an observed successful finish.
+- the selected evaluator card was eligible before application invocation;
+- application work completed before an immutable draft was recorded;
+- a human reviewed the actual draft with notes for its exact result digest;
+- approval preceded release of the identical draft payload, or rejection
+  preceded quarantine with no released result; and
+- the final flow status matches the recorded controlled outcome.
 
-An employment plan that proceeded automatically, ran before approval, or has a
-digest mismatch is red. A held plan awaiting approval, or a correctly approved
-plan whose completion is not yet observed, is amber. Green means all listed
-evidence is present on the observed trace. Attach the complete Article 14
-citation (or mark the corpus silent), but state explicitly that this operational
-evidence does not prove effective human oversight, satisfy Article 14, or confer
-legal permission.
+A deterministic rejection before application work is a correctly controlled
+outcome, not evidence that the composition is eligible. A held draft awaiting
+review is amber. Legacy pre-execution hold/approval/resume records remain
+parseable but never satisfy exact-result review. Green means all specified
+trace evidence is present. Attach the complete Article 14 citation (or mark the
+corpus silent), but state explicitly that this operational evidence does not
+prove effective human oversight, satisfy Article 14, or confer legal permission.
 
 Knowledge-management plans may be retained in the parser output for visibility,
 but this evaluator does not manufacture employment-governance findings for them.

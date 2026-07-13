@@ -62,7 +62,11 @@ function emptyLifecycle() {
     plan: [],
     governance: null,
     planDigest: "",
-    approval: null,
+    draft: null,
+    resultDigest: "",
+    review: null,
+    release: null,
+    quarantine: null,
     result: null,
     error: "",
   };
@@ -412,32 +416,76 @@ function applyLifecycleEvent(record) {
       decision: record.decision || "",
       plan_digest: record.plan_digest || "",
       findings: record.findings || [],
+      card_eligibility: record.card_eligibility || {},
+      release_policy: record.release_policy || {},
+      result_review_required: Boolean(record.result_review_required),
+      knowledge_evidence: record.knowledge_evidence || {},
       evaluation_markdown: record.evaluation_markdown || "",
       signals: record.signals || {},
     };
     life.planDigest = record.plan_digest || life.planDigest;
     return;
   }
+  if (record.step === "governance-release") {
+    life.status = "running";
+    return;
+  }
+  if (record.step === "plan-rejected") {
+    life.status = "rejected";
+    return;
+  }
+  if (record.step === "result-draft") {
+    life.draft = record.outputs || {};
+    life.resultDigest = record.result_digest || "";
+    life.status = "draft";
+    return;
+  }
+  if (record.step === "result-hold") {
+    life.resultDigest = record.result_digest || life.resultDigest;
+    life.status = "draft-held";
+    return;
+  }
+  if (record.step === "result-review") {
+    life.review = {
+      decision: record.decision || "",
+      actor_id: record.actor_id || "",
+      reviewed_at: record.reviewed_at || record.ts || "",
+      result_digest: record.result_digest || "",
+      review_notes: record.review_notes || "",
+    };
+    life.status = "reviewed";
+    return;
+  }
+  if (record.step === "result-release") {
+    life.release = {
+      result_digest: record.result_digest || "",
+      actor_id: record.actor_id || "",
+      released_at: record.ts || "",
+    };
+    life.result = record.outputs || {};
+    life.status = "released";
+    return;
+  }
+  if (record.step === "result-quarantine") {
+    life.quarantine = {
+      result_digest: record.result_digest || "",
+      actor_id: record.actor_id || "",
+      quarantined_at: record.ts || "",
+    };
+    life.status = "quarantined";
+    return;
+  }
+  // Legacy pre-execution approval traces remain readable in the event view.
   if (record.step === "hold") {
     life.status = "held";
     life.planDigest = record.plan_digest || life.planDigest;
-    if (life.governance && !life.governance.evaluation_markdown) {
-      life.governance.evaluation_markdown = record.evaluation_markdown || "";
-    }
     return;
   }
   if (record.step === "plan-approval") {
-    life.approval = {
-      decision: record.decision || "",
-      actor_id: record.actor_id || "",
-      approved_at: record.approved_at || record.ts || "",
-      plan_digest: record.plan_digest || "",
-      reason: record.reason || "",
-    };
     life.status = record.decision === "reject" ? "rejected" : "approved";
     return;
   }
-  if (record.step === "resume" || record.step === "governance-release") {
+  if (record.step === "resume") {
     life.status = "running";
     return;
   }
@@ -470,8 +518,16 @@ function applyLifecycleEvent(record) {
     return;
   }
   if (record.step === "finish") {
-    life.result = record.outputs || {};
-    life.status = record.outputs && record.outputs.error ? "error" : "done";
+    if (life.status === "quarantined" || life.status === "rejected") {
+      void loadWikiGraph();
+      return;
+    }
+    life.result = record.outputs || life.result || {};
+    life.status = record.outputs && record.outputs.error
+      ? "error"
+      : life.status === "released"
+        ? "released"
+        : "done";
     void loadWikiGraph();
   }
 }
@@ -508,6 +564,7 @@ function renderLifecycle() {
   renderPlanner(life);
   renderPlanGovernance(life);
   renderTasks(life);
+  renderResultReview(life);
   renderResult(life);
 }
 
@@ -765,24 +822,26 @@ function renderLifecycleRail(life) {
   const stages = [
     ["intent", "Intent", Boolean(life.intent)],
     ["context", "Capabilities", life.capabilityContext.length > 0],
-    ["proposal", "Plan proposal", Boolean(life.proposal || life.fallbackReason || life.source === "deterministic")],
-    ["validation", "Validation", Boolean(life.validation || life.fallbackReason || life.source === "deterministic")],
-    ["governance", "Plan governance", Boolean(life.governance)],
-    ["work", "Work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))],
-    ["result", "Result", Boolean(life.result)],
+    ["proposal", "Resolved plan", Boolean(life.plan.length || life.proposal || life.source === "deterministic")],
+    ["governance", "Eligibility", Boolean(life.governance)],
+    ["work", "Application work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))],
+    ["draft", "Draft", Boolean(life.draft)],
+    ["review", "Human review", Boolean(life.review)],
+    ["release", "Release", Boolean(life.release || life.quarantine)],
   ];
   const rail = $("lifecycle-rail");
   rail.innerHTML = "";
   for (const [key, label, done] of stages) {
     const li = document.createElement("li");
     li.className = done ? "done" : "pending";
-    if (key === "governance" && life.status === "held") {
+    if (key === "draft" && life.status === "draft-held") {
       li.className = "held";
     }
     if (key === "work" && life.tasks.some((task) => task.status === "running")) {
       li.className = "active";
     }
-    if ((key === "result" || key === "validation" || key === "work") && life.status === "error") {
+    if (["governance", "work", "draft", "review", "release"].includes(key)
+        && ["error", "rejected", "quarantined"].includes(life.status)) {
       li.classList.add("error");
     }
     li.innerHTML = `<span class="stage-dot"></span><span>${escapeHtml(label)}</span>`;
@@ -861,10 +920,16 @@ function isResponsibilityRecord(record) {
     "plan-proposal",
     "governance-invoke",
     "plan-governance",
+    "governance-release",
+    "plan-rejected",
+    "result-draft",
+    "result-hold",
+    "result-review",
+    "result-release",
+    "result-quarantine",
     "hold",
     "plan-approval",
     "resume",
-    "governance-release",
     "rejected",
     "select",
     "lookup",
@@ -906,8 +971,26 @@ function traceEventView(record) {
   if (step === "plan-governance") {
     return traceView("governance", status, `Plan decision: ${record.decision || "unknown"}`, record.workflow || "workflow", record.plan_digest || "");
   }
+  if (step === "plan-rejected") {
+    return traceView("governance", "error", "Plan blocked as ineligible", "No application AU was invoked", record.plan_digest || "");
+  }
+  if (step === "result-draft") {
+    return traceView("result", "done", "Draft evaluation ready", "Draft is not released", record.result_digest || "");
+  }
+  if (step === "result-hold") {
+    return traceView("governance", "held", "Draft held for human review", "Review the actual evaluation before release", record.result_digest || "");
+  }
+  if (step === "result-review") {
+    return traceView("governance", record.decision === "reject" ? "error" : "done", `Result ${record.decision || "reviewed"}`, record.actor_id || "human reviewer", record.result_digest || "");
+  }
+  if (step === "result-release") {
+    return traceView("result", "done", "Approved result released", record.actor_id || "human reviewer", record.result_digest || "");
+  }
+  if (step === "result-quarantine") {
+    return traceView("result", "error", "Rejected result quarantined", record.actor_id || "human reviewer", record.result_digest || "");
+  }
   if (step === "hold") {
-    return traceView("governance", "held", "Execution held", "Accountable approval is required before application work", record.plan_digest || "");
+    return traceView("governance", "held", "Legacy execution hold", "Legacy pre-execution approval trace", record.plan_digest || "");
   }
   if (step === "plan-approval") {
     return traceView("governance", "done", `Plan ${record.decision || "reviewed"}`, record.actor_id || "accountable reviewer", record.plan_digest || "");
@@ -936,10 +1019,19 @@ function traceEventView(record) {
     return traceView(layer, status, `${cap} started`, shapeLine(record.inputs_shape), [agentId || record.agent, record.model, hash].filter(Boolean).join(" · "));
   }
   if (step === "tool-invoke") {
-    return traceView(layer, status, `${parent} called ${cap}`, shapeLine(record.inputs_shape), "inward tool boundary");
+    const detail = record.query ? `query: ${record.query}` : shapeLine(record.inputs_shape);
+    const meta = record.operation ? `${record.operation} · inward tool boundary` : "inward tool boundary";
+    return traceView(layer, status, `${parent} called ${cap}`, detail, meta);
   }
   if (step === "tool-response") {
-    return traceView(layer, status, `${cap} returned`, shapeLine(record.outputs_shape), signalLine(record.signals) || latency);
+    const citation = Array.isArray(record.citations) ? record.citations[0] : null;
+    const detail = citation && citation.passage_id
+      ? `citation: ${citation.passage_id}`
+      : shapeLine(record.outputs_shape);
+    const meta = citation && citation.source_path
+      ? citation.source_path
+      : signalLine(record.signals) || latency;
+    return traceView(layer, status, `${cap} returned`, detail, meta);
   }
   if (step === "tool-error") {
     return traceView(layer, status, `${cap} failed`, record.error || "tool error", latency);
@@ -987,7 +1079,8 @@ function traceLayer(step) {
   if (step === "start") return "intent";
   if (step === "capability-context" || step === "lookup" || step === "select") return "registry";
   if (step === "plan-proposal") return "planner";
-  if (["governance-invoke", "plan-governance", "hold", "plan-approval", "resume", "governance-release", "rejected"].includes(step)) return "governance";
+  if (["governance-invoke", "plan-governance", "governance-release", "plan-rejected", "result-hold", "result-review", "hold", "plan-approval", "resume", "rejected"].includes(step)) return "governance";
+  if (["result-draft", "result-release", "result-quarantine"].includes(step)) return "result";
   if (step === "au-start" || step === "au-finish" || step === "au-error") return "au";
   if (step === "tool-invoke" || step === "tool-response" || step === "tool-error") return "tool";
   if (step === "finish") return "result";
@@ -1087,15 +1180,12 @@ function renderPlanner(life) {
 function renderPlanGovernance(life) {
   const stateLabel = $("governance-state");
   const body = $("governance-body");
-  const approve = $("governance-approve");
-  const actionStatus = $("governance-action-status");
-  if (!stateLabel || !body || !approve) return;
+  if (!stateLabel || !body) return;
 
   if (!life.governance) {
     stateLabel.textContent = "waiting";
     body.className = "result-body muted-block";
     body.textContent = "No resolved plan has been evaluated yet.";
-    approve.hidden = true;
     return;
   }
 
@@ -1110,53 +1200,112 @@ function renderPlanGovernance(life) {
     pre.innerHTML = highlightJson(life.governance);
     body.appendChild(pre);
   }
-
-  if (life.approval) {
-    const approval = document.createElement("p");
-    approval.className = "approval-evidence";
-    approval.textContent = `${life.approval.decision} by ${life.approval.actor_id} for plan ${life.approval.plan_digest}`;
-    body.appendChild(approval);
-  }
-  approve.hidden = life.status !== "held";
-  approve.disabled = false;
-  if (life.status === "held") actionStatus.textContent = "Execution is paused before the first application AU.";
-  else if (life.approval) actionStatus.textContent = "Approval recorded on this trace.";
-  else actionStatus.textContent = "";
 }
 
 
-async function approveHeldPlan() {
-  const life = state.lifecycle;
-  const button = $("governance-approve");
-  const status = $("governance-action-status");
-  if (!state.currentTraceId || life.status !== "held" || !life.planDigest) return;
+function renderResultReview(life) {
+  const stateLabel = $("result-review-state");
+  const body = $("result-review-body");
+  const controls = $("result-review-controls");
+  if (!stateLabel || !body || !controls) return;
 
-  button.disabled = true;
-  status.textContent = "Recording approval and executing the frozen plan…";
+  controls.hidden = life.status !== "draft-held";
+  if (!life.draft) {
+    stateLabel.textContent = life.status === "rejected" ? "plan blocked" : "waiting";
+    body.className = "result-body muted-block";
+    body.textContent = life.status === "rejected"
+      ? "The plan was ineligible, so no application AU ran and no draft exists."
+      : "No draft result is awaiting review.";
+    return;
+  }
+
+  stateLabel.textContent = life.status;
+  body.className = "result-body";
+  body.innerHTML = "";
+  const notice = document.createElement("p");
+  notice.className = "draft-notice";
+  if (life.status === "released") {
+    notice.textContent = `Human-approved draft released unchanged. Result digest: ${life.resultDigest}`;
+  } else if (life.status === "quarantined") {
+    notice.textContent = `Human-rejected draft quarantined; no result released. Result digest: ${life.resultDigest}`;
+  } else {
+    notice.textContent = `Draft only — not released. Result digest: ${life.resultDigest}`;
+  }
+  body.appendChild(notice);
+  const markdown = life.draft.report_markdown || life.draft.answer_markdown || life.draft.ingest_markdown || life.draft.findings_markdown || "";
+  if (markdown) body.appendChild(renderMarkdown(markdown));
+  else {
+    const pre = document.createElement("pre");
+    pre.className = "json-view";
+    pre.innerHTML = highlightJson(life.draft);
+    body.appendChild(pre);
+  }
+  if (life.review) {
+    const review = document.createElement("p");
+    review.className = "approval-evidence";
+    review.textContent = `${life.review.decision} by ${life.review.actor_id}: ${life.review.review_notes}`;
+    body.appendChild(review);
+  }
+}
+
+
+async function reviewHeldResult(decision) {
+  const life = state.lifecycle;
+  const approve = $("result-review-approve");
+  const reject = $("result-review-reject");
+  const status = $("result-review-action-status");
+  const notes = $("result-review-notes").value.trim();
+  if (!state.currentTraceId || life.status !== "draft-held" || !life.resultDigest) return;
+  if (!notes) {
+    status.textContent = "Add reviewer notes before approving or rejecting the draft.";
+    return;
+  }
+
+  approve.disabled = true;
+  reject.disabled = true;
+  status.textContent = decision === "approve" ? "Approving and releasing…" : "Rejecting and quarantining…";
   try {
-    const response = await fetch(`/api/runs/${encodeURIComponent(state.currentTraceId)}/approval`, {
+    const response = await fetch(`/api/runs/${encodeURIComponent(state.currentTraceId)}/review`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        decision: "approve",
-        plan_digest: life.planDigest,
-        reason: "Approved interactively in the course Studio after reviewing the resolved plan.",
+        decision,
+        result_digest: life.resultDigest,
+        review_notes: notes,
       }),
     });
     const run = await response.json();
     if (!response.ok) {
-      status.textContent = `error: ${run.error || response.statusText}`;
+      status.textContent = `error: ${apiErrorMessage(run, response.statusText)}`;
       return;
     }
     life.status = run.status || life.status;
-    life.approval = run.approval || life.approval;
-    if (run.status === "done" && run.outputs) life.result = run.outputs;
-    status.textContent = run.status === "done" ? "Approved plan completed." : `run ${run.status}`;
+    life.review = run.review || life.review;
+    life.resultDigest = run.result_digest || life.resultDigest;
+    if (run.status === "released") life.result = run.outputs || {};
+    status.textContent = run.status === "released"
+      ? "Reviewed result released."
+      : run.status === "quarantined"
+        ? "Reviewed result quarantined."
+        : `run ${run.status}`;
     renderLifecycle();
   } catch (error) {
     status.textContent = `error: ${error}`;
   } finally {
-    button.disabled = false;
+    approve.disabled = false;
+    reject.disabled = false;
+  }
+}
+
+
+function apiErrorMessage(payload, fallback) {
+  const value = payload && (payload.detail || payload.error);
+  if (typeof value !== "string") return value || fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed.detail || parsed.error || value;
+  } catch {
+    return value;
   }
 }
 
@@ -1208,13 +1357,17 @@ function renderResult(life) {
   if (!life.result) {
     resultState.textContent = life.status === "running" ? "waiting" : life.status;
     body.className = "result-body muted-block";
-    body.textContent = life.status === "held"
-      ? "The plan is held. Review the governance report and approve the exact plan before work begins."
-      : "No result yet.";
+    body.textContent = life.status === "draft-held"
+      ? "The evaluation remains a draft. Review it above before any result is released."
+      : life.status === "quarantined"
+        ? "The human-rejected draft is quarantined; no final result was released."
+        : life.status === "rejected"
+          ? "The plan was ineligible, so no result was produced."
+          : "No released result yet.";
     return;
   }
   const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || life.result.findings_markdown || "";
-  resultState.textContent = life.result.error ? "error" : "complete";
+  resultState.textContent = life.result.error ? "error" : life.status === "released" ? "released" : "complete";
   body.className = "result-body";
   if (markdown) {
     body.appendChild(renderMarkdown(markdown));
@@ -1258,17 +1411,24 @@ function pickPayload(record) {
     return {
       decision: record.decision,
       plan_digest: record.plan_digest,
+      card_eligibility: record.card_eligibility,
+      release_policy: record.release_policy,
+      result_review_required: record.result_review_required,
+      knowledge_evidence: record.knowledge_evidence,
       findings: record.findings,
       signals: record.signals,
     };
   }
-  if (["hold", "plan-approval", "resume", "governance-release", "rejected"].includes(record.step)) {
+  if (["governance-release", "plan-rejected", "result-draft", "result-hold", "result-review", "result-release", "result-quarantine", "hold", "plan-approval", "resume", "rejected"].includes(record.step)) {
     return {
       decision: record.decision,
       actor_id: record.actor_id,
       plan_digest: record.plan_digest,
-      approval_required: record.approval_required,
-      reason: record.reason,
+      result_digest: record.result_digest,
+      review_required: record.review_required,
+      review_notes: record.review_notes,
+      card_eligibility: record.card_eligibility,
+      outputs: record.outputs,
     };
   }
   if (record.step === "lookup") return record.card;
@@ -1287,11 +1447,19 @@ function pickPayload(record) {
     return {
       parent_capability: record.parent_capability,
       capability: record.capability,
+      operation: record.operation,
+      query: record.query,
+      limit: record.limit,
       inputs_shape: record.inputs_shape,
     };
   }
   if (record.step === "tool-response") {
-    return { outputs_shape: record.outputs_shape, signals: record.signals };
+    return {
+      passages_returned: record.passages_returned,
+      citations: record.citations,
+      outputs_shape: record.outputs_shape,
+      signals: record.signals,
+    };
   }
   if (record.step === "au-finish") {
     return {
@@ -1316,7 +1484,7 @@ function pickPayload(record) {
 
 function pickMarkdown(record) {
   const outputs = record.outputs || {};
-  if (record.step === "response" || record.step === "finish") {
+  if (["response", "result-draft", "result-release", "finish"].includes(record.step)) {
     return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || outputs.findings_markdown || "";
   }
   if (record.step === "plan-governance" || record.step === "hold") {
@@ -1550,8 +1718,10 @@ async function submitIntent() {
     const body = await resp.json();
     if (!resp.ok) {
       status.textContent = `error: ${body.error || resp.statusText}`;
-    } else if (body.status === "held") {
-      status.textContent = `approval required · trace ${body.trace_id}`;
+    } else if (body.status === "draft-held") {
+      status.textContent = `draft ready for human review · trace ${body.trace_id}`;
+    } else if (body.status === "rejected") {
+      status.textContent = `plan blocked by eligibility policy · trace ${body.trace_id}`;
     } else if (body.outputs && body.outputs.error) {
       status.textContent = `error: ${body.outputs.error}`;
     } else {
@@ -1597,7 +1767,14 @@ function buildIntentPayload(status) {
     };
   }
 
-  if (["agent-card-check", "flow-audit", "estate-check"].includes(state.mode)) {
+  if (state.mode === "flow-audit") {
+    return {
+      kind: state.mode,
+      include_legacy: Boolean($("flow-audit-include-legacy")?.checked),
+    };
+  }
+
+  if (["agent-card-check", "estate-check"].includes(state.mode)) {
     // No learner inputs: these workflows read the estate's governance artefacts.
     return { kind: state.mode };
   }
@@ -1724,7 +1901,7 @@ function setMode(mode) {
     "cv-fit-interview": "Run cv-fit + interview",
     "knowledge-ingest": "Run ingest",
     "wiki-graph": "Refresh graph",
-    "knowledge-query": "Run query",
+    "knowledge-query": "Ask wiki",
     "flow-audit": "Run flow audit",
     "estate-check": "Run estate check",
   };
@@ -1759,7 +1936,8 @@ window.addEventListener("DOMContentLoaded", () => {
   applyWorkflowConfig();
   setupModeTabs();
   $("intent-submit").addEventListener("click", submitIntent);
-  $("governance-approve").addEventListener("click", approveHeldPlan);
+  $("result-review-approve").addEventListener("click", () => reviewHeldResult("approve"));
+  $("result-review-reject").addEventListener("click", () => reviewHeldResult("reject"));
   const reset = $("wiki-reset");
   if (reset) reset.addEventListener("click", resetWikiStore);
   setupFileDrop();

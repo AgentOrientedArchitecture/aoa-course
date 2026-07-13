@@ -37,14 +37,20 @@
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "agent-card-check" %} hidden{% endif %}" data-mode-panel="agent-card-check">
           <p class="mode-note">
-            Inspect the evidence declared by each individual capability card.
-            Findings cite complete regulation passages from the course wiki.
-            Edit the <code>evaluator-cv</code> card, watch it hot-reload, then
-            re-run to see the declaration evidence change.
+            Inspect evidence declared by each capability card. Open the trace to
+            see <code>tool-wiki-store</code> queries and cited passage IDs, then
+            inspect the report for each source and complete quote. Edit the
+            <code>evaluator-cv</code> card, watch it hot-reload, and rerun the check.
           </p>
         </div>
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "cv-fit" %} hidden{% endif %}" data-mode-panel="cv-fit">
+          <p class="mode-note">
+            The baseline card is ineligible, so this plan is blocked before any
+            application AU runs. After you fix the card, execution produces a
+            held draft; review the actual evaluation and approve or reject its
+            exact result digest below.
+          </p>
           <label class="drop-field">
             <span class="drop-label">
               <strong>CV</strong>
@@ -84,6 +90,10 @@
         </div>
 
         <div class="workflow-fields hidden" data-mode-panel="knowledge-query">
+          <p class="mode-note">
+            Ask a grounded question about the seeded EU AI Act notes. The answer
+            should cite wiki passage IDs; inspect the trace to see retrieval.
+          </p>
           <label class="drop-field">
             <span class="drop-label">
               <strong>Question</strong>
@@ -97,10 +107,15 @@
 
         <div class="workflow-fields hidden" data-mode-panel="flow-audit">
           <p class="mode-note">
-            Audit post-execution trace evidence for employment-shaped flows:
-            the governance decision, exact-digest approval, event order, resume,
-            and completion. This does not re-check individual capability cards.
+            Audit employment traces for card eligibility, application-before-draft
+            ordering, exact-result human review, and release or quarantine. The
+            report cites Article 14 from the wiki. Current result-governance
+            traces are shown by default.
           </p>
+          <label class="audit-history-option">
+            <input id="flow-audit-include-legacy" type="checkbox">
+            <span></span>Show legacy history</span>
+          </label>
         </div>
 
         <div class="workflow-fields hidden" data-mode-panel="estate-check">
@@ -118,7 +133,7 @@
             <div class="section-head">
               <span class="section-label">Wiki Graph</span>
               <span class="graph-actions">
-                <button id="wiki-reset" type="button" class="secondary danger">Reset wiki</button>
+                {% if studio_config.allow_wiki_reset %}<button id="wiki-reset" type="button" class="secondary danger">Reset wiki</button>{% endif %}
                 <span id="wiki-graph-state" class="section-meta">waiting</span>
               </span>
             </div>
@@ -167,14 +182,10 @@
 
         <section class="lifecycle-section governance-section">
           <div class="section-head">
-            <span class="section-label">Pre-execution plan governance</span>
+            <span class="section-label">Pre-execution plan eligibility</span>
             <span id="governance-state" class="section-meta">waiting</span>
           </div>
           <div id="governance-body" class="result-body muted-block">No resolved plan has been evaluated yet.</div>
-          <div class="governance-actions">
-            <button id="governance-approve" type="button" hidden>Approve this plan and run</button>
-            <span id="governance-action-status"></span>
-          </div>
         </section>
 
         <section class="lifecycle-section">
@@ -185,9 +196,28 @@
           <ol id="task-list" class="task-list"></ol>
         </section>
 
+        <section class="lifecycle-section governance-section" id="result-review-section">
+          <div class="section-head">
+            <span class="section-label">Human review before result release</span>
+            <span id="result-review-state" class="section-meta">waiting</span>
+          </div>
+          <div id="result-review-body" class="result-body muted-block">No draft result is awaiting review.</div>
+          <div id="result-review-controls" class="governance-actions" hidden>
+            <label class="review-notes-field">
+              <span>Reviewer notes</span>
+              <textarea id="result-review-notes" rows="3" placeholder="Explain why this evaluation is satisfactory to release, or why it must be quarantined."></textarea>
+            </label>
+            <div class="review-buttons">
+              <button id="result-review-approve" type="button">Approve and release</button>
+              <button id="result-review-reject" type="button" class="secondary danger">Reject and quarantine</button>
+            </div>
+            <span id="result-review-action-status"></span>
+          </div>
+        </section>
+
         <section class="lifecycle-section result-section">
           <div class="section-head">
-            <span class="section-label">Result</span>
+            <span class="section-label">Released result</span>
             <span id="result-state" class="section-meta">waiting</span>
           </div>
           <div id="result-body" class="result-body muted-block">No result yet.</div>

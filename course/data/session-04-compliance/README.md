@@ -1,155 +1,116 @@
-# Session 4 - Card evidence, plan release, and flow audit
+# Session 4 - Card check, held result, and flow audit
 
-Session 4 has three learner-facing stages, exposed in Studio as exactly
-**Agent card check**, **CV fit**, and **Flow audit**:
+Session 4 has exactly three core governance learning stages: **Agent card
+check**, **CV fit**, and **Flow audit**. Studio also provides optional **Graph**
+and **Ask** evidence-exploration utilities; they are not extra stages.
 
-1. **Agent card check** inspects what Agent cards declare and cites the relevant
-   regulation text.
-2. **CV fit** demonstrates operational release of one resolved employment
-   composition.
-3. **Flow audit** inspects post-execution evidence for what actually happened.
+## Start and seed
 
-The wiki store remains hidden in Session 4. It supplies verbatim regulation
-citations to the evidence evaluator; it is not a learner-facing Studio mode.
-
-## Keep the claims separate
-
-- **Card evidence** is a public declaration in a capability card. It does not
-  prove that the declared control is implemented or effective.
-- **Operational plan release** decides whether this course planner may execute
-  one exact resolved plan and digest now.
-- **Execution evidence** records whether the gate, digest, event order, resume,
-  and completion were observed on a trace after execution.
-- **Legal compliance and effective oversight** require contextual legal and
-  organisational assessment outside this course system.
-
-Green in Agent card check means *declared evidence is present*. It never means
-legal compliance, certification, legal permission, or effective human
-oversight. A recorded plan approval is likewise a course control event, not
-proof that a real human-oversight process is effective.
-
-## Start and seed Session 4
-
-Session 4 runs the three Studio stages above. Its planner strategy is
-`deterministic`, so each workflow uses a fixed course plan before governance
-evaluates the resolved composition.
-
-On macOS or Linux:
+macOS or Linux:
 
 ```bash
 ./scripts/session4-up.sh
 ./scripts/session4-seed.sh
 ```
 
-On Windows Command Prompt:
+Windows Command Prompt:
 
 ```bat
 scripts\session4-up.bat
 scripts\session4-seed.bat
 ```
 
-The seed command loads the curated EU AI Act corpus through the same
-`write_ingest` contract used by the wiki workflow. In Session 4 that wiki store
-is a hidden knowledge source for verbatim citations. Then open
-`http://localhost:8080`.
+The seed script loads the curated EU AI Act corpus, then verifies the wiki with
+searches for `Annex III employment` and `Article 14 human oversight`. Open
+`http://localhost:8080` when both searches print a top passage ID and source.
+Wiki reset is disabled in Session 4 to protect this governance corpus. If its
+evidence is missing, rerun the seed script.
 
-## Main learner arc
+## 1. Start red: inspect the Agent card
 
-1. Run **Agent card check**:
-   `parser-estate → evaluator-agent-evidence → reporter-agent-evidence`.
-2. Inspect the `evaluator-cv` Article 14 evidence and its verbatim wiki citation.
-3. Under `constraints` in
-   `system/agents/evaluator/capabilities/cv/capability-card.yaml`, add:
-
-   ```yaml
-   - A human reviewer must approve every verdict before it informs candidate screening, interview, or employment action.
-   ```
-
-4. Watch the card hot-reload in the registry, rerun **Agent card check**, and
-   observe the declaration and evidence improve. Green means declared evidence
-   only.
-5. Run **CV fit** and inspect the resolved employment composition. Confirm that
-   `evaluator-plan-governance` returns `require-human-approval` and holds the
-   plan before any application `lookup` or `invoke`.
-6. Click **Approve this plan and run**. Approval must match the held digest; the
-   same trace records `plan-approval`, `resume`, application work, and the final
-   result. A wrong digest, or a selected card that changes while the plan is
-   held, receives HTTP `409`; submit a new intent and review its new digest.
-7. Run **Flow audit**:
-   `parser-estate → evaluator-flow-evidence → reporter-flow-audit`. Inspect only
-   post-execution evidence for the gate, exact digest, event order, resume, and
-   completion.
-
-## What the plan digest binds
-
-The planner derives a 16-character digest from a canonical representation of
-the workflow, full intent, resolved tasks and dataflow, and each selected card's
-governance snapshot: identity/version, purpose, input/output contracts,
-constraints, evaluation signals, lifecycle, provenance, and endpoints. Approval
-is therefore bound to the displayed resolved plan rather than to a workflow
-name in the abstract.
-
-The digest is a course integrity and correlation mechanism. It is not a digital
-signature, authorization token, or production approval protocol.
-
-## Three workflow responsibilities
-
-### Agent card check
+Run **Agent card check**:
 
 ```text
 parser-estate → evaluator-agent-evidence → reporter-agent-evidence
 ```
 
-`parser-estate` reads the current card inventory through `tool-filesystem`.
-`evaluator-agent-evidence` evaluates declared evidence and retrieves complete,
-verbatim regulation passages from the wiki store. `reporter-agent-evidence`
-renders those declarations and citations. A silent corpus produces
-`unknown`/`corpus_silent` rather than a legal paraphrase from model memory.
+`evaluator-cv` starts red for Article 14. In the trace and report, confirm that
+`evaluator-agent-evidence` visibly calls `tool-wiki-store` and shows the exact
+query, passage ID, source, and complete verbatim quote.
 
-Editing the `evaluator-cv` card changes this surface because the public
-declaration changed. It does not release a CV-fit plan or prove that a human
-reviewer can intervene effectively.
+The wiki is an explicit, inspectable governance/evidence knowledge plane. The
+deterministic policy makes decisions; the wiki supplies cited rationale and
+evidence rather than uncited model knowledge.
 
-### CV fit operational release
+Optional: run **CV fit** now. Employment eligibility is rejected before any
+application AU `lookup` or `invoke` because the selected `evaluator-cv` card is
+missing the required declaration.
 
-After resolving the concrete CV-fit plan, the planner computes its digest and
-invokes `evaluator-plan-governance` before any application-card `lookup` or
-`invoke`. The declared employment use context returns
-`require-human-approval`, so no `parser-cv`, `evaluator-cv`, or
-`reporter-cv-fit` application AU runs while the plan is held.
+## 2. Declare review, then review the actual result
 
-**Approve this plan and run** submits the exact held digest. Accepted approval
-records `plan-approval` and `resume` on the same trace before the frozen plan
-executes. Editing the `evaluator-cv` card is not approval for this composition,
-and approving this composition is not approval of the card.
+In
+`system/agents/evaluator/capabilities/cv/capability-card.yaml`, add exactly this
+item under `constraints`:
 
-### Flow audit
+```yaml
+- Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
+```
+
+Watch the registry hot-reload, then rerun **Agent card check**. Green means only
+that the declaration was observed. It does not prove implementation,
+effectiveness, legal compliance, or legal permission.
+
+Run **CV fit** again. The deterministic eligibility check now proceeds only if
+the card declaration and result-release control are present and the wiki has
+citeable Annex III employment and Article 14 passages. Missing either passage
+fails employment eligibility closed.
+
+The application AUs then run and produce an immutable held draft with a
+`result_digest`. Inspect the actual draft, add reviewer notes, and approve or
+reject that exact digest:
+
+- **Approve** releases a payload identical to the reviewed draft.
+- **Reject** quarantines the draft and releases no employment result.
+- Missing notes or a different digest is rejected.
+
+Current CV application AUs are read/compute/draft only. A result hold cannot
+undo an email, database write, external action, or other side effect that has
+already happened.
+
+## 3. Audit the observed flow
+
+After approving or rejecting, run **Flow audit**:
 
 ```text
 parser-estate → evaluator-flow-evidence → reporter-flow-audit
 ```
 
-`parser-estate` reconstructs observed planner JSONL records.
-`evaluator-flow-evidence` evaluates only post-execution evidence for the gate,
-exact digest, event order, resume, and completion. `reporter-flow-audit` renders
-that execution evidence without mixing in Agent card declarations. Historical
-CV traces from before the gate existed can therefore show missing evidence even
-when the current approved run is complete.
+Check the evidence for:
 
-## Course-state limitation
+- employment eligibility before application invocation;
+- application completion before `result-draft` and `result-hold`;
+- human review of the exact `result_digest`, with notes;
+- approval before release or rejection before quarantine;
+- released-payload equality with the immutable draft; and
+- a complete Article 14 citation retrieved from the wiki.
 
-Trace JSONL files are bind-mounted and remain available for Flow audit, but held
-`PreparedRun` objects and their locks live only in planner memory. If the
-planner restarts, an existing held run can no longer be approved or resumed;
-submit a new intent and review its new digest.
+By default, the Flow audit panel includes only employment traces carrying the
+current `human-review-before-release` result-governance model. Older employment
+traces remain persisted but are hidden. Select the **Show legacy history**
+checkbox to include them; the panel reports the included count. Red legacy
+rows mean evidence required by the current model is absent, not necessarily
+that the older
+execution failed. Legacy `hold`, `plan-approval`, and `resume` events remain
+parseable, but they do not satisfy exact-result review.
 
-This is intentionally simple course state. It is not production persistence,
-crash recovery, durable workflow orchestration, or proof of idempotent resume.
+## Optional evidence exploration
 
-## Hidden knowledge source
+Use **Graph** to visualize the seeded EU AI Act wiki. Use **Ask** to run the
+grounded knowledge-query workflow, ask about the EU AI Act, and inspect passage
+citations and tool retrieval. These utilities support evidence exploration; they
+are not governance stages.
 
-`evaluator-agent-evidence` consumes the registered search contract
-`{op: "search", query, limit}` and receives cited passages from the wiki store.
-The store remains hidden from the Session 4 Studio while supplying verbatim
-citations. Another knowledge engine can replace it behind the same registered
-contract without changing the evaluator.
+Trace JSONL persists on disk, while active held drafts and locks live in planner
+memory. If the planner restarts, submit a new CV-fit intent and review its new
+draft. This course control is not production persistence or proof of effective
+human oversight.

@@ -1,52 +1,61 @@
 #!/usr/bin/env bash
-# Reset Session 4 to its demo starting state:
-#   - wiki store emptied (re-run scripts/session4-seed.sh afterwards)
-#   - planner traces cleared (so Art 12 starts red until a workflow runs)
-#   - evaluator-cv demoted to lifecycle status "draft" (so Art 72 starts red
-#     and the live approval beat has something to approve)
+# Reset Session 4 to its learner starting state:
+#   - empty the wiki store (re-run session4-seed.sh afterwards)
+#   - clear persisted planner traces
+#   - remove only the learner-added evaluator-cv review constraint
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 WIKI_URL="${WIKI_STORE_URL:-http://localhost:7403}/invoke?capability=tool-wiki-store"
-REGISTRY_URL="${REGISTRY_URL:-http://localhost:7100}"
+CARD_PATH="system/agents/evaluator/capabilities/cv/capability-card.yaml"
 
-echo "1/4 resetting wiki store..."
-curl -sf -X POST "$WIKI_URL" -H 'content-type: application/json' \
-  -d '{"inputs":{"op":"reset"}}' >/dev/null && echo "   wiki store reset"
+echo "1/3 resetting wiki store..."
+uv run python - "$WIKI_URL" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
 
-echo "2/4 clearing planner traces..."
-find system/services/planner/traces -name '*.jsonl' -delete
+url = sys.argv[1]
+request = urllib.request.Request(
+    url,
+    data=json.dumps({"inputs": {"op": "reset"}}).encode("utf-8"),
+    headers={"content-type": "application/json; charset=utf-8"},
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(request, timeout=30) as response:
+        response.read()
+except urllib.error.HTTPError as error:
+    detail = error.read().decode("utf-8", errors="replace")
+    raise SystemExit(f"wiki reset failed with HTTP {error.code}: {detail}") from error
+except urllib.error.URLError as error:
+    raise SystemExit(f"cannot reach tool-wiki-store at {url}: {error.reason}") from error
+print("   wiki store reset")
+PY
+
+echo "2/3 clearing planner traces..."
+find system/services/planner/traces -type f -name '*.jsonl' -delete
 echo "   traces cleared"
 
-echo "3/4 restoring the evaluator-cv card (removes the demo's oversight constraint)..."
-git checkout -- system/agents/evaluator/capabilities/cv/capability-card.yaml 2>/dev/null \
-  && echo "   card restored from git" \
-  || echo "   (not a git checkout; card left as-is)"
+echo "3/3 restoring the evaluator-cv learner baseline..."
+uv run python - "$CARD_PATH" <<'PY'
+from pathlib import Path
+import sys
 
-echo "4/4 demoting evaluator-cv to draft..."
-python3 - "$REGISTRY_URL" <<'EOF'
-import json, sys, urllib.request, urllib.parse
-
-registry = sys.argv[1]
-with urllib.request.urlopen(f"{registry}/find?" + urllib.parse.urlencode({"id": "evaluator-cv"}), timeout=10) as resp:
-    found = json.load(resp)
-card = found.get("capability") or found
-lifecycle = card.setdefault("lifecycle", {})
-lifecycle["status"] = "draft"
-lifecycle["approved_by"] = ""
-lifecycle["approved_at"] = ""
-req = urllib.request.Request(
-    f"{registry}/update", data=json.dumps(card).encode(),
-    headers={"content-type": "application/json"}, method="POST",
+path = Path(sys.argv[1])
+learner_constraint = (
+    "- Every verdict is a draft and must be approved by a human reviewer before "
+    "it informs candidate screening, interview, or employment action."
 )
-with urllib.request.urlopen(req, timeout=10) as resp:
-    resp.read()
-print("   evaluator-cv is now draft (unapproved)")
-EOF
+lines = path.read_text(encoding="utf-8").splitlines()
+filtered = [line for line in lines if line.strip() != learner_constraint]
+path.write_text("\n".join(filtered) + "\n", encoding="utf-8")
+print("   evaluator-cv restored to the red-by-missing-declaration baseline")
+PY
 
 echo
-echo "Demo starting state ready. Next:"
-echo "  ./scripts/session4-seed.sh     # load the regulations corpus"
-echo "  run one CV-fit from the Studio # generates trace evidence (Art 12)"
-echo "  run the Estate check           # evaluator-cv: Art 14 red, Art 72 red"
+echo "Session 4 learner state ready. Next:"
+echo "  ./scripts/session4-seed.sh  # load and verify the EU AI Act corpus"
+echo "  open http://localhost:8080 and run Agent card check"

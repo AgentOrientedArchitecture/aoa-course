@@ -112,4 +112,5 @@ git checkout -- system/services/registry/data/cards.json 2>/dev/null || true
 ./scripts/sessionN-up.sh
 ```
 
-For Session 4's staged demo state specifically, use `./scripts/session4-reset.sh`.
+For Session 4's learner baseline on macOS or Linux, use
+`./scripts/session4-reset.sh`, then rerun `./scripts/session4-seed.sh`.
