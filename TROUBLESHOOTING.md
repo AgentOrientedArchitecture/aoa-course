@@ -70,6 +70,13 @@ workshop received `MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and
 `OLLAMA_HOST` from the course `.env`. First verify the provider using the checks
 above, then reopen the native workshop with `session3-up` and retry `eve dev`.
 
+If the error is `AI_APICallError: field 'input' is required` and the URL in the
+stack trace ends in `/responses`, your `agent.ts` selects the model with
+`provider(...)`, which targets OpenAI's newer Responses API. SambaNova,
+Ollama's `/v1` shim, and most OpenAI-compatible providers only implement
+`/chat/completions`. Use `provider.chat(...)` as in the walkthrough's
+Checkpoint 2 file, then restart `eve dev`.
+
 
 ## I edited instructions.md / capability-card.yaml and nothing changed
 

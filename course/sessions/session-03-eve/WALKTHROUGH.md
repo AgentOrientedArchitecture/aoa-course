@@ -108,7 +108,11 @@ const provider = createOpenAI({
 });
 
 export default defineAgent({
-  model: provider(process.env.MODEL || "gpt-oss:120b"),
+  // provider.chat(...) targets /chat/completions, which every
+  // OpenAI-compatible endpoint serves. Calling provider(...) directly would
+  // select OpenAI's newer Responses API (/responses), which SambaNova,
+  // Ollama's shim, and most compatible providers do not implement.
+  model: provider.chat(process.env.MODEL || "gpt-oss:120b"),
   modelContextWindowTokens: Number(
     process.env.MODEL_CONTEXT_WINDOW_TOKENS || 128000,
   ),
