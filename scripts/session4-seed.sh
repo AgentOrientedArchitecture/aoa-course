@@ -14,11 +14,16 @@ if [[ ! -d "$SEED_DIR" ]]; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required for this script (standard library only; no packages)." >&2
+  exit 1
+fi
+
 printf 'Loading corpus: curated EU AI Act Session 4 regulations from %s\n' "$SEED_DIR"
 mkdir -p "$INBOX_DIR"
 cp "$SEED_DIR"/*.md "$INBOX_DIR/"
 
-uv run python - "$SEED_DIR" "$BRIDGE_URL" <<'PY'
+python3 - "$SEED_DIR" "$BRIDGE_URL" <<'PY'
 import glob
 import json
 import sys

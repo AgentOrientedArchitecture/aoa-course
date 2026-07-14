@@ -42,7 +42,6 @@ SUPPORTED_WORKFLOWS = (
     "knowledge-ingest",
     "wiki-graph",
     "knowledge-query",
-    "estate-check",
 )
 
 
@@ -363,7 +362,7 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind == "knowledge-query":
         return await _submit_knowledge_query(inputs, files)
 
-    if kind in ("agent-card-check", "flow-audit", "estate-check"):
+    if kind in ("agent-card-check", "flow-audit"):
         return await _submit_estate_read(kind, inputs)
 
     # cv-fit and cv-fit-interview take the same CV + JD inputs; they differ only
@@ -474,8 +473,6 @@ async def _submit_estate_read(kind: str, inputs: dict[str, Any]) -> JSONResponse
     planner_inputs: dict[str, Any] = {"estate_root": "/data/estate"}
     if kind == "flow-audit":
         planner_inputs["include_legacy"] = _as_bool(inputs.get("include_legacy"))
-    elif kind == "estate-check":
-        planner_inputs["include_legacy"] = True
     planner_body = {
         "kind": kind,
         "inputs": planner_inputs,

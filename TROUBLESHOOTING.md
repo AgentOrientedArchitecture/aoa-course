@@ -117,7 +117,7 @@ scripts\session4-seed.bat
 
 Correct behaviour, not a bug: Art 12 (record-keeping) goes green only when
 trace evidence exists for a capability. Run one CV-fit workflow, then re-run
-the estate check.
+**Agent card check**.
 
 ## Start over completely
 

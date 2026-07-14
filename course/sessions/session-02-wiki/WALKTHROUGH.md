@@ -60,4 +60,4 @@ system knows what it doesn't know.
 - Promotion-as-judgement and cited answering are the governance story for
   knowledge: what enters the store is decided, and what leaves it is traceable.
 - Session 4 reuses this exact pipeline to hold a **regulations corpus** — the
-  wiki you just built is how the estate-check's citations stay current.
+  wiki you just built is how the governance checks' citations stay current.

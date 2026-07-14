@@ -40,4 +40,4 @@ evaluation_signals:
   - has_markdown
   - latency_p95_under(8s)
 provenance:
-  model: ${MODEL}
+  model: none

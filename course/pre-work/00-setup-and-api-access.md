@@ -4,7 +4,11 @@ Before the first hands-on session, install the base tooling, set up one working
 model provider, and verify that the course stack can call it. The runtime
 supports local Ollama and OpenAI-compatible hosted APIs through `.env` files in
 the repo root. The provider test and Session 3's EVE dependencies run inside
-Docker; no host Python, Node/npm, or `curl` installation is required.
+Docker; no host Node/npm installation is required. On macOS and Linux, the
+Session 3 adopt script uses `curl` and the Session 4 seed/reset scripts use the
+system `python3` (standard library only — no packages or virtualenvs); both
+ship with macOS and are preinstalled on most Linux distributions. Windows
+learners need neither: the `.bat` scripts use PowerShell.
 
 ---
 

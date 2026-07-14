@@ -14,7 +14,6 @@ const WORKFLOWS = [
   "knowledge-ingest",
   "wiki-graph",
   "knowledge-query",
-  "estate-check",
 ];
 
 // cv-fit-interview reuses the CV + JD form panel of cv-fit; it only differs in the
@@ -290,6 +289,11 @@ function appendTraceRow(record) {
     state.records = [];
     state.lifecycle = emptyLifecycle();
     $("trace-list").innerHTML = "";
+  } else if (!state.currentTraceId && record.trace_id) {
+    // Attached mid-run (e.g. the page was refreshed while a flow was in
+    // flight): adopt the in-flight trace so the trace summary and the
+    // held-result review controls target it.
+    state.currentTraceId = record.trace_id;
   }
   if (state.currentTraceId && record.trace_id !== state.currentTraceId) {
     // Skip events from older flows that are still draining.
@@ -814,7 +818,6 @@ function lifecycleIntentTitle(life) {
   if (kind === "wiki-graph") return "Inspect the AOA wiki graph";
   if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
   if (kind === "flow-audit") return "Audit post-execution flow evidence";
-  if (kind === "estate-check") return "Inspect component and end-to-end plan evidence";
   return "No run yet";
 }
 
@@ -1255,7 +1258,10 @@ async function reviewHeldResult(decision) {
   const reject = $("result-review-reject");
   const status = $("result-review-action-status");
   const notes = $("result-review-notes").value.trim();
-  if (!state.currentTraceId || life.status !== "draft-held" || !life.resultDigest) return;
+  if (!state.currentTraceId || life.status !== "draft-held" || !life.resultDigest) {
+    status.textContent = "No held draft is attached to this page; submit a new run and review its draft.";
+    return;
+  }
   if (!notes) {
     status.textContent = "Add reviewer notes before approving or rejecting the draft.";
     return;
@@ -1774,8 +1780,8 @@ function buildIntentPayload(status) {
     };
   }
 
-  if (["agent-card-check", "estate-check"].includes(state.mode)) {
-    // No learner inputs: these workflows read the estate's governance artefacts.
+  if (state.mode === "agent-card-check") {
+    // No learner inputs: this workflow reads the estate's governance artefacts.
     return { kind: state.mode };
   }
 
@@ -1903,7 +1909,6 @@ function setMode(mode) {
     "wiki-graph": "Refresh graph",
     "knowledge-query": "Ask wiki",
     "flow-audit": "Run flow audit",
-    "estate-check": "Run estate check",
   };
   $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";

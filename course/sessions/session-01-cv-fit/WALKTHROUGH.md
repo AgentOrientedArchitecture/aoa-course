@@ -82,4 +82,4 @@ that is "replacement is registration" at the model layer.
 - Change behind the boundary is safe **because** the public surfaces
   (`skills_hash`, `provenance.model`, signals) show it moving.
 - The question this sets up: the registry accepted your change without asking
-  anyone. Should it have? (Session 4's estate check has an opinion.)
+  anyone. Should it have? (Session 4's Agent card check has an opinion.)
