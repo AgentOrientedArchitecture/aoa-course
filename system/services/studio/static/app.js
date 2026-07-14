@@ -27,6 +27,15 @@ const configuredWorkflows = Array.isArray(studioConfig.workflows)
   : WORKFLOWS;
 const enabledWorkflows = new Set(configuredWorkflows.length ? configuredWorkflows : ["cv-fit"]);
 
+// Result governance (eligibility, held drafts, human review) is the Session 4
+// story. Show those surfaces when this profile runs the governance workflows,
+// or when a run's release policy actually requires review.
+const governanceUiDefault = ["agent-card-check", "flow-audit"].some((w) => enabledWorkflows.has(w));
+
+function governanceStagesActive(life) {
+  return governanceUiDefault || life.releasePolicy === "human-review-before-release";
+}
+
 const state = {
   capabilities: new Map(),     // id -> card
   governanceEvents: [],
@@ -59,6 +68,7 @@ function emptyLifecycle() {
     tasks: [],
     taskById: new Map(),
     plan: [],
+    releasePolicy: "",
     governance: null,
     planDigest: "",
     draft: null,
@@ -407,6 +417,7 @@ function applyLifecycleEvent(record) {
   }
   if (record.step === "plan") {
     life.plan = record.plan || [];
+    life.releasePolicy = (record.release_policy || {}).mode || "";
     for (const item of life.plan) {
       const task = ensureTask(item.task);
       task.selectedCapability = item.capability || task.selectedCapability;
@@ -544,6 +555,18 @@ function renderLifecycle() {
   const runState = $("run-state");
   runState.textContent = life.status;
   runState.className = `run-state ${life.status}`;
+  const governed = governanceStagesActive(life);
+  for (const el of document.querySelectorAll(".governance-section")) {
+    el.classList.toggle("hidden", !governed);
+  }
+  const resultLabel = $("result-section-label");
+  if (resultLabel) resultLabel.textContent = governed ? "Released result" : "Result";
+  const cvNote = $("cv-fit-note");
+  if (cvNote) {
+    cvNote.textContent = governed
+      ? cvNote.dataset.governedNote
+      : cvNote.dataset.naiveNote;
+  }
   renderLifecycleRail(life);
   renderTraceSummary();
   renderResponsibilityWalk();
@@ -804,16 +827,24 @@ function lifecycleIntentTitle(life) {
 }
 
 function renderLifecycleRail(life) {
+  const governed = governanceStagesActive(life);
   const stages = [
     ["intent", "Intent", Boolean(life.intent)],
     ["context", "Capabilities", life.capabilityContext.length > 0],
     ["proposal", "Resolved plan", Boolean(life.plan.length || life.proposal || life.source === "deterministic")],
-    ["governance", "Eligibility", Boolean(life.governance)],
-    ["work", "Application work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))],
-    ["draft", "Draft", Boolean(life.draft)],
-    ["review", "Human review", Boolean(life.review)],
-    ["release", "Release", Boolean(life.release || life.quarantine)],
   ];
+  if (governed) stages.push(["governance", "Eligibility", Boolean(life.governance)]);
+  stages.push(["work", "Application work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))]);
+  if (governed) {
+    stages.push(
+      ["draft", "Draft", Boolean(life.draft)],
+      ["review", "Human review", Boolean(life.review)],
+      ["release", "Release", Boolean(life.release || life.quarantine)],
+    );
+  } else {
+    // The naive sessions run straight through to a released result.
+    stages.push(["result", "Result", Boolean(life.result)]);
+  }
   const rail = $("lifecycle-rail");
   rail.innerHTML = "";
   for (const [key, label, done] of stages) {
@@ -825,7 +856,7 @@ function renderLifecycleRail(life) {
     if (key === "work" && life.tasks.some((task) => task.status === "running")) {
       li.className = "active";
     }
-    if (["governance", "work", "draft", "review", "release"].includes(key)
+    if (["governance", "work", "draft", "review", "release", "result"].includes(key)
         && ["error", "rejected", "quarantined"].includes(life.status)) {
       li.classList.add("error");
     }

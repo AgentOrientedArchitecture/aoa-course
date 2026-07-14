@@ -785,6 +785,7 @@ def _validate_plan(
     proposal: dict[str, Any],
     intent_inputs: dict[str, Any],
     cards_by_id: dict[str, dict[str, Any]],
+    workflow: Workflow,
 ) -> tuple[list[TaskSpec], dict[str, Any]]:
     tasks = proposal.get("tasks")
     if not isinstance(tasks, list) or not tasks:
@@ -850,6 +851,16 @@ def _validate_plan(
             "outputs": sorted(output_names),
         })
 
+    # The model fills in the requested workflow; it does not redesign it.
+    # A plan that drops a workflow task (e.g. skips the evaluator because its
+    # card is not discoverable) would otherwise run and produce a
+    # plausible-looking but meaningless result.
+    missing_tasks = {task.id for task in workflow.tasks} - seen_task_ids
+    if missing_tasks:
+        raise ValueError(
+            f"plan is missing workflow task(s): {', '.join(sorted(missing_tasks))}"
+        )
+
     final_outputs = prior_outputs.get(planned_tasks[-1].id, set())
     final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown", "findings_markdown"}
     if not final_markdown_outputs.intersection(final_outputs):
@@ -895,7 +906,9 @@ async def _build_plan(
             "prompt_eval_count": raw.get("prompt_eval_count"),
         }
         cards_by_id = {card["id"]: card for card in cards if card.get("id")}
-        tasks, validation = _validate_plan(proposal, intent.get("inputs", {}) or {}, cards_by_id)
+        tasks, validation = _validate_plan(
+            proposal, intent.get("inputs", {}) or {}, cards_by_id, workflow
+        )
         return PlanBuildResult(tasks=tasks, source="llm", proposal=proposal, validation=validation)
     except Exception as e:  # noqa: BLE001
         if PLANNER_STRATEGY == "llm":
@@ -1034,6 +1047,11 @@ def _resolved_plan_payload(resolved_steps: list[ResolvedStep]) -> list[dict[str,
 
 
 def _release_policy(workflow: str, intent: dict[str, Any]) -> dict[str, Any]:
+    # Result governance is part of the Session 4 story. Sessions 1-3 run the
+    # naive shape deliberately: no governance capability is configured, so
+    # every result releases automatically.
+    if not PLAN_GOVERNANCE_CAPABILITY:
+        return {"mode": "automatic"}
     raw_use_context = intent.get("use_context")
     use_context = raw_use_context if isinstance(raw_use_context, dict) else {}
     employment_shaped = (
@@ -1557,13 +1575,16 @@ async def _run_workflow(
             })
             return trace_id, run.status, run.outputs
 
-        await _record({
-            "trace_id": trace_id,
-            "step": "governance-release",
-            "workflow": workflow.name,
-            "decision": decision or "proceed",
-            "plan_digest": run.plan_digest,
-        })
+        if PLAN_GOVERNANCE_CAPABILITY:
+            # Only record a governance decision when a governance component
+            # actually made one; the naive sessions have no such event.
+            await _record({
+                "trace_id": trace_id,
+                "step": "governance-release",
+                "workflow": workflow.name,
+                "decision": decision or "proceed",
+                "plan_digest": run.plan_digest,
+            })
 
     outputs = await _execute_prepared_run(run)
     return trace_id, run.status, outputs
