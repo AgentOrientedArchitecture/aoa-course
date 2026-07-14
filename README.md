@@ -80,7 +80,7 @@ running on your host.
 ```bash
 git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
-cp .env.sambanova .env     # or .env.nvidia / .env.ollama
+cp .env.sambanova .env     # or .env.nvidia / .env.ollama / .env.ollama-cloud
 # edit .env - add your API key if using a hosted provider
 ```
 
@@ -201,6 +201,7 @@ system/
   docker-compose.session4.yml
 .env.example
 .env.ollama
+.env.ollama-cloud
 .env.sambanova
 .env.nvidia
 scripts/
