@@ -608,6 +608,7 @@ def _build_planner_prompt(
 ) -> str:
     intent_summary = {
         "kind": intent.get("kind"),
+        "requested_workflow": workflow.name,
         "available_inputs": sorted((intent.get("inputs") or {}).keys()),
     }
     examples = [_workflow_example(wf) for wf in WORKFLOWS.values()]
@@ -1261,6 +1262,12 @@ async def _execute_prepared_run(run: PreparedRun) -> dict[str, Any]:
                 })
                 run.status = "error"
                 run.outputs = {"error": str(exc)}
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "finish",
+                    "workflow": run.workflow,
+                    "outputs": run.outputs,
+                })
                 raise HTTPException(status_code=500, detail=str(exc))
 
             await _record({
@@ -1434,10 +1441,14 @@ async def _run_workflow(
             if task.selected_capability:
                 card = cards_by_id.get(task.selected_capability)
                 if card is None:
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"planner selected missing capability {task.selected_capability}",
-                    )
+                    message = f"planner selected missing capability {task.selected_capability}"
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "error",
+                        "task": task.id,
+                        "error": message,
+                    })
+                    raise HTTPException(status_code=502, detail=message)
                 if not _lifecycle_approved(card):
                     message = (
                         f"capability {task.selected_capability} is not "

@@ -208,11 +208,14 @@ async def list_capabilities() -> JSONResponse:
 @app.get("/api/capabilities/{capability_id}")
 async def get_capability(capability_id: str) -> JSONResponse:
     async with httpx.AsyncClient(timeout=5.0) as client:
-        r = await client.get(f"{REGISTRY_URL}/find", params={"id": capability_id})
-        if r.status_code == 404:
-            raise HTTPException(status_code=404, detail=f"unknown capability: {capability_id}")
-        r.raise_for_status()
-        return JSONResponse(r.json())
+        try:
+            r = await client.get(f"{REGISTRY_URL}/find", params={"id": capability_id})
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"unknown capability: {capability_id}")
+            r.raise_for_status()
+            return JSONResponse(r.json())
+        except httpx.HTTPError as exc:
+            return JSONResponse({"error": repr(exc)}, status_code=502)
 
 
 @app.get("/api/runs/{trace_id}")

@@ -13,7 +13,7 @@ services:
     environment:
       # Deterministic keeps the Session 3 demo reliable: the planner runs the
       # fixed cv-fit-interview workflow instead of asking a small local model to
-      # rediscover the four-step plan each time.
+      # rediscover the three-step plan each time.
       PLANNER_STRATEGY: deterministic
 
   studio:

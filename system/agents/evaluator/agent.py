@@ -1,13 +1,21 @@
 """evaluator agent.
 
-Backs ``evaluator-cv`` for Session 1, plus wiki promotion and wiki-query
-evidence evaluation for Session 2. The same Python process serves each through
-capability-id dispatch in ``handle``.
+One Python process serving six capabilities through capability-id dispatch in
+``handle``: ``evaluator-cv`` (Session 1), ``evaluator-promote`` and
+``evaluator-wiki-query`` (Session 2), and the Session 4 governance trio
+``evaluator-agent-evidence``, ``evaluator-flow-evidence``, and
+``evaluator-plan-governance``.
 
-For ``evaluator-cv`` we receive a parsed CV (the parser's output) and a path
-to a job description on the shared inbox volume. We read the JD through
-``tool-document-text`` so the call shows up in the trace, hand both to the
-model with the rubric in ``instructions.md``, and return a JSON evaluation.
+``evaluator-cv`` and ``evaluator-promote`` are model-backed. For
+``evaluator-cv`` we receive a parsed CV (the parser's output) and a path to a
+job description on the shared inbox volume, read the JD through
+``tool-document-text`` so the call shows up in the trace, and hand both to
+the model with the rubric in ``instructions.md``.
+
+The wiki-query and Session 4 governance capabilities are deterministic — no
+model call. They rank retrieved passages and check estate/plan evidence in
+code, using ``tool-wiki-store`` for cited regulation passages; their
+``instructions.md`` files are documented contracts, not prompts.
 """
 from __future__ import annotations
 
@@ -289,7 +297,8 @@ def _employment_card_eligibility(capability_cards: list) -> dict:
         }
     card = evaluator_cards[0]
     lifecycle = card.get("lifecycle") if isinstance(card.get("lifecycle"), dict) else {}
-    status = str(lifecycle.get("status") or "approved")
+    # Fail closed: a snapshot with no lifecycle at all is not approved.
+    status = str(lifecycle.get("status") or "missing")
     matched = _human_review_before_use_constraint(card)
     eligible = status == "approved" and bool(matched)
     if status != "approved":

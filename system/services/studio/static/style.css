@@ -355,7 +355,7 @@ button.secondary {
   padding: 4px 9px;
   border: 1px solid var(--border);
   background: #fafaf8;
-  color: var(--text);
+  color: var(--ink);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -479,16 +479,6 @@ button.secondary.danger {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
-}
-.lifecycle-rail li.held {
-  border-color: #e0b04b;
-  background: #fff3cd;
-  color: #684500;
-}
-.lifecycle-rail li.error {
-  border-color: #f2b8b5;
-  background: #fdecea;
-  color: var(--warn);
 }
 .stage-dot {
   width: 8px;

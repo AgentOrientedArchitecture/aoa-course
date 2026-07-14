@@ -1,8 +1,14 @@
 """reporter agent.
 
-Backs ``reporter-cv-fit`` for Session 1, plus Session 2 answer and ingest
-reporting. Some reporter capabilities only consume structured data; others
-use a declared tool to store the finished result.
+One Python process serving five capabilities through capability-id dispatch
+in ``handle``: ``reporter-cv-fit`` (Session 1), ``reporter-answer`` and
+``reporter-ingest-summary`` (Session 2), and the Session 4 governance pair
+``reporter-agent-evidence`` and ``reporter-flow-audit``.
+
+Only ``reporter-cv-fit`` is model-backed; the rest render structured inputs
+into markdown deterministically. Some capabilities only consume structured
+data; ``reporter-ingest-summary`` uses the declared ``tool-wiki-store`` to
+store the finished result.
 """
 from __future__ import annotations
 

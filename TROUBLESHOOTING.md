@@ -125,7 +125,7 @@ trace evidence exists for a capability. Run one CV-fit workflow, then re-run
 ./scripts/down.sh
 docker compose -f system/docker-compose.yml down -v --remove-orphans
 rm -f system/services/planner/traces/*.jsonl
-git checkout -- system/services/registry/data/cards.json 2>/dev/null || true
+rm -f system/services/registry/data/cards.json
 ./scripts/sessionN-up.sh
 ```
 

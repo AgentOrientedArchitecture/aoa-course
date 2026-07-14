@@ -1,11 +1,16 @@
 """parser agent.
 
-Backs ``parser-cv`` for the ``cv-parser`` runtime, plus ``parser-notes`` and
-``parser-query`` for the ``wiki-parser`` runtime.
-The shared scaffold in ``_base`` does the discovery, registration, and hot
-reload work; this file is just the agent-specific wiring: build a prompt from
-the loaded ``instructions.md`` plus the inputs, call the model, parse the JSON
-response, return it.
+Backs ``parser-cv`` for the ``cv-parser`` runtime, ``parser-notes`` and
+``parser-query`` for the ``wiki-parser`` runtime, and ``parser-estate`` for
+the Session 4 ``estate-parser`` runtime. The shared scaffold in ``_base``
+does the discovery, registration, and hot reload work.
+
+The first three capabilities are model-backed: build a prompt from the loaded
+``instructions.md`` plus the inputs, call the model, parse the JSON response,
+return it. ``parser-estate`` is deterministic — no model call: it inventories
+registered capability cards and reconstructs plan evidence from persisted
+planner traces through ``tool-filesystem``. Its ``instructions.md`` is a
+documented contract, not a prompt.
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# Session 2 narrows the system to the CV-fit workflow.
+# Session 1 narrows the system to the CV-fit workflow.
 #
 # Use with:
 #   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session1.yml --profile session1 up --build -d --remove-orphans
