@@ -561,11 +561,9 @@ function renderLifecycle() {
   }
   const resultLabel = $("result-section-label");
   if (resultLabel) resultLabel.textContent = governed ? "Released result" : "Result";
-  const cvNote = $("cv-fit-note");
-  if (cvNote) {
-    cvNote.textContent = governed
-      ? cvNote.dataset.governedNote
-      : cvNote.dataset.naiveNote;
+  // Panel notes with Session 4 framing carry a naive variant for Sessions 1-3.
+  for (const note of document.querySelectorAll("[data-naive-note]")) {
+    note.textContent = governed ? note.dataset.governedNote : note.dataset.naiveNote;
   }
   renderLifecycleRail(life);
   renderTraceSummary();
