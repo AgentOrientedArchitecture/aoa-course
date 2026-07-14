@@ -84,6 +84,13 @@ On the host, replace
 import { createOpenAI } from "@ai-sdk/openai";
 import { defineAgent } from "eve";
 
+// Endpoint resolution, in order:
+//   1. OPENAI_BASE_URL   — any OpenAI-compatible endpoint (SambaNova, NVIDIA
+//                          NIM, an MLX server on the host, ...).
+//   2. OLLAMA_HOST + /v1 — Ollama's OpenAI-compatible shim.
+//   3. localhost Ollama  — only reachable when EVE runs outside Docker;
+//                          inside the workshop container Compose always sets
+//                          OLLAMA_HOST, so this is a host-dev fallback.
 function baseUrl(): string {
   const explicit = process.env.OPENAI_BASE_URL?.trim();
   if (explicit) return explicit;
@@ -94,6 +101,9 @@ function baseUrl(): string {
 
 const provider = createOpenAI({
   baseURL: baseUrl(),
+  // Inside the workshop containers Compose supplies OPENAI_API_KEY from your
+  // .env's AOA_OPENAI_API_KEY, so the course key arrives here even though
+  // .env leaves OPENAI_API_KEY itself blank. Local endpoints need no key.
   apiKey: process.env.OPENAI_API_KEY || "not-needed-for-local",
 });
 
@@ -105,10 +115,21 @@ export default defineAgent({
 });
 ```
 
-This uses the OpenAI-compatible interface supplied by the course `.env`. The
-same file works with the configured hosted provider or Ollama's `/v1` shim;
-`.env` selects the provider endpoint and active model, while the code keeps only
-a local-development fallback.
+The same file works unchanged with every tested course `.env` — the workshop
+containers receive `MODEL`, `OPENAI_BASE_URL`, `OLLAMA_HOST`, and (mapped from
+`AOA_OPENAI_API_KEY`) `OPENAI_API_KEY` from Compose:
+
+| Your `.env` | What the agent uses |
+| --- | --- |
+| `.env.sambanova` / `.env.nvidia` | `OPENAI_BASE_URL` + your `AOA_OPENAI_API_KEY`, model from `MODEL`. |
+| `.env.ollama` (host Ollama) | `OLLAMA_HOST` (`http://host.docker.internal:11434`) + `/v1`, no key. |
+| Container Ollama (`AOA_LOCAL=1`) | `OLLAMA_HOST` (`http://ollama:11434`) + `/v1`, no key. |
+| MLX or another host-served OpenAI endpoint | Set `OPENAI_BASE_URL=http://host.docker.internal:<port>/v1` — `localhost` would point inside the container. |
+
+Two limits worth knowing: this lab speaks the OpenAI-compatible interface
+only, so `PROVIDER=anthropic` does not apply here (the `PROVIDER` variable is
+ignored by `agent.ts`); and the `gpt-oss:120b` fallback model name is just a
+last resort — Compose always passes your `.env`'s `MODEL`.
 
 ## Checkpoint 3 — give the agent one bounded job
 
