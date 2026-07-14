@@ -2,7 +2,7 @@
 
 `base.py` is the FastAPI scaffold every agent in this system extends.
 
-It handles the four jobs every agent does the same way:
+It handles the five jobs every agent does the same way:
 
 1. Discovers capability cards under `capabilities/<name>/`.
 2. Computes `skills_hash` for each by SHA-ing the matching `instructions.md`.
@@ -23,7 +23,7 @@ A concrete agent provides a `handle(capability_id, inputs, ctx) -> outputs` func
 - `base.py` — the scaffold.
 - `model.py` — a thin wrapper around the configured model provider (OpenAI, Anthropic, Ollama). Agents call `model.complete(prompt, **opts)` and don't know which provider is behind it.
 - `registry_client.py` — a small HTTP client for talking to the registry service.
-- `Dockerfile` — base image for agent containers.
 - `requirements.txt` — runtime dependencies shared across agents.
 
-Concrete agents inherit the base image and add their own `agent.py`.
+Each agent's own `Dockerfile` copies this directory in alongside its
+`agent.py`; there is no shared base image.

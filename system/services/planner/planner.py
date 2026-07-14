@@ -433,66 +433,6 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
-    # Compatibility workflow retained for older traces and direct API callers.
-    "estate-check": Workflow(
-        name="estate-check",
-        tasks=[
-            # Session 4: the estate scans itself. The parser reads the
-            # registry's persisted cards and the planner's traces through
-            # tool-filesystem — governance artefacts as ordinary files.
-            TaskSpec(
-                id="scan-estate",
-                purpose="Inventory registered capability cards, lifecycle state, and trace evidence.",
-                discovery={
-                    "kind": "au",
-                    "text": "scan estate inventory capability cards lifecycle traces governance",
-                    "required_inputs": [{"name": "estate_root", "type": "string"}],
-                    "required_outputs": [{"name": "inventory"}],
-                },
-                input_map={"estate_root": "inputs.estate_root"},
-            ),
-            TaskSpec(
-                id="evaluate-compliance",
-                purpose="Check the estate inventory for EU AI Act evidence hooks with regulation citations.",
-                discovery={
-                    "kind": "au",
-                    "text": "evaluate compliance obligations eu ai act findings citations risk tier",
-                    "required_inputs": [
-                        {"name": "inventory", "type": "array"},
-                        {"name": "plans", "type": "array"},
-                    ],
-                    "required_outputs": [
-                        {"name": "findings"},
-                        {"name": "plan_findings"},
-                        {"name": "summary"},
-                    ],
-                },
-                input_map={
-                    "inventory": "scan-estate.outputs.inventory",
-                    "plans": "scan-estate.outputs.plans",
-                },
-            ),
-            TaskSpec(
-                id="write-findings-report",
-                purpose="Render the estate-check findings report with evidence and citations.",
-                discovery={
-                    "kind": "au",
-                    "text": "write findings report markdown posture evidence regulation citations",
-                    "required_inputs": [
-                        {"name": "inventory", "type": "array"},
-                        {"name": "plans", "type": "array"},
-                        {"name": "findings", "type": "object"},
-                    ],
-                    "required_outputs": [{"name": "findings_markdown"}],
-                },
-                input_map={
-                    "inventory": "scan-estate.outputs.inventory",
-                    "plans": "scan-estate.outputs.plans",
-                    "findings": "evaluate-compliance.outputs",
-                },
-            ),
-        ],
-    ),
 }
 
 
@@ -507,8 +447,6 @@ def _select_workflow(intent: dict[str, Any]) -> Workflow:
         return WORKFLOWS["knowledge-ingest"]
     if kind is None and {"question"} <= set(intent.get("inputs", {})):
         return WORKFLOWS["knowledge-query"]
-    if kind is None and {"estate_root"} <= set(intent.get("inputs", {})):
-        return WORKFLOWS["estate-check"]
     raise HTTPException(status_code=400, detail=f"no workflow for intent kind={kind!r}")
 
 
@@ -616,6 +554,8 @@ def _workflow_example(workflow: Workflow) -> dict[str, Any]:
 
 
 def _deterministic_capability_for_task(task: TaskSpec) -> str:
+    if task.selected_capability:
+        return task.selected_capability
     matches = {
         "parse-cv": "parser-cv",
         "evaluate-cv-fit": "evaluator-cv",
@@ -632,11 +572,17 @@ def _deterministic_capability_for_task(task: TaskSpec) -> str:
         "scan-flow-evidence": "parser-estate",
         "evaluate-flow-evidence": "evaluator-flow-evidence",
         "write-flow-audit": "reporter-flow-audit",
-        "scan-estate": "parser-estate",
-        "evaluate-compliance": "evaluator-compliance",
-        "write-findings-report": "reporter-findings",
     }
     return matches.get(task.id, "")
+
+
+def _lifecycle_approved(card: dict[str, Any]) -> bool:
+    """Only lifecycle-approved cards are eligible for planning and invocation.
+
+    The registry's /discover already enforces this; /list does not, so every
+    path that resolves a card from a /list snapshot must check it here.
+    """
+    return (card.get("lifecycle") or {}).get("status") == "approved"
 
 
 def _parse_json_block(text: str) -> dict[str, Any]:
@@ -662,12 +608,17 @@ def _build_planner_prompt(
 ) -> str:
     intent_summary = {
         "kind": intent.get("kind"),
+        "requested_workflow": workflow.name,
         "available_inputs": sorted((intent.get("inputs") or {}).keys()),
     }
     examples = [_workflow_example(wf) for wf in WORKFLOWS.values()]
     body = {
         "intent": intent_summary,
-        "available_capabilities": [_compact_card(card) for card in cards if card.get("kind") == "au"],
+        "available_capabilities": [
+            _compact_card(card)
+            for card in cards
+            if card.get("kind") == "au" and _lifecycle_approved(card)
+        ],
         "few_shot_examples": examples,
         "output_schema": {
             "goal": "short human-readable goal",
@@ -709,6 +660,8 @@ async def _planner_model_complete(prompt: str) -> tuple[str, dict[str, Any]]:
         return await _planner_ollama(prompt, model)
     if provider == "openai":
         return await _planner_openai(prompt, model)
+    if provider == "anthropic":
+        return await _planner_anthropic(prompt, model)
     raise RuntimeError(f"planner model provider {provider!r} is not supported")
 
 
@@ -773,6 +726,37 @@ async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]
     return message.get("content") or message.get("reasoning") or "", raw
 
 
+async def _planner_anthropic(prompt: str, model: str) -> tuple[str, dict[str, Any]]:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    payload: dict[str, Any] = {
+        "model": model,
+        "max_tokens": PLANNER_MODEL_MAX_TOKENS,
+        "temperature": 0.0,
+        "system": "Return only a valid JSON object.",
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=PLANNER_MODEL_TIMEOUT) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages", json=payload, headers=headers
+        )
+        r.raise_for_status()
+        raw = r.json()
+    # Anthropic returns a list of content blocks; concatenate text blocks.
+    text = "".join(
+        block.get("text", "")
+        for block in raw.get("content") or []
+        if isinstance(block, dict) and block.get("type") == "text"
+    )
+    return text, raw
+
+
 def _fallback_plan(
     workflow: Workflow,
     reason: str | None = None,
@@ -829,6 +813,11 @@ def _validate_plan(
         card = cards_by_id[capability_id]
         if card.get("kind") != "au":
             raise ValueError(f"task {task_id} selected non-AU capability {capability_id}")
+        if not _lifecycle_approved(card):
+            raise ValueError(
+                f"task {task_id} selected capability {capability_id}, "
+                "which is not lifecycle-approved"
+            )
         required_inputs = [
             field for field in card.get("inputs", []) or [] if field.get("required", True)
         ]
@@ -1273,6 +1262,12 @@ async def _execute_prepared_run(run: PreparedRun) -> dict[str, Any]:
                 })
                 run.status = "error"
                 run.outputs = {"error": str(exc)}
+                await _record({
+                    "trace_id": run.trace_id,
+                    "step": "finish",
+                    "workflow": run.workflow,
+                    "outputs": run.outputs,
+                })
                 raise HTTPException(status_code=500, detail=str(exc))
 
             await _record({
@@ -1446,17 +1441,41 @@ async def _run_workflow(
             if task.selected_capability:
                 card = cards_by_id.get(task.selected_capability)
                 if card is None:
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"planner selected missing capability {task.selected_capability}",
+                    message = f"planner selected missing capability {task.selected_capability}"
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "error",
+                        "task": task.id,
+                        "error": message,
+                    })
+                    raise HTTPException(status_code=502, detail=message)
+                if not _lifecycle_approved(card):
+                    message = (
+                        f"capability {task.selected_capability} is not "
+                        "lifecycle-approved; refusing to invoke it"
                     )
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "error",
+                        "task": task.id,
+                        "error": message,
+                    })
+                    raise HTTPException(status_code=502, detail=message)
+                # Say honestly how the capability was chosen: an LLM plan
+                # selected it, or the deterministic workflow definition pins it.
+                if plan_result.source == "llm":
+                    reasons = ["selected_by_planner_model"]
+                    strategy = "small-registry-llm-context"
+                else:
+                    reasons = ["pinned_by_workflow_definition"]
+                    strategy = "deterministic-workflow-pin"
                 candidates = [{
                     "score": None,
-                    "reasons": ["selected_by_planner_model"],
+                    "reasons": reasons,
                     "card": card,
                 }]
                 query = {
-                    "strategy": "small-registry-llm-context",
+                    "strategy": strategy,
                     "considered_capabilities": [card.get("id") for card in au_cards],
                     "task": _task_trace(task),
                 }

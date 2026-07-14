@@ -61,7 +61,9 @@ export function loadStampedCard(cardPath, instructionsPath) {
   card.provenance = card.provenance || {};
   card.provenance.skills_hash = sha256(instructionsText);
   if (card.provenance.model == null || card.provenance.model === "${MODEL}") {
-    card.provenance.model = env("MODEL", "${MODEL}");
+    // "unknown" rather than the literal placeholder when MODEL is unset
+    // (e.g. when the adapter runs outside compose).
+    card.provenance.model = env("MODEL", "unknown");
   }
 
   const id = identity();

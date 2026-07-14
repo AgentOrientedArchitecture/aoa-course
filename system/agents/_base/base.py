@@ -633,7 +633,6 @@ def build_app(handle: Handler) -> FastAPI:
 
     capabilities = discover_capabilities()
     by_id = {c.id: c for c in capabilities}
-    agent_card = _build_agent_card(capabilities)
     registry = RegistryClient()
     model: Model | None = None
     tool_cards: dict[str, dict[str, Any]] = {}
@@ -667,13 +666,16 @@ def build_app(handle: Handler) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown capability: {capability_id}")
         return JSONResponse(cap.card)
 
+    # Built per request rather than snapshotted at boot so the advertised
+    # contracts stay in sync with hot-reloaded capability cards. (The card-edit
+    # reload path rebinds cap.card, which a boot-time snapshot never sees.)
     @app.get("/.well-known/agent-card.json")
     async def get_agent_card() -> JSONResponse:
-        return JSONResponse(agent_card)
+        return JSONResponse(_build_agent_card(capabilities))
 
     @app.get("/a2a/.well-known/agent-card.json")
     async def get_scoped_agent_card() -> JSONResponse:
-        return JSONResponse(agent_card)
+        return JSONResponse(_build_agent_card(capabilities))
 
     async def _emit_trace(record: dict[str, Any]) -> None:
         if not PLANNER_URL or tool_client is None:

@@ -32,4 +32,4 @@ evaluation_signals:
   - passages_have_citations
   - latency_p95_under(8s)
 provenance:
-  model: ${MODEL}
+  model: none

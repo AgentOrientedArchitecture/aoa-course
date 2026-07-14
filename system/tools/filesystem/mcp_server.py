@@ -18,9 +18,14 @@ Tools provided:
 All paths must resolve inside ``FS_ROOT`` (default ``/data``). Anything else
 returns a JSON-RPC error.
 
-The wire shape follows the MCP 2025-06-18 spec for ``tools/call`` (a content
-array with typed blocks). The bridge in ``bridge.py`` parses the structured
-extras (``entries``) when present.
+Simplified MCP: the wire shape follows the spirit of the MCP 2025-06-18 spec
+for ``tools/call`` (JSON-RPC 2.0, a content array with typed blocks) but is
+not a conformant implementation — the handshake skips ``protocolVersion``
+negotiation and the ``initialized`` notification, structured extras ride as
+ad-hoc top-level result keys (``entries``) instead of ``structuredContent``,
+and tool execution errors come back as JSON-RPC errors rather than results
+with ``isError``. The bridge in ``bridge.py`` matches this dialect; a real
+MCP peer would not.
 """
 from __future__ import annotations
 

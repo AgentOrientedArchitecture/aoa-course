@@ -32,7 +32,6 @@
           <button id="mode-ingest" type="button" data-mode="knowledge-ingest">Ingest</button>
           <button id="mode-graph" type="button" data-mode="wiki-graph">Graph</button>
           <button id="mode-query" type="button" data-mode="knowledge-query">Ask</button>
-          <button id="mode-estate" type="button" data-mode="estate-check">Estate check</button>
         </div>
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "agent-card-check" %} hidden{% endif %}" data-mode-panel="agent-card-check">
@@ -114,18 +113,8 @@
           </p>
           <label class="audit-history-option">
             <input id="flow-audit-include-legacy" type="checkbox">
-            <span></span>Show legacy history</span>
+            <span>Show legacy history</span>
           </label>
-        </div>
-
-        <div class="workflow-fields hidden" data-mode-panel="estate-check">
-          <p class="mode-note">
-            Scans this system's own governance artefacts — registered capability
-            cards, lifecycle state, and planner traces — for evidence hooks
-            related to selected EU AI Act high-risk-system obligations, citing
-            the regulations corpus in the wiki. Findings and evidence only;
-            never a classification or compliance determination.
-          </p>
         </div>
 
         <div class="workflow-fields hidden" data-mode-panel="wiki-graph">

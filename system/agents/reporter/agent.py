@@ -1,12 +1,19 @@
 """reporter agent.
 
-Backs ``reporter-cv-fit`` for Session 1, plus Session 2 answer and ingest
-reporting. Some reporter capabilities only consume structured data; others
-use a declared tool to store the finished result.
+One Python process serving five capabilities through capability-id dispatch
+in ``handle``: ``reporter-cv-fit`` (Session 1), ``reporter-answer`` and
+``reporter-ingest-summary`` (Session 2), and the Session 4 governance pair
+``reporter-agent-evidence`` and ``reporter-flow-audit``.
+
+Only ``reporter-cv-fit`` is model-backed; the rest render structured inputs
+into markdown deterministically. Some capabilities only consume structured
+data; ``reporter-ingest-summary`` uses the declared ``tool-wiki-store`` to
+store the finished result.
 """
 from __future__ import annotations
 
 import json
+import time as _time
 
 from _base.base import Context, run
 from _base.json_utils import error_envelope, parse_json
@@ -37,8 +44,6 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _report_agent_evidence(inputs, ctx)
     if capability_id == "reporter-flow-audit":
         return await _report_flow_audit(inputs, ctx)
-    if capability_id == "reporter-findings":
-        return await _report_estate_findings(inputs, ctx)
     return error_envelope(f"reporter does not back capability {capability_id!r}")
 
 
@@ -78,6 +83,7 @@ async def _report_cv_fit(inputs: dict, ctx: Context) -> dict:
 
 
 async def _report_answer(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
     question = inputs.get("question")
     parsed_note = inputs.get("parsed_note")
     evaluation = inputs.get("evaluation")
@@ -99,12 +105,13 @@ async def _report_answer(inputs: dict, ctx: Context) -> dict:
             "has_citations": isinstance(citations, list) and len(citations) > 0,
             "has_markdown": bool(answer.get("answer_markdown")),
             "grounded_from_passages": True,
-            "latency_seconds": 0,
+            "latency_seconds": round(_time.monotonic() - started, 3),
         },
     }
 
 
 async def _report_ingest_summary(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
     promotion = inputs.get("promotion")
     source_path = inputs.get("source_path")
     if not isinstance(promotion, dict):
@@ -132,7 +139,7 @@ async def _report_ingest_summary(inputs: dict, ctx: Context) -> dict:
                 "stored_document": False,
                 "has_markdown": bool(markdown),
                 "passage_count": 0,
-                "latency_seconds": 0,
+                "latency_seconds": round(_time.monotonic() - started, 3),
             },
         }
 
@@ -160,7 +167,7 @@ async def _report_ingest_summary(inputs: dict, ctx: Context) -> dict:
             "stored_document": bool(stored.get("document_id")),
             "has_markdown": bool(markdown),
             "passage_count": stored.get("passage_count", 0),
-            "latency_seconds": 0,
+            "latency_seconds": round(_time.monotonic() - started, 3),
         },
     }
 
@@ -376,7 +383,8 @@ def _markdown_list(title: str, values: list) -> list[str]:
     return lines + [""]
 
 # ----------------------------------------------------------------------
-# reporter-findings — deterministic estate-check report (no model call)
+# reporter-agent-evidence / reporter-flow-audit — deterministic governance
+# evidence reports (no model call)
 # ----------------------------------------------------------------------
 
 _SCOPE_BANNER = (
@@ -529,107 +537,6 @@ async def _report_flow_audit(inputs: dict, ctx: Context) -> dict:
             "all_findings_rendered": all_findings_rendered,
         },
     }
-
-
-async def _report_estate_findings(inputs: dict, ctx: Context) -> dict:
-    inventory = inputs.get("inventory")
-    plans = inputs.get("plans")
-    findings_obj = inputs.get("findings")
-    if not isinstance(inventory, list):
-        return error_envelope("inventory (array) is required")
-    if not isinstance(plans, list):
-        return error_envelope("plans (array) is required")
-    if not isinstance(findings_obj, dict):
-        return error_envelope("findings (object) is required")
-
-    raw_findings = [
-        finding
-        for finding in findings_obj.get("findings") or []
-        if isinstance(finding, dict)
-    ]
-    findings = [finding for finding in raw_findings if not _is_plan_finding(finding)]
-    plan_findings = _plan_findings(findings_obj, raw_findings, plans)
-    summary = findings_obj.get("summary") or {}
-    if not isinstance(summary, dict):
-        summary = {}
-
-    markdown = _findings_markdown(inventory, plans, findings, plan_findings, summary)
-    lowered = markdown.lower()
-    no_verdict = not any(word in lowered for word in _BANNED_WORDS)
-    all_plans_rendered = all(
-        _plan_label(plan, index) in markdown
-        for index, plan in enumerate(plans)
-        if isinstance(plan, dict)
-    )
-    all_component_findings_rendered = all(
-        str(finding.get("capability_id") or "?") in markdown
-        and str(finding.get("article") or "?") in markdown
-        for finding in findings
-    )
-    all_plan_findings_rendered = all(
-        str(
-            finding.get("trace_id")
-            or finding.get("plan_id")
-            or finding.get("plan_digest")
-            or finding.get("finding_id")
-            or ""
-        ) in markdown
-        for finding in plan_findings
-    )
-
-    return {
-        "outputs": {"findings_markdown": markdown},
-        "signals": {
-            "valid_output_shape": True,
-            "has_markdown": bool(markdown.strip()),
-            "no_compliance_verdict": no_verdict,
-            "all_plans_rendered": all_plans_rendered,
-            "all_findings_rendered": (
-                all_component_findings_rendered and all_plan_findings_rendered
-            ),
-        },
-    }
-
-
-def _findings_markdown(
-    inventory: list,
-    plans: list,
-    findings: list[dict],
-    plan_findings: list[dict],
-    summary: dict,
-) -> str:
-    lines: list[str] = ["# Estate check - EU AI Act findings", "", _SCOPE_BANNER]
-
-    lines.append(
-        f"Scanned **{summary.get('aus_scanned', len(inventory))} AUs** and observed "
-        f"**{len(plans)} end-to-end plans/traces** - "
-        f"{summary.get('annex_iii_candidates', 0)} Annex III candidates for legal review. "
-        f"Component findings: {summary.get('red', 0)} red / "
-        f"{summary.get('amber', 0)} amber / {summary.get('green', 0)} green / "
-        f"{summary.get('unknown', 0)} corpus-silent."
-    )
-    lines.append("")
-
-    _append_plan_governance(lines, plans, plan_findings)
-    _append_component_evidence(lines, findings)
-
-    silent = sorted({
-        f.get("article", "?")
-        for f in findings + plan_findings
-        if f.get("corpus_silent")
-    })
-    if silent:
-        lines.append("## Corpus gaps")
-        lines.append("")
-        lines.append(
-            "The regulations corpus is silent for: " + ", ".join(silent) +
-            ". Findings for these articles abstain (corpus silent - ingest the "
-            "regulation note for each article)."
-        )
-        lines.append("")
-
-    lines.append(_FOOTER)
-    return "\n".join(lines)
 
 
 def _append_plan_governance(

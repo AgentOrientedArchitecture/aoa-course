@@ -1,17 +1,26 @@
 """evaluator agent.
 
-Backs ``evaluator-cv`` for Session 1, plus wiki promotion and wiki-query
-evidence evaluation for Session 2. The same Python process serves each through
-capability-id dispatch in ``handle``.
+One Python process serving six capabilities through capability-id dispatch in
+``handle``: ``evaluator-cv`` (Session 1), ``evaluator-promote`` and
+``evaluator-wiki-query`` (Session 2), and the Session 4 governance trio
+``evaluator-agent-evidence``, ``evaluator-flow-evidence``, and
+``evaluator-plan-governance``.
 
-For ``evaluator-cv`` we receive a parsed CV (the parser's output) and a path
-to a job description on the shared inbox volume. We read the JD through
-``tool-document-text`` so the call shows up in the trace, hand both to the
-model with the rubric in ``instructions.md``, and return a JSON evaluation.
+``evaluator-cv`` and ``evaluator-promote`` are model-backed. For
+``evaluator-cv`` we receive a parsed CV (the parser's output) and a path to a
+job description on the shared inbox volume, read the JD through
+``tool-document-text`` so the call shows up in the trace, and hand both to
+the model with the rubric in ``instructions.md``.
+
+The wiki-query and Session 4 governance capabilities are deterministic — no
+model call. They rank retrieved passages and check estate/plan evidence in
+code, using ``tool-wiki-store`` for cited regulation passages; their
+``instructions.md`` files are documented contracts, not prompts.
 """
 from __future__ import annotations
 
 import json
+import time as _time
 
 from _base.base import Context, run
 from _base.json_utils import error_envelope, parse_json
@@ -46,8 +55,6 @@ async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
         return await _evaluate_agent_evidence(inputs, ctx)
     if capability_id == "evaluator-flow-evidence":
         return await _evaluate_flow_evidence(inputs, ctx)
-    if capability_id == "evaluator-compliance":
-        return await _evaluate_compliance(inputs, ctx)
     if capability_id == "evaluator-plan-governance":
         return await _evaluate_plan_governance(inputs, ctx)
     return error_envelope(f"evaluator does not back capability {capability_id!r}")
@@ -130,6 +137,7 @@ async def _promote_note(inputs: dict, ctx: Context) -> dict:
 
 
 async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
+    started = _time.monotonic()
     question = inputs.get("question")
     query = inputs.get("query")
     if not isinstance(question, str) or not question.strip():
@@ -183,7 +191,7 @@ async def _evaluate_wiki_query(inputs: dict, ctx: Context) -> dict:
                 isinstance(item, dict) and item.get("passage_id")
                 for item in ranked
             ) if isinstance(ranked, list) else False,
-            "latency_seconds": 0,
+            "latency_seconds": round(_time.monotonic() - started, 3),
         },
     }
 
@@ -289,7 +297,8 @@ def _employment_card_eligibility(capability_cards: list) -> dict:
         }
     card = evaluator_cards[0]
     lifecycle = card.get("lifecycle") if isinstance(card.get("lifecycle"), dict) else {}
-    status = str(lifecycle.get("status") or "approved")
+    # Fail closed: a snapshot with no lifecycle at all is not approved.
+    status = str(lifecycle.get("status") or "missing")
     matched = _human_review_before_use_constraint(card)
     eligible = status == "approved" and bool(matched)
     if status != "approved":
@@ -589,12 +598,11 @@ async def _evaluate_plan_governance(inputs: dict, ctx: Context) -> dict:
 
 
 # ----------------------------------------------------------------------
-# evaluator-compliance — EU AI Act obligation checks over an estate
-# inventory. Deterministic checks + wiki-store retrieval for citations.
-# Findings and evidence only; never a verdict.
+# evaluator-agent-evidence / evaluator-flow-evidence — EU AI Act obligation
+# checks over an estate inventory and planner traces. Deterministic checks +
+# wiki-store retrieval for citations. Findings and evidence only; never a
+# verdict.
 # ----------------------------------------------------------------------
-
-import time as _time
 
 _ANNEX_III_MARKERS = (
     "recruit", "candidates", "candidate evaluation", " cv", "cv ",
@@ -802,47 +810,6 @@ async def _evaluate_flow_evidence(inputs: dict, ctx: Context) -> dict:
             "all_findings_cited": all(
                 finding.get("regulation_citation") or finding.get("corpus_silent")
                 for finding in plan_findings
-            ),
-            "corpus_present": summary["corpus_present"],
-            "latency_seconds": round(_time.monotonic() - started, 2),
-        },
-    }
-
-
-async def _evaluate_compliance(inputs: dict, ctx: Context) -> dict:
-    """Compatibility wrapper returning the former combined estate evidence shape."""
-    started = _time.monotonic()
-    inventory = inputs.get("inventory")
-    plans = inputs.get("plans")
-    if not isinstance(inventory, list):
-        return error_envelope("inventory (array) is required")
-    if not isinstance(plans, list):
-        return error_envelope("plans (array) is required")
-    citations = await _retrieve_regulation_citations(ctx, _ARTICLE_QUERIES)
-    if citations is None:
-        return error_envelope("tool-wiki-store is not available")
-
-    findings, component_summary = _component_evidence(inventory, citations)
-    plan_findings, flow_summary = _flow_evidence(plans, citations.get("Art 14"))
-    summary = {
-        **component_summary,
-        **flow_summary,
-        "corpus_present": component_summary["corpus_present"],
-    }
-    all_findings = findings + plan_findings
-    return {
-        "outputs": {
-            "findings": findings,
-            "plan_findings": plan_findings,
-            "summary": summary,
-        },
-        "signals": {
-            "valid_output_shape": True,
-            "risk_marker_assessed": True,
-            "plan_sequence_assessed": True,
-            "all_findings_cited": all(
-                finding.get("regulation_citation") or finding.get("corpus_silent")
-                for finding in all_findings
             ),
             "corpus_present": summary["corpus_present"],
             "latency_seconds": round(_time.monotonic() - started, 2),

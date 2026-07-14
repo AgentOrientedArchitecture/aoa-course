@@ -267,7 +267,9 @@ export async function serve(cfg) {
     }
   }
 
-  // 4. The AOA HTTP + A2A surface — identical routes to base.py:build_app.
+  // 4. The AOA HTTP + A2A surface — the same routes as base.py:build_app.
+  //    One semantic difference: an unknown capability returns HTTP 200 with an
+  //    error envelope here, where base.py raises 404.
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const p = url.pathname;

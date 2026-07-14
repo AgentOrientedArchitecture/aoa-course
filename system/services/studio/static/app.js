@@ -14,7 +14,6 @@ const WORKFLOWS = [
   "knowledge-ingest",
   "wiki-graph",
   "knowledge-query",
-  "estate-check",
 ];
 
 // cv-fit-interview reuses the CV + JD form panel of cv-fit; it only differs in the
@@ -290,6 +289,11 @@ function appendTraceRow(record) {
     state.records = [];
     state.lifecycle = emptyLifecycle();
     $("trace-list").innerHTML = "";
+  } else if (!state.currentTraceId && record.trace_id) {
+    // Attached mid-run (e.g. the page was refreshed while a flow was in
+    // flight): adopt the in-flight trace so the trace summary and the
+    // held-result review controls target it.
+    state.currentTraceId = record.trace_id;
   }
   if (state.currentTraceId && record.trace_id !== state.currentTraceId) {
     // Skip events from older flows that are still draining.
@@ -473,24 +477,6 @@ function applyLifecycleEvent(record) {
       quarantined_at: record.ts || "",
     };
     life.status = "quarantined";
-    return;
-  }
-  // Legacy pre-execution approval traces remain readable in the event view.
-  if (record.step === "hold") {
-    life.status = "held";
-    life.planDigest = record.plan_digest || life.planDigest;
-    return;
-  }
-  if (record.step === "plan-approval") {
-    life.status = record.decision === "reject" ? "rejected" : "approved";
-    return;
-  }
-  if (record.step === "resume") {
-    life.status = "running";
-    return;
-  }
-  if (record.step === "rejected") {
-    life.status = "rejected";
     return;
   }
   if (record.step === "invoke") {
@@ -814,7 +800,6 @@ function lifecycleIntentTitle(life) {
   if (kind === "wiki-graph") return "Inspect the AOA wiki graph";
   if (kind === "knowledge-query") return "Answer a question from the AOA wiki";
   if (kind === "flow-audit") return "Audit post-execution flow evidence";
-  if (kind === "estate-check") return "Inspect component and end-to-end plan evidence";
   return "No run yet";
 }
 
@@ -927,10 +912,6 @@ function isResponsibilityRecord(record) {
     "result-review",
     "result-release",
     "result-quarantine",
-    "hold",
-    "plan-approval",
-    "resume",
-    "rejected",
     "select",
     "lookup",
     "invoke",
@@ -989,20 +970,8 @@ function traceEventView(record) {
   if (step === "result-quarantine") {
     return traceView("result", "error", "Rejected result quarantined", record.actor_id || "human reviewer", record.result_digest || "");
   }
-  if (step === "hold") {
-    return traceView("governance", "held", "Legacy execution hold", "Legacy pre-execution approval trace", record.plan_digest || "");
-  }
-  if (step === "plan-approval") {
-    return traceView("governance", "done", `Plan ${record.decision || "reviewed"}`, record.actor_id || "accountable reviewer", record.plan_digest || "");
-  }
-  if (step === "resume") {
-    return traceView("governance", "done", "Approved plan released", record.actor_id || "accountable reviewer", record.plan_digest || "");
-  }
   if (step === "governance-release") {
     return traceView("governance", "done", "Plan released automatically", record.decision || "proceed", record.plan_digest || "");
-  }
-  if (step === "rejected") {
-    return traceView("governance", "error", "Plan rejected", record.actor_id || record.decision || "policy", record.plan_digest || "");
   }
   if (step === "select") {
     const hash = record.card && record.card.provenance && record.card.provenance.skills_hash;
@@ -1079,7 +1048,7 @@ function traceLayer(step) {
   if (step === "start") return "intent";
   if (step === "capability-context" || step === "lookup" || step === "select") return "registry";
   if (step === "plan-proposal") return "planner";
-  if (["governance-invoke", "plan-governance", "governance-release", "plan-rejected", "result-hold", "result-review", "hold", "plan-approval", "resume", "rejected"].includes(step)) return "governance";
+  if (["governance-invoke", "plan-governance", "governance-release", "plan-rejected", "result-hold", "result-review"].includes(step)) return "governance";
   if (["result-draft", "result-release", "result-quarantine"].includes(step)) return "result";
   if (step === "au-start" || step === "au-finish" || step === "au-error") return "au";
   if (step === "tool-invoke" || step === "tool-response" || step === "tool-error") return "tool";
@@ -1255,7 +1224,10 @@ async function reviewHeldResult(decision) {
   const reject = $("result-review-reject");
   const status = $("result-review-action-status");
   const notes = $("result-review-notes").value.trim();
-  if (!state.currentTraceId || life.status !== "draft-held" || !life.resultDigest) return;
+  if (!state.currentTraceId || life.status !== "draft-held" || !life.resultDigest) {
+    status.textContent = "No held draft is attached to this page; submit a new run and review its draft.";
+    return;
+  }
   if (!notes) {
     status.textContent = "Add reviewer notes before approving or rejecting the draft.";
     return;
@@ -1300,7 +1272,15 @@ async function reviewHeldResult(decision) {
 
 function apiErrorMessage(payload, fallback) {
   const value = payload && (payload.detail || payload.error);
-  if (typeof value !== "string") return value || fallback;
+  if (value == null) return fallback;
+  if (typeof value !== "string") {
+    // e.g. FastAPI validation errors put a list of objects in `detail`.
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
   try {
     const parsed = JSON.parse(value);
     return parsed.detail || parsed.error || value;
@@ -1419,7 +1399,7 @@ function pickPayload(record) {
       signals: record.signals,
     };
   }
-  if (["governance-release", "plan-rejected", "result-draft", "result-hold", "result-review", "result-release", "result-quarantine", "hold", "plan-approval", "resume", "rejected"].includes(record.step)) {
+  if (["governance-release", "plan-rejected", "result-draft", "result-hold", "result-review", "result-release", "result-quarantine"].includes(record.step)) {
     return {
       decision: record.decision,
       actor_id: record.actor_id,
@@ -1487,7 +1467,7 @@ function pickMarkdown(record) {
   if (["response", "result-draft", "result-release", "finish"].includes(record.step)) {
     return outputs.report_markdown || outputs.answer_markdown || outputs.ingest_markdown || outputs.findings_markdown || "";
   }
-  if (record.step === "plan-governance" || record.step === "hold") {
+  if (record.step === "plan-governance") {
     return record.evaluation_markdown || "";
   }
   return "";
@@ -1774,8 +1754,8 @@ function buildIntentPayload(status) {
     };
   }
 
-  if (["agent-card-check", "estate-check"].includes(state.mode)) {
-    // No learner inputs: these workflows read the estate's governance artefacts.
+  if (state.mode === "agent-card-check") {
+    // No learner inputs: this workflow reads the estate's governance artefacts.
     return { kind: state.mode };
   }
 
@@ -1878,9 +1858,7 @@ function applyWorkflowConfig() {
   for (const btn of document.querySelectorAll("[data-mode]")) {
     btn.hidden = !enabledWorkflows.has(btn.dataset.mode);
   }
-  for (const panel of document.querySelectorAll("[data-mode-panel]")) {
-    if (!enabledWorkflows.has(panel.dataset.modePanel)) panel.classList.add("hidden");
-  }
+  // setMode recomputes every panel's hidden state from the selected mode.
   const initialMode = enabledWorkflows.has(state.mode) ? state.mode : configuredWorkflows[0] || "cv-fit";
   setMode(initialMode);
 }
@@ -1903,7 +1881,6 @@ function setMode(mode) {
     "wiki-graph": "Refresh graph",
     "knowledge-query": "Ask wiki",
     "flow-audit": "Run flow audit",
-    "estate-check": "Run estate check",
   };
   $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";

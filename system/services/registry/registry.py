@@ -100,7 +100,12 @@ def _ensure_data_dir() -> None:
         CARDS_PATH.write_text("{}")
 
 
-def _read_cards_file() -> dict[str, dict[str, Any]]:
+def _read_cards_file() -> dict[str, dict[str, Any]] | None:
+    """Read cards.json; None means the file is currently invalid JSON.
+
+    The distinction matters to the watcher: a hand-edit saved mid-keystroke
+    must be skipped, not treated as "all cards removed".
+    """
     if not CARDS_PATH.exists():
         return {}
     try:
@@ -109,8 +114,8 @@ def _read_cards_file() -> dict[str, dict[str, Any]]:
             return {}
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.exception("cards.json is not valid JSON, starting empty")
-        return {}
+        logger.exception("cards.json is not valid JSON")
+        return None
     if isinstance(data, dict):
         return {k: v for k, v in data.items() if isinstance(v, dict)}
     if isinstance(data, list):
@@ -202,7 +207,13 @@ async def _watch_cards_file() -> None:
 
     try:
         async for _changes in awatch(str(CARDS_PATH)):
-            on_disk = _filter_allowed_cards(_read_cards_file())
+            raw = _read_cards_file()
+            if raw is None:
+                # Invalid hand-edit: keep serving the in-memory cards and
+                # wait for the next save rather than mass-deregistering.
+                logger.warning("cards.json reload skipped: invalid JSON")
+                continue
+            on_disk = _filter_allowed_cards(raw)
             async with state.lock:
                 old_cards = state.cards
                 old_ids = set(old_cards)
@@ -379,7 +390,8 @@ async def _store(card: dict[str, Any], event: str) -> None:
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_data_dir()
-    state.cards = _filter_allowed_cards(_read_cards_file())
+    # At boot there is no in-memory state to preserve: invalid JSON starts empty.
+    state.cards = _filter_allowed_cards(_read_cards_file() or {})
     for card in state.cards.values():
         _stamp_lifecycle(card, "registered")
     if CARD_ALLOWLIST or state.cards:

@@ -10,8 +10,13 @@ cd "$(dirname "$0")/.."
 WIKI_URL="${WIKI_STORE_URL:-http://localhost:7403}/invoke?capability=tool-wiki-store"
 CARD_PATH="system/agents/evaluator/capabilities/cv/capability-card.yaml"
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required for this script (standard library only; no packages)." >&2
+  exit 1
+fi
+
 echo "1/3 resetting wiki store..."
-uv run python - "$WIKI_URL" <<'PY'
+python3 - "$WIKI_URL" <<'PY'
 import json
 import sys
 import urllib.error
@@ -40,7 +45,7 @@ find system/services/planner/traces -type f -name '*.jsonl' -delete
 echo "   traces cleared"
 
 echo "3/3 restoring the evaluator-cv learner baseline..."
-uv run python - "$CARD_PATH" <<'PY'
+python3 - "$CARD_PATH" <<'PY'
 from pathlib import Path
 import sys
 
