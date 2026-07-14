@@ -2,7 +2,8 @@
 
 Session 3 uses [Vercel EVE](https://github.com/vercel/eve) to author and accept
 an agent natively before adopting it into the same registry, planner, and Studio
-used by the Python agents. The full technical write-up is in
+used by the Python agents. The complete guided lab is in
+[`WALKTHROUGH.md`](WALKTHROUGH.md); the full technical write-up is in
 [`system/EVE.md`](../../../system/EVE.md).
 
 ## Data
@@ -19,7 +20,7 @@ Reuse the Session 1 CV and job-description examples in
 `session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt` in Studio's
 **CV fit + interview** mode.
 
-## Exercise
+## Overview
 
 The learner starts with a blank authored surface under
 `system/agents-eve/workshop/`. The Session 3 public commands are:
@@ -41,5 +42,4 @@ Learner-authored files and the generated capability card stay under
 `system/agents-eve/workshop/`.
 
 Node, npm, EVE, and package dependencies remain in Docker; no host JavaScript
-toolchain is required. Follow the complete guided lab in
-[`system/agents-eve/EXERCISE.md`](../../../system/agents-eve/EXERCISE.md).
+toolchain is required.

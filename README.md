@@ -6,7 +6,7 @@ not a production deployment platform.
 
 This repo holds two things:
 
-- **`course/`** — pre-work and example data.
+- **`course/`** — pre-work, plus a folder per session with its walkthrough and example data.
 - **`system/`** — a small, container-shaped AOA system you build across the course.
 
 ## What you'll build
@@ -66,7 +66,7 @@ remain persisted but hidden unless the **Show legacy history** checkbox is
 selected; the panel reports how many are included. A red legacy row means current evidence is
 absent, not necessarily that the old execution failed. Legacy plan approval is
 not result-review evidence. See
-[`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md).
+[`course/sessions/session-04-compliance/WALKTHROUGH.md`](course/sessions/session-04-compliance/WALKTHROUGH.md).
 
 ## Run it
 
@@ -187,7 +187,7 @@ If something misbehaves, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 ```
 course/
   pre-work/
-  data/
+  sessions/     # one folder per session: WALKTHROUGH.md + example data
 system/
   agents/       # Python agentic units (parser, evaluator, reporter)
   agents-eve/   # EVE-authored agentic units (Session 3: interviewer)
@@ -210,12 +210,16 @@ For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.
 
 ## Sessions
 
-| Repo profile | What you do | Walkthrough / data | Used by course session |
+Each session folder under [`course/sessions/`](course/sessions/) has a
+`WALKTHROUGH.md` with the learner instructions and a `README.md` describing its
+example data.
+
+| Repo profile | What you do | Walkthrough | Used by course session |
 |---|---|---|---|
-| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/data/session-01-cv-fit/WALKTHROUGH.md`](course/data/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
-| `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/data/session-02-wiki/WALKTHROUGH.md`](course/data/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
-| `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/data/session-03-eve/README.md`](course/data/session-03-eve/README.md) · capstone: [`system/agents-eve/EXERCISE.md`](system/agents-eve/EXERCISE.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
-| `session4` (card evidence + result review + flow audit) | Improve declared Agent card evidence, run eligible CV fit to a held draft, review its exact result digest, then audit release or quarantine evidence | [`course/data/session-04-compliance/README.md`](course/data/session-04-compliance/README.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, deterministic eligibility, result review, execution evidence, and legal claims) |
+| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/sessions/session-01-cv-fit/WALKTHROUGH.md`](course/sessions/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
+| `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/sessions/session-02-wiki/WALKTHROUGH.md`](course/sessions/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
+| `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/sessions/session-03-eve/WALKTHROUGH.md`](course/sessions/session-03-eve/WALKTHROUGH.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
+| `session4` (card evidence + result review + flow audit) | Improve declared Agent card evidence, run eligible CV fit to a held draft, review its exact result digest, then audit release or quarantine evidence | [`course/sessions/session-04-compliance/WALKTHROUGH.md`](course/sessions/session-04-compliance/WALKTHROUGH.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, deterministic eligibility, result review, execution evidence, and legal claims) |
 
 ## License
 

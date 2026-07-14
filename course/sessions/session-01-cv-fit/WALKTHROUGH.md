@@ -21,8 +21,8 @@ surface.
 
 In the **CV fit** tab, drop or paste a CV and a job description:
 
-- CV: `course/data/session-01-cv-fit/cv-examples/jordan-okafor.txt`
-- JD: `course/data/session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt`
+- CV: `course/sessions/session-01-cv-fit/cv-examples/jordan-okafor.txt`
+- JD: `course/sessions/session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt`
 
 Submit, and watch the **trace timeline** fill in: the planner proposes a route,
 validates it against the capability cards, then each AU is looked up, invoked
@@ -37,7 +37,7 @@ Things worth pointing at in the trace:
   "observed, not asserted" surface in miniature.
 
 Try the other pairings (`sam-everett.txt`, `frontend-engineer-design-systems.txt`)
-— the expected verdicts are in [`../README.md`](../README.md).
+— the expected verdicts are in [`README.md`](README.md).
 
 ## 3. The lab: modify your agent
 

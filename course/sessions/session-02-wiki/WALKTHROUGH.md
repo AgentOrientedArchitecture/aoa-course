@@ -18,7 +18,7 @@ codebase underneath, two governed agents with different public promises.
 ## 2. Ingest — promotion is judgement
 
 In the **Ingest** tab, submit
-`course/data/session-02-wiki/quickstart-note/agent-registry-lessons.txt`.
+`course/sessions/session-02-wiki/quickstart-note/agent-registry-lessons.txt`.
 
 Watch the trace: `parser-notes` extracts structured passages,
 `evaluator-promote` decides what deserves promotion (a judgement, not a copy),

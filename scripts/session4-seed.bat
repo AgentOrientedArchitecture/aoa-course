@@ -6,7 +6,7 @@ setlocal EnableExtensions
 
 cd /d "%~dp0.."
 
-set "SEED_DIR=course\data\session-04-compliance\regulations-seed"
+set "SEED_DIR=course\sessions\session-04-compliance\regulations-seed"
 set "INBOX_DIR=system\inbox\regulations"
 set "BRIDGE_BASE=%WIKI_STORE_URL%"
 if not defined BRIDGE_BASE set "BRIDGE_BASE=http://localhost:7403"

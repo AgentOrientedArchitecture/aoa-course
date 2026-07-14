@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SEED_DIR="course/data/session-04-compliance/regulations-seed"
+SEED_DIR="course/sessions/session-04-compliance/regulations-seed"
 INBOX_DIR="system/inbox/regulations"
 BRIDGE_URL="${WIKI_STORE_URL:-http://localhost:7403}/invoke?capability=tool-wiki-store"
 

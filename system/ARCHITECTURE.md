@@ -459,7 +459,8 @@ docker compose --env-file .env \
 For Session 3, pre-build with `session3-build`, open only the native EVE
 workshop with `session3-up`, and start the composed AOA system only after native
 acceptance with `session3-adopt`. These are the public Session 3 entry points;
-the guided sequence is in [`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
+the guided sequence is in
+[`course/sessions/session-03-eve/WALKTHROUGH.md`](../course/sessions/session-03-eve/WALKTHROUGH.md).
 
 For Session 4, start the deterministic stack with three core stages plus
 optional Graph and Ask evidence exploration, then seed and verify the inspectable

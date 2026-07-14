@@ -1,4 +1,4 @@
-# Session 3 lab — build natively in EVE, then adopt into AOA
+# Session 3 walkthrough — build natively in EVE, then adopt into AOA
 
 Session 3 starts with a blank authored workspace. You first create and accept an
 agent with EVE's own CLI. Only after the native agent works do you adopt it into
@@ -309,7 +309,7 @@ before testing through AOA.
 ## Checkpoint 6 — run the composed workflow
 
 Open Studio at `http://localhost:8080`, choose **CV fit + interview**, and submit
-a CV and job description from `course/data/session-01-cv-fit/`.
+a CV and job description from [`../session-01-cv-fit/`](../session-01-cv-fit/).
 
 The intent runs:
 

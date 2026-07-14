@@ -66,8 +66,8 @@ eve dev
 
 The learner replaces the generated model wiring with the provider-neutral
 OpenAI-compatible `agent.ts` and replaces the default prompt with the bounded
-`instructions.md` embedded in
-[`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md). That contract requires
+`instructions.md` embedded in the
+[Session 3 walkthrough](../course/sessions/session-03-eve/WALKTHROUGH.md). That contract requires
 exactly five concise questions, strict word limits, JSON only, and a response no
 larger than 1,200 tokens.
 
@@ -116,5 +116,5 @@ Keep the two validation boundaries distinct:
   acceptance so the composed system uses the newly accepted learner files.
 
 The complete learner sequence, copy-ready provider-neutral `agent.ts`, full
-concise `instructions.md`, acceptance input, and Studio checkpoint are in
-[`agents-eve/EXERCISE.md`](agents-eve/EXERCISE.md).
+concise `instructions.md`, acceptance input, and Studio checkpoint are in the
+[Session 3 walkthrough](../course/sessions/session-03-eve/WALKTHROUGH.md).

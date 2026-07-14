@@ -1,4 +1,4 @@
-# Session 4 - Card check, held result, and flow audit
+# Session 4 walkthrough — card check, held result, and flow audit
 
 Session 4 has exactly three core governance learning stages: **Agent card
 check**, **CV fit**, and **Flow audit**. Studio also provides optional **Graph**
