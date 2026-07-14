@@ -27,7 +27,7 @@ def parse_json(text: str) -> tuple[Any, str | None]:
 
     # First try the whole string as-is.
     try:
-        return json.loads(text), None
+        return _unwrap(json.loads(text)), None
     except json.JSONDecodeError:
         pass
 
@@ -35,7 +35,7 @@ def parse_json(text: str) -> tuple[Any, str | None]:
     match = _FENCE_RE.search(text)
     if match:
         try:
-            return json.loads(match.group(1)), None
+            return _unwrap(json.loads(match.group(1))), None
         except json.JSONDecodeError as e:
             return None, f"could not parse JSON inside code fence: {e}"
 
@@ -43,11 +43,24 @@ def parse_json(text: str) -> tuple[Any, str | None]:
     block = _largest_balanced(text)
     if block is not None:
         try:
-            return json.loads(block), None
+            return _unwrap(json.loads(block)), None
         except json.JSONDecodeError as e:
             return None, f"could not parse extracted JSON block: {e}"
 
     return None, "no JSON object or array found in model response"
+
+
+def _unwrap(value: Any) -> Any:
+    """Unwrap ``[{...}]`` to ``{...}``.
+
+    Local quantised models asked for "a single JSON object" sometimes wrap it
+    in a one-element array. Every course capability expects an object, so the
+    wrapper is never meaningful — but only a single-object array is unwrapped;
+    anything else passes through for the caller's own shape validation.
+    """
+    if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+        return value[0]
+    return value
 
 
 def _largest_balanced(text: str) -> str | None:
