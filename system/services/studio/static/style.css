@@ -52,7 +52,8 @@ main {
   grid-template-columns: 250px 1fr 320px;
   gap: 16px;
   padding: 16px;
-  height: calc(100vh - 53px);
+  align-items: start;
+  min-height: calc(100vh - 53px);
 }
 
 .pane {
@@ -60,10 +61,17 @@ main {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 14px 16px;
-  overflow: auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+/* The page scrolls as one; the registry and card columns stay in view and scroll on their own. */
+#registry-pane,
+#card-pane {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 69px);
+  overflow: auto;
 }
 
 .pane h2 {
@@ -1137,3 +1145,5 @@ button.secondary.danger {
 .intent-collapsed #intent-collapsed-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
 .intent-collapsed .section-meta { color: var(--accent); }
 .intent-collapsed.hidden { display: none; }
+
+.event-details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }

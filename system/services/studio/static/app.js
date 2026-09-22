@@ -1502,8 +1502,14 @@ function allocationCard(task) {
       ? `<li class="check ok">Reference plan agrees: ${escapeHtml(task.referenceCapability)}</li>`
       : `<li class="check bad">Reference plan differs: expected ${escapeHtml(task.referenceCapability)}</li>`)
     : `<li class="check muted">No reference plan for this task (model-proposed)</li>`;
-  const checks = contractChecks(task, chosenCard).map((r) =>
-    `<li class="check ${r.ok ? "ok" : "bad"}">${r.kind} <code>${escapeHtml(r.spec)}</code> ${r.ok ? `covered by ${r.how}` : "not covered by the chosen card"}</li>`).join("");
+  // One line per direction: every required field with its tick, so five outputs are one glance, not five rows.
+  const checks = ["input", "output"].map((kind) => {
+    const rows = contractChecks(task, chosenCard).filter((r) => r.kind === kind);
+    if (!rows.length) return "";
+    const allOk = rows.every((r) => r.ok);
+    const parts = rows.map((r) => `<code title="${r.ok ? `covered by ${r.how}` : "not covered by the chosen card"}">${r.ok ? "" : "✗ "}${escapeHtml(r.spec)}</code>`).join(" ");
+    return `<li class="check ${allOk ? "ok" : "bad"}">${kind}${rows.length > 1 ? "s" : ""} ${parts} ${allOk ? "covered by the chosen card's contract" : "not all covered by the chosen card"}</li>`;
+  }).join("");
   const signals = task.signals && Object.keys(task.signals).length
     ? `<li class="check ok">Execution signals: ${escapeHtml(signalLine(task.signals))}</li>` : "";
   const explain = d.outcome === "gap"
