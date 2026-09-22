@@ -1004,6 +1004,7 @@ async def _build_plan(
 ) -> PlanBuildResult:
     if PLANNER_STRATEGY == "deterministic":
         return _fallback_plan(workflow)
+    text = ""
     try:
         prompt = _build_planner_prompt(workflow, intent, cards)
         text, raw = await _planner_model_complete(prompt)
@@ -1024,7 +1025,11 @@ async def _build_plan(
         if PLANNER_STRATEGY == "llm":
             raise
         logger.warning("planner model failed; falling back to deterministic plan: %r", e)
-        return _fallback_plan(workflow, reason=_planner_fallback_message(e), detail=str(e))
+        detail = str(e)
+        if text:
+            # keep what the model actually said so the trace shows why the plan was rejected
+            detail = f"{detail}; model output: {' '.join(text.split())[:600]}"
+        return _fallback_plan(workflow, reason=_planner_fallback_message(e), detail=detail)
 
 
 # ----------------------------------------------------------------------
