@@ -1117,12 +1117,34 @@ async def _decision_evaluate(
     return answers
 
 
+async def _counterfactual_allocations(
+    client: httpx.AsyncClient, task: TaskSpec, proposed: str | None
+) -> dict[str, Any]:
+    """What the other two allocators would have picked for this task, recorded next to the decision so the
+    trace (and Studio) can show agreement or disagreement between independent methods:
+    the registry's lexical /discover ranking and the planner model's own proposal."""
+    lexical: list[dict[str, Any]] = []
+    try:
+        discovery = await _registry_discover(client, task.discovery)
+        for candidate in (discovery.get("candidates") or [])[:3]:
+            card = candidate.get("card") or {}
+            lexical.append({"id": card.get("id"), "score": candidate.get("score"), "reasons": candidate.get("reasons", [])[:3]})
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("counterfactual lexical discovery failed for task %s: %r", task.id, exc)
+    return {
+        "registry_lexical": lexical,
+        "planner_model": proposed or None,
+        "reference_plan": _deterministic_capability_for_task(task) or None,
+    }
+
+
 async def _allocate_with_decision(
     client: httpx.AsyncClient,
     workflow: Workflow,
     intent: dict[str, Any],
     task: TaskSpec,
     au_cards: list[dict[str, Any]],
+    proposed: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Ask the decision service which capability should perform this task.
 
@@ -1174,6 +1196,7 @@ async def _allocate_with_decision(
         })
         fit = float(fit_answer["fits"].get("noul") or 0.0)
 
+    counterfactuals = await _counterfactual_allocations(client, task, proposed)
     ranked = sorted(probabilities.items(), key=lambda kv: kv[1], reverse=True)
     candidates: list[dict[str, Any]] = []
     for option, probability in ranked:
@@ -1205,6 +1228,7 @@ async def _allocate_with_decision(
             "gap_floor": DECISION_GAP_FLOOR,
             "confidence_floor": DECISION_CONFIDENCE_FLOOR,
         },
+        "counterfactuals": counterfactuals,
         "task": _task_trace(task),
     }
     return candidates, query
@@ -1807,9 +1831,14 @@ async def _run_workflow(
                 # The decision model re-allocates every task, whether the planner model or the workflow
                 # definition proposed a capability: the proposal becomes one candidate among all approved
                 # AU cards, and the trace says what the model actually chose and how sure it was.
+                proposed = (
+                    task.selected_capability
+                    if plan_result.source == "llm" and task.selected_capability
+                    else None
+                )
                 try:
                     candidates, query = await _allocate_with_decision(
-                        client, workflow, intent, task, au_cards
+                        client, workflow, intent, task, au_cards, proposed=proposed
                     )
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("decision allocator failed for task %s; keeping %s: %r", task.id, query.get("strategy") if isinstance(query, dict) else "discovery", exc)

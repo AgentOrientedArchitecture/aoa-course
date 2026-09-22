@@ -1149,3 +1149,15 @@ button.secondary.danger {
 .event-details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
 .check.warn { color: #b7791f; }
 .check.warn::before { content: "!"; font-weight: 700; }
+
+/* --- counterfactual strip ------------------------------------------------- */
+.cf-strip { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+.cf-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+.cf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cf-col { display: grid; gap: 2px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: #fff; min-width: 0; }
+.cf-col.agree { border-color: var(--ok); }
+.cf-col.differ { border-color: var(--warn); background: #fdf6f5; }
+.cf-col.none { opacity: 0.7; }
+.cf-name { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.cf-pick { font: 12px/1.4 var(--mono); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-note { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

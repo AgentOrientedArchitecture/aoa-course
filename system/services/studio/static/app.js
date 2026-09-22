@@ -422,6 +422,7 @@ function applyLifecycleEvent(record) {
     task.strategy = query.strategy || "";
     if (query.strategy === "decision-model") {
       task.decision = query.decision || null;
+      task.counterfactuals = query.counterfactuals || null;
       life.decisionMode = true;
       const qt = query.task || {};
       if (!task.referenceCapability && qt.reference_capability) task.referenceCapability = qt.reference_capability;
@@ -1482,6 +1483,37 @@ function contractChecks(task, card) {
   return rows;
 }
 
+function counterfactualStrip(task) {
+  // Three independent allocators side by side: agreement is evidence, disagreement is the teachable moment.
+  const d = task.decision;
+  const cf = task.counterfactuals;
+  if (!d || !cf) return "";
+  const lexical = cf.registry_lexical || [];
+  const lexTop = lexical[0] || null;
+  const cols = [
+    { name: "Decision model", pick: d.choice === "none_of_these" ? "none_of_these" : d.choice, note: `p=${fmtProb(d.probability)}`, title: "typed choice over the cards with calibrated probability" },
+    { name: "Planner model", pick: cf.planner_model || "", note: cf.planner_model ? "free-text proposal" : "no proposal (fixed plan)", title: "the capability the generative planner named in its proposal" },
+    { name: "Registry search", pick: lexTop ? lexTop.id : "", note: lexTop ? `score ${Number(lexTop.score).toFixed(1)}${lexical[1] ? `, next ${lexical[1].id} ${Number(lexical[1].score).toFixed(1)}` : ""}` : "no match", title: lexTop ? (lexTop.reasons || []).join("; ") : "lexical name/type/keyword scoring" },
+    { name: "Reference plan", pick: cf.reference_plan || "", note: cf.reference_plan ? "course gold" : "no reference", title: "the course's fixed plan for this task" },
+  ];
+  const picks = cols.map((c) => c.pick).filter(Boolean);
+  const distinct = new Set(picks);
+  const verdict = distinct.size <= 1
+    ? `<span class="ok-text">All ${picks.length} methods agree</span>`
+    : `<span class="warn-text">Methods disagree: ${[...distinct].join(" vs ")}</span>`;
+  const cells = cols.map((c) => `
+    <div class="cf-col ${c.pick && c.pick === d.choice ? "agree" : c.pick ? "differ" : "none"}" title="${escapeHtml(c.title)}">
+      <span class="cf-name">${escapeHtml(c.name)}</span>
+      <span class="cf-pick">${escapeHtml(c.pick || "–")}</span>
+      <span class="cf-note">${escapeHtml(c.note)}</span>
+    </div>`).join("");
+  return `
+    <div class="cf-strip">
+      <div class="cf-head"><span class="section-label">What each allocator would pick</span>${verdict}</div>
+      <div class="cf-grid">${cells}</div>
+    </div>`;
+}
+
 function allocationCard(task) {
   const d = task.decision;
   if (!d) return "";
@@ -1532,6 +1564,7 @@ function allocationCard(task) {
       <p class="decision-facts">${facts}</p>
       ${explain ? `<p class="decision-explain">${escapeHtml(explain)}</p>` : ""}
       <ul class="check-list">${ref}${fitCheck}${checks}${signals}</ul>
+      ${counterfactualStrip(task)}
     </div>`;
 }
 

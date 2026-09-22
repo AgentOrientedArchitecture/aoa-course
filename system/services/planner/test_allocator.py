@@ -59,8 +59,16 @@ class _Response:
         return self._body
 
 
-def _allocate(client):
-    return asyncio.run(planner._allocate_with_decision(client, WORKFLOW, {"kind": "cv-fit"}, TASK, CARDS))
+def _allocate(client, proposed=None):
+    async def fake_discover(_client, _query):
+        return {"candidates": [{"score": 9.5, "reasons": ["input cv matched by name"], "card": CARDS[1]},
+                               {"score": 2.0, "reasons": ["kind au"], "card": CARDS[0]}]}
+    original = planner._registry_discover
+    planner._registry_discover = fake_discover
+    try:
+        return asyncio.run(planner._allocate_with_decision(client, WORKFLOW, {"kind": "cv-fit"}, TASK, CARDS, proposed=proposed))
+    finally:
+        planner._registry_discover = original
 
 
 def test_criteria_only_approved_cards_plus_escape():
@@ -161,3 +169,13 @@ def test_free_text_prompt_omits_the_requested_workflow_example():
     assert '"workflow": "cv-fit"' not in prompt and '"goal": "Is this candidate a fit?"' in prompt
     strict = planner._build_planner_prompt(WORKFLOW, {"kind": "cv-fit", "inputs": {}}, CARDS)
     assert '"workflow": "cv-fit"' in strict
+
+
+def test_counterfactuals_recorded_next_to_the_decision():
+    client = FakeClient({"evaluator-cv": 0.9, "parser-cv": 0.05, "reporter-cv-fit": 0.04, "none_of_these": 0.01})
+    _candidates, query = _allocate(client, proposed="evaluator-cv")
+    cf = query["counterfactuals"]
+    assert cf["planner_model"] == "evaluator-cv"
+    assert cf["reference_plan"] == "evaluator-cv"
+    assert [c["id"] for c in cf["registry_lexical"]] == ["evaluator-cv", "parser-cv"]
+    assert cf["registry_lexical"][0]["score"] == 9.5

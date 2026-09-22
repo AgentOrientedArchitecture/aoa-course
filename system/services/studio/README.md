@@ -161,3 +161,6 @@ decided, what the decider saw, and independent evidence that it was right.
   and fit; then checks a learner can read without the JSON: reference plan agrees or differs, the task's required
   inputs and outputs covered by the chosen card's contract (by name or type), and the AU's execution signals once it
   has run. Probability is what the model believes; the checks are the evidence. Raw JSON stays behind **Raw**.
+- **What each allocator would pick** (per task): the decision model, the planner model's proposal, the registry's
+  lexical search (with its score and the runner-up) and the course reference plan side by side, with a one-line
+  verdict: all methods agree, or which ones disagree.

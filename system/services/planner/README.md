@@ -166,7 +166,10 @@ selects how it is made:
   | proceed | otherwise | binds the winner |
 
   The `discover` record lists every considered capability with its probability as the score, and the
-  `select` record carries the chosen card; Studio renders both unchanged. If the service is unreachable the
+  `select` record carries the chosen card; Studio renders both unchanged. The record also carries
+  `counterfactuals`: what the registry's lexical `/discover` ranking and the planner model's own proposal
+  would have picked for the same task, next to the course's reference plan, so agreement between
+  independent methods is visible per task and disagreement is a teachable moment. If the service is unreachable the
   planner records `allocator-fallback` and keeps the registry allocation, so a missing model never blocks
   a session.
 
