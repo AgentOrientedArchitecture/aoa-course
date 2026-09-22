@@ -49,7 +49,7 @@ header h1 {
 
 main {
   display: grid;
-  grid-template-columns: 280px 1fr 360px;
+  grid-template-columns: 250px 1fr 320px;
   gap: 16px;
   padding: 16px;
   height: calc(100vh - 53px);
@@ -1110,3 +1110,30 @@ button.secondary.danger {
 .check code { font: 11px/1.4 var(--mono); }
 .ok-text { color: var(--ok); }
 .task-card.gap { border-left-color: var(--warn); background: #fdf6f5; }
+
+
+/* --- compact request form and collapsed strip ---------------------------- */
+.attach-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.attach-row textarea { min-height: 52px; }
+.intent-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.intent-collapsed #intent-collapsed-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+.intent-collapsed .section-meta { color: var(--accent); }
+.intent-collapsed.hidden { display: none; }

@@ -82,6 +82,9 @@ services:
       PLANNER_STRATEGY: ${PLANNER_STRATEGY:-hybrid}
       PLANNER_MODEL_TIMEOUT_SECONDS: ${PLANNER_MODEL_TIMEOUT_SECONDS:-60}
       PLANNER_MODEL_MAX_TOKENS: ${PLANNER_MODEL_MAX_TOKENS:-2048}
+      # Let the planner model think before answering (reasoning models return valid plans far more
+      # reliably); the AUs keep OLLAMA_THINK for their own JSON outputs.
+      PLANNER_MODEL_THINK: ${PLANNER_MODEL_THINK:-true}
       # Task->capability allocation: "registry" (lexical /discover or the planner model's pick, the
       # original course behaviour) or "decision" (typed, calibrated choice from the decision service).
       PLANNER_ALLOCATOR: ${PLANNER_ALLOCATOR:-registry}

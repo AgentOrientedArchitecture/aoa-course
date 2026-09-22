@@ -1930,6 +1930,7 @@ async function submitIntent() {
   const payload = buildIntentPayload(status);
   if (!payload) return;
   const formBody = intentFormData(payload);
+  collapseIntentForm(payload);
 
   btn.disabled = true;
   status.textContent = "running…";
@@ -1955,6 +1956,27 @@ async function submitIntent() {
   } finally {
     btn.disabled = false;
   }
+}
+
+function intentSummaryText(payload) {
+  if (payload.goal) return `“${payload.goal.length > 110 ? `${payload.goal.slice(0, 107)}…` : payload.goal}”`;
+  const names = [payload.cv_name, payload.jd_name, payload.note_name].filter(Boolean);
+  return `${payload.kind}${names.length ? ` · ${names.join(", ")}` : payload.question ? ` · “${payload.question.slice(0, 80)}”` : ""}`;
+}
+
+function collapseIntentForm(payload) {
+  // Once a run starts the request is a one-line strip and the run's story takes the pane; click to edit.
+  $("intent-collapsed-text").textContent = intentSummaryText(payload);
+  $("intent-collapsed").classList.remove("hidden");
+  $("intent-form").classList.add("hidden");
+  const life = $("lifecycle");
+  if (life) life.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function expandIntentForm() {
+  $("intent-collapsed").classList.add("hidden");
+  $("intent-form").classList.remove("hidden");
+  $("intent-form").scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function buildIntentPayload(status) {
@@ -2096,6 +2118,11 @@ function clearDroppedFile(id) {
   if (labelId && $(labelId)) $(labelId).textContent = id.startsWith("auto-") ? "optional: paste below or drop a file" : "paste below or drop a file";
 }
 
+function setupIntentCollapse() {
+  const strip = $("intent-collapsed");
+  if (strip) strip.addEventListener("click", expandIntentForm);
+}
+
 function setupModeTabs() {
   for (const btn of document.querySelectorAll("[data-mode]")) {
     btn.addEventListener("click", () => setMode(btn.dataset.mode));
@@ -2173,6 +2200,7 @@ function escapeHtml(s) {
 window.addEventListener("DOMContentLoaded", () => {
   applyWorkflowConfig();
   setupModeTabs();
+  setupIntentCollapse();
   $("intent-submit").addEventListener("click", submitIntent);
   $("result-review-approve").addEventListener("click", () => reviewHeldResult("approve"));
   $("result-review-reject").addEventListener("click", () => reviewHeldResult("reject"));

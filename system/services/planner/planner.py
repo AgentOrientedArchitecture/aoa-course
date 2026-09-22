@@ -774,10 +774,39 @@ async def _planner_model_complete(prompt: str) -> tuple[str, dict[str, Any]]:
     raise RuntimeError(f"planner model provider {provider!r} is not supported")
 
 
+# The plan's shape, as a JSON schema. Handed to the model provider as a structured-output constraint so the
+# sampler can only produce task *objects*: under a plain JSON grammar gpt-oss-20b reliably emitted a stray quote
+# before the second task ("{"id":...) and the plan truncated to one task.
+PLAN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "goal": {"type": "string"},
+        "tasks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "capability": {"type": "string"},
+                    "input_map": {"type": "object", "additionalProperties": {"type": "string"}},
+                },
+                "required": ["id", "purpose", "capability", "input_map"],
+            },
+        },
+    },
+    "required": ["goal", "tasks"],
+}
+PLANNER_PLAN_SCHEMA = os.environ.get("PLANNER_PLAN_SCHEMA", "true").strip().lower() == "true"
+
+
 async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]:
     host = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
     response_format = os.environ.get("OLLAMA_RESPONSE_FORMAT", "json").strip()
-    think = os.environ.get("OLLAMA_THINK", "false").strip().lower()
+    # The planner asks for a structured plan, and reasoning models (gpt-oss) return a valid task list far more
+    # reliably when allowed to think first. PLANNER_MODEL_THINK overrides the AU-wide OLLAMA_THINK setting.
+    think = os.environ.get("PLANNER_MODEL_THINK", os.environ.get("OLLAMA_THINK", "true")).strip().lower()
     payload: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -790,7 +819,9 @@ async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]
             "num_predict": PLANNER_MODEL_MAX_TOKENS,
         },
     }
-    if response_format:
+    if PLANNER_PLAN_SCHEMA and response_format == "json":
+        payload["format"] = PLAN_SCHEMA          # Ollama structured outputs: a schema, not just "json"
+    elif response_format:
         payload["format"] = response_format
     if think in {"true", "false"}:
         payload["think"] = think == "true"
@@ -820,7 +851,9 @@ async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]
         "max_tokens": PLANNER_MODEL_MAX_TOKENS,
     }
     response_format = os.environ.get("OPENAI_RESPONSE_FORMAT", "json_object").strip()
-    if response_format:
+    if PLANNER_PLAN_SCHEMA and response_format == "json_object":
+        payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "plan", "schema": PLAN_SCHEMA}}
+    elif response_format:
         payload["response_format"] = {"type": response_format}
     reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low").strip()
     if reasoning_effort:
