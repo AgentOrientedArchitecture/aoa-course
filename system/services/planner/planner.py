@@ -37,6 +37,17 @@ PLANNER_STRATEGY = os.environ.get("PLANNER_STRATEGY", "hybrid").strip().lower()
 PLANNER_MODEL_TIMEOUT = float(os.environ.get("PLANNER_MODEL_TIMEOUT_SECONDS", "60"))
 PLANNER_MODEL_MAX_TOKENS = int(os.environ.get("PLANNER_MODEL_MAX_TOKENS", "2048"))
 PLAN_GOVERNANCE_CAPABILITY = os.environ.get("PLAN_GOVERNANCE_CAPABILITY", "").strip()
+# Task -> capability allocation. "registry" is the original course behaviour (the planner model's pick, or the
+# registry's lexical /discover ranking). "decision" asks the decision service a typed Choice over the approved
+# AU cards plus none_of_these and applies calibrated thresholds: below the gap floor the task is a capability
+# gap; below the confidence floor the allocation proceeds but is flagged for review.
+PLANNER_ALLOCATOR = os.environ.get("PLANNER_ALLOCATOR", "registry").strip().lower()
+DECISION_URL = os.environ.get("DECISION_URL", "http://decision:7500").rstrip("/")
+DECISION_TIMEOUT = float(os.environ.get("DECISION_TIMEOUT_SECONDS", "60"))
+DECISION_GAP_FLOOR = float(os.environ.get("DECISION_GAP_FLOOR", "0.35"))
+DECISION_CONFIDENCE_FLOOR = float(os.environ.get("DECISION_CONFIDENCE_FLOOR", "0.6"))
+DECISION_NONE = "none_of_these"
+DECISION_MAX_PURPOSE = 180
 RESULT_REVIEWER_ID = os.environ.get(
     "RESULT_REVIEWER_ID",
     os.environ.get("PLAN_APPROVER_ID", "urn:aoa:human:course-result-reviewer"),
@@ -918,6 +929,143 @@ async def _build_plan(
 
 
 # ----------------------------------------------------------------------
+# Decision allocator (typed, calibrated task -> capability choice)
+# ----------------------------------------------------------------------
+
+def _allocation_goal(workflow: Workflow, intent: dict[str, Any]) -> str:
+    """The goal text the decision model sees: the intent's own words when the studio sends them, else the
+    workflow name and the deployment context. The task text is the step's purpose."""
+    goal = str(intent.get("goal") or intent.get("text") or "").strip()
+    if goal:
+        return goal
+    use_context = intent.get("use_context") or {}
+    parts = [f"workflow: {workflow.name}"]
+    for key in ("domain", "output_use", "decision_effect"):
+        if use_context.get(key):
+            parts.append(f"{key}: {use_context[key]}")
+    return "; ".join(parts)
+
+
+def _decision_criteria(au_cards: list[dict[str, Any]]) -> dict[str, str]:
+    """Candidate options exactly as the decision model is asked to choose between them: approved AU cards by
+    id with a compact purpose, plus the escape option. The model can only answer with one of these keys."""
+    criteria: dict[str, str] = {}
+    for card in au_cards:
+        card_id = str(card.get("id") or "").strip()
+        if not card_id or not _lifecycle_approved(card):
+            continue
+        purpose = " ".join(str(card.get("purpose", "")).split())
+        criteria[card_id] = purpose if len(purpose) <= DECISION_MAX_PURPOSE else purpose[: DECISION_MAX_PURPOSE - 1] + "…"
+    criteria[DECISION_NONE] = "None of the available capabilities can perform this task."
+    return criteria
+
+
+async def _decision_evaluate(
+    client: httpx.AsyncClient, state: dict[str, Any], questions: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    response = await client.post(
+        f"{DECISION_URL}/v1/systemone",
+        json={"model": "kev-latest", "state": state, "questions": questions},
+        timeout=DECISION_TIMEOUT,
+    )
+    response.raise_for_status()
+    answers = response.json().get("answers")
+    if not isinstance(answers, dict):
+        raise ValueError("decision service response has no answers")
+    return answers
+
+
+async def _allocate_with_decision(
+    client: httpx.AsyncClient,
+    workflow: Workflow,
+    intent: dict[str, Any],
+    task: TaskSpec,
+    au_cards: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Ask the decision service which capability should perform this task.
+
+    Returns (candidates, query) in the same shape the registry's /discover produces, so the trace and the
+    studio render the allocation like any other discovery: every option with its probability as the score,
+    sorted, and the decision (proceed / review / gap) in the query for the `select` record.
+    """
+    criteria = _decision_criteria(au_cards)
+    state = {"goal": _allocation_goal(workflow, intent), "task": task.purpose}
+    questions = {
+        "agent": {
+            "type": "choice",
+            "instructions": (
+                "Which single capability is best suited to perform this task, given each capability's stated "
+                "purpose? Choose none_of_these only if no capability genuinely provides what the task needs."
+            ),
+            "criteria": criteria,
+        }
+    }
+    answer = (await _decision_evaluate(client, state, questions))["agent"]
+    probabilities: dict[str, float] = {
+        str(k): float(v) for k, v in (answer.get("probabilities") or {}).items()
+    }
+    choice = str(answer.get("choice") or "")
+    confidence = float(answer.get("confidence") or 0.0)
+    winner_probability = probabilities.get(choice, 0.0)
+    cards_by_id = {card.get("id"): card for card in au_cards}
+
+    if choice == DECISION_NONE or winner_probability < DECISION_GAP_FLOOR:
+        outcome = "gap"
+    elif confidence < DECISION_CONFIDENCE_FLOOR:
+        outcome = "review"
+    else:
+        outcome = "proceed"
+
+    fit = None
+    if outcome != "gap":
+        fit_answer = await _decision_evaluate(client, state, {
+            "fits": {
+                "type": "noul",
+                "instructions": (
+                    f"Does this task genuinely require the '{choice}' capability (true), "
+                    "or is it a poor/forced fit (false)?"
+                ),
+                "criteria": {"true": "Genuine, direct fit", "false": "Poor or forced fit"},
+            }
+        })
+        fit = float(fit_answer["fits"].get("noul") or 0.0)
+
+    ranked = sorted(probabilities.items(), key=lambda kv: kv[1], reverse=True)
+    candidates: list[dict[str, Any]] = []
+    for option, probability in ranked:
+        if option == DECISION_NONE:
+            continue
+        card = cards_by_id.get(option)
+        if card is None:
+            continue
+        reasons = [f"decision probability {probability:.2f}"]
+        if option == choice:
+            reasons.append(f"chosen with confidence {confidence:.2f}, outcome {outcome}")
+            if fit is not None:
+                reasons.append(f"fit {fit:.2f}")
+        candidates.append({"score": round(probability, 4), "reasons": reasons, "card": card})
+    if outcome == "gap":
+        candidates = []   # nothing is eligible; the planner records a gap like a failed discovery
+    query = {
+        "strategy": "decision-model",
+        "state": state,
+        "considered_capabilities": [key for key in criteria if key != DECISION_NONE],
+        "decision": {
+            "choice": choice,
+            "confidence": round(confidence, 4),
+            "probability": round(winner_probability, 4),
+            "none_of_these": round(probabilities.get(DECISION_NONE, 0.0), 4),
+            "fit": None if fit is None else round(fit, 4),
+            "outcome": outcome,
+            "gap_floor": DECISION_GAP_FLOOR,
+            "confidence_floor": DECISION_CONFIDENCE_FLOOR,
+        },
+        "task": _task_trace(task),
+    }
+    return candidates, query
+
+
+# ----------------------------------------------------------------------
 # Registry + agent IO
 # ----------------------------------------------------------------------
 
@@ -1501,6 +1649,22 @@ async def _run_workflow(
                 discovery = await _registry_discover(client, task.discovery)
                 candidates = discovery.get("candidates", [])
                 query = task.discovery
+            if PLANNER_ALLOCATOR == "decision":
+                # The decision model re-allocates every task, whether the planner model or the workflow
+                # definition proposed a capability: the proposal becomes one candidate among all approved
+                # AU cards, and the trace says what the model actually chose and how sure it was.
+                try:
+                    candidates, query = await _allocate_with_decision(
+                        client, workflow, intent, task, au_cards
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("decision allocator failed for task %s; keeping %s: %r", task.id, query.get("strategy") if isinstance(query, dict) else "discovery", exc)
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "allocator-fallback",
+                        "task": task.id,
+                        "error": str(exc),
+                    })
             await _record({
                 "trace_id": trace_id,
                 "step": "discover",
@@ -1508,8 +1672,26 @@ async def _run_workflow(
                 "query": query,
                 "candidates": [_candidate_trace(candidate) for candidate in candidates],
             })
+            if isinstance(query, dict) and query.get("strategy") == "decision-model":
+                decision = query.get("decision") or {}
+                if decision.get("outcome") == "review":
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "plan-review",
+                        "task": task.id,
+                        "capability": decision.get("choice"),
+                        "confidence": decision.get("confidence"),
+                        "runner_up": (candidates[1]["card"].get("id") if len(candidates) > 1 else None),
+                        "note": "allocation confidence below the review floor; proceeding but flagged",
+                    })
             if not candidates:
                 message = f"no capability discovered for task {task.id}"
+                if isinstance(query, dict) and query.get("strategy") == "decision-model":
+                    decision = query.get("decision") or {}
+                    message = (
+                        f"capability gap for task {task.id}: the decision model chose "
+                        f"{decision.get('choice')!r} at probability {decision.get('probability')}"
+                    )
                 await _record({
                     "trace_id": trace_id,
                     "step": "error",
@@ -1613,7 +1795,12 @@ async def _startup() -> None:
 
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
-    return {"ok": True, "workflows": sorted(WORKFLOWS), "planner_strategy": PLANNER_STRATEGY}
+    return {
+        "ok": True,
+        "workflows": sorted(WORKFLOWS),
+        "planner_strategy": PLANNER_STRATEGY,
+        "planner_allocator": PLANNER_ALLOCATOR,
+    }
 
 
 @app.post("/intent")

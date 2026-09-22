@@ -147,6 +147,32 @@ and reports the included count. Red legacy rows mean current evidence is absent,
 necessarily that the old execution failed. Legacy `hold`, `plan-approval`, and
 `resume` events remain parseable, but never count as `result-review` evidence.
 
+## Allocation: registry or decision model
+
+Binding a task to a capability is a separate decision from proposing the task list. `PLANNER_ALLOCATOR`
+selects how it is made:
+
+- `registry` (default, the original course behaviour): the planner model's pick when the plan came from
+  the model, the workflow definition's pin, or the registry's lexical `/discover` ranking otherwise.
+- `decision`: for every task the planner asks the [decision service](../decision/README.md) one typed
+  Choice over all approved AU cards plus `none_of_these`, with the goal and the task purpose as state, then
+  a yes/no fit question about the chosen card. The service returns a probability for every option, so the
+  planner can apply thresholds instead of trusting prose:
+
+  | outcome | rule | what the planner does |
+  |---|---|---|
+  | gap | `none_of_these` wins or the winner's probability < `DECISION_GAP_FLOOR` (0.35) | no candidates; the run stops with a capability gap before any AU is invoked |
+  | review | confidence < `DECISION_CONFIDENCE_FLOOR` (0.6) | binds the winner and records a `plan-review` event naming the runner-up |
+  | proceed | otherwise | binds the winner |
+
+  The `discover` record lists every considered capability with its probability as the score, and the
+  `select` record carries the chosen card; Studio renders both unchanged. If the service is unreachable the
+  planner records `allocator-fallback` and keeps the registry allocation, so a missing model never blocks
+  a session.
+
+The decision model cannot invent a capability: its answer is always one of the ids the planner supplied.
+That is the difference from the generative planner path, whose free text has to be parsed and validated.
+
 ## Planning configuration
 
 The planner runs on port `7200` and expects
@@ -158,6 +184,9 @@ The planner runs on port `7200` and expects
 - `deterministic` — skip the model and use the built-in course plan. Session 4
   uses this strategy.
 - `llm` — require a valid model-generated plan; fail if validation fails.
+
+`PLANNER_ALLOCATOR` (`registry` | `decision`), `DECISION_URL`, `DECISION_GAP_FLOOR` and
+`DECISION_CONFIDENCE_FLOOR` configure allocation (see above).
 
 `PLAN_GOVERNANCE_CAPABILITY` enables the pre-execution eligibility check. The
 configured card must be an approved AU. If the evaluator is unavailable or its

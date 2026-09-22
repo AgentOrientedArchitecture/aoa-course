@@ -1,0 +1,5 @@
+# Kev: Apache-2.0 decision models (LoRA + pointer head on Qwen bases) with a TypeSafe-compatible
+# POST /v1/systemone server. Pinned to a commit; see ../../ARCHITECTURE.md "Decision allocator".
+kev[serve] @ git+https://github.com/jaredpalmer/kev@90990a5fac2995b9faa3190f7d437e84f2067768
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
