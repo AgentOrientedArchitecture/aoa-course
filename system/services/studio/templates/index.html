@@ -55,16 +55,16 @@
             <textarea id="intent-goal" placeholder="e.g. Is this candidate a good fit for the data engineer role? / What does the wiki say about observed behaviour?" rows="3"></textarea>
           </label>
           <label class="drop-field">
-            <span class="drop-label"><strong>CV</strong> <em>optional</em></span>
-            <textarea id="auto-cv" placeholder="Paste a CV if the goal needs one." rows="4"></textarea>
+            <span class="drop-label"><strong>CV</strong> <em id="auto-cv-name">optional: paste below or drop a file</em></span>
+            <textarea id="auto-cv" data-name-target="auto-cv-name" placeholder="Paste a CV if the goal needs one." rows="4"></textarea>
           </label>
           <label class="drop-field">
-            <span class="drop-label"><strong>Job description</strong> <em>optional</em></span>
-            <textarea id="auto-jd" placeholder="Paste a job description if the goal needs one." rows="3"></textarea>
+            <span class="drop-label"><strong>Job description</strong> <em id="auto-jd-name">optional: paste below or drop a file</em></span>
+            <textarea id="auto-jd" data-name-target="auto-jd-name" placeholder="Paste a job description if the goal needs one." rows="3"></textarea>
           </label>
           <label class="drop-field">
-            <span class="drop-label"><strong>Note</strong> <em>optional</em></span>
-            <textarea id="auto-note-text" placeholder="Paste a research note if the goal is to ingest it." rows="3"></textarea>
+            <span class="drop-label"><strong>Note</strong> <em id="auto-note-name">optional: paste below or drop a file</em></span>
+            <textarea id="auto-note-text" data-name-target="auto-note-name" placeholder="Paste a research note if the goal is to ingest it." rows="3"></textarea>
           </label>
         </div>
         <div class="workflow-fields{% if studio_config.workflows[0] != "cv-fit" %} hidden{% endif %}" data-mode-panel="cv-fit">

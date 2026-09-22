@@ -53,6 +53,7 @@ const state = {
   cvFile: null,
   jdFile: null,
   noteFile: null,
+  auto: { cvFile: null, cvName: "", jdFile: null, jdName: "", noteFile: null, noteName: "" },   // Goal tab drops
 };
 
 function emptyLifecycle() {
@@ -1969,6 +1970,12 @@ function buildIntentPayload(status) {
       cv_text: $("auto-cv").value.trim(),
       jd_text: $("auto-jd").value.trim(),
       note_text: $("auto-note-text").value.trim(),
+      cv_name: state.auto.cvName || "cv.txt",
+      jd_name: state.auto.jdName || "jd.txt",
+      note_name: state.auto.noteName || "source-note.txt",
+      cv_file: state.auto.cvFile,
+      jd_file: state.auto.jdFile,
+      note_file: state.auto.noteFile,
     };
   }
 
@@ -2042,8 +2049,18 @@ function intentFormData(payload) {
 // File drop (per-textarea: drop on the CV box or the JD box)
 // ---------------------------------------------------------------------------
 
+const DROP_SLOTS = {
+  "intent-cv": ["cv", null], "intent-jd": ["jd", null], "intent-note": ["note", null],
+  "auto-cv": ["cv", "auto"], "auto-jd": ["jd", "auto"], "auto-note-text": ["note", "auto"],
+};
+
+function dropSlot(id) {
+  const [kind, scope] = DROP_SLOTS[id] || ["note", null];
+  return { target: scope === "auto" ? state.auto : state, fileKey: `${kind}File`, nameKey: `${kind}Name` };
+}
+
 function setupFileDrop() {
-  for (const id of ["intent-cv", "intent-jd", "intent-note"]) {
+  for (const id of Object.keys(DROP_SLOTS)) {
     const ta = $(id);
     if (!ta) continue;
 
@@ -2063,34 +2080,20 @@ function setupFileDrop() {
       ta.placeholder = `Selected file: ${f.name}`;
       const labelId = ta.dataset.nameTarget;
       if (labelId && $(labelId)) $(labelId).textContent = f.name;
-      if (id === "intent-cv") {
-        state.cvName = f.name;
-        state.cvFile = f;
-      } else if (id === "intent-jd") {
-        state.jdName = f.name;
-        state.jdFile = f;
-      } else {
-        state.noteName = f.name;
-        state.noteFile = f;
-      }
+      const slot = dropSlot(id);
+      slot.target[slot.nameKey] = f.name;
+      slot.target[slot.fileKey] = f;
     });
   }
 }
 
 function clearDroppedFile(id) {
   const ta = $(id);
-  if (id === "intent-cv") {
-    state.cvFile = null;
-    state.cvName = "";
-  } else if (id === "intent-jd") {
-    state.jdFile = null;
-    state.jdName = "";
-  } else {
-    state.noteFile = null;
-    state.noteName = "";
-  }
+  const slot = dropSlot(id);
+  slot.target[slot.fileKey] = null;
+  slot.target[slot.nameKey] = "";
   const labelId = ta && ta.dataset.nameTarget;
-  if (labelId && $(labelId)) $(labelId).textContent = "paste below or drop a file";
+  if (labelId && $(labelId)) $(labelId).textContent = id.startsWith("auto-") ? "optional: paste below or drop a file" : "paste below or drop a file";
 }
 
 function setupModeTabs() {
