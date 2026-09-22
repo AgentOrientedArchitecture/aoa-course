@@ -1510,6 +1510,10 @@ function allocationCard(task) {
     const parts = rows.map((r) => `<code title="${r.ok ? `covered by ${r.how}` : "not covered by the chosen card"}">${r.ok ? "" : "✗ "}${escapeHtml(r.spec)}</code>`).join(" ");
     return `<li class="check ${allOk ? "ok" : "bad"}">${kind}${rows.length > 1 ? "s" : ""} ${parts} ${allOk ? "covered by the chosen card's contract" : "not all covered by the chosen card"}</li>`;
   }).join("");
+  const fitCheck = d.fit == null ? ""
+    : d.fit >= 0.5
+      ? `<li class="check ok">Fit check agrees (${fmtProb(d.fit)}): the task genuinely needs this capability</li>`
+      : `<li class="check warn">Fit check disagrees (${fmtProb(d.fit)}): the model chose this card but doubts the task really needs it; read the task wording</li>`;
   const signals = task.signals && Object.keys(task.signals).length
     ? `<li class="check ok">Execution signals: ${escapeHtml(signalLine(task.signals))}</li>` : "";
   const explain = d.outcome === "gap"
@@ -1527,7 +1531,7 @@ function allocationCard(task) {
       <div class="prob-list">${rows}</div>
       <p class="decision-facts">${facts}</p>
       ${explain ? `<p class="decision-explain">${escapeHtml(explain)}</p>` : ""}
-      <ul class="check-list">${ref}${checks}${signals}</ul>
+      <ul class="check-list">${ref}${fitCheck}${checks}${signals}</ul>
     </div>`;
 }
 

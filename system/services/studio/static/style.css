@@ -1147,3 +1147,5 @@ button.secondary.danger {
 .intent-collapsed.hidden { display: none; }
 
 .event-details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.check.warn { color: #b7791f; }
+.check.warn::before { content: "!"; font-weight: 700; }
