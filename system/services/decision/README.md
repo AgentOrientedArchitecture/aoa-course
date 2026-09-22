@@ -22,3 +22,22 @@ service falls back to the released `jaredpalmer/kev-0.8b`, which does not know t
 | `DECISION_PORT` | `7500` | |
 
 Endpoints: `POST /v1/systemone`, `GET /v1/models`.
+
+## The course allocator checkpoint
+
+`models/run` (git-ignored, mount it or fetch it) is a Qwen3-0.6B-Base + LoRA r16 + pointer head, warm-started
+from `jaredpalmer/kev-0.6b` and fine-tuned for 7 minutes on this repo's own task→capability examples: the 18
+gold pairs in the planner's `WORKFLOWS`, paraphrased goals and task purposes, `none_of_these` records with the
+gold card removed, and Session 1 allowlist records (three cards only). On the held-out test split
+(356 questions, human-written originals never trained on):
+
+| question | accuracy | notes |
+|---|---|---|
+| agent (Choice, 16 cards + none) | 98.1% | 97.3% on the human originals, 94.7% abstention when the gold card is absent, 90% abstention under the Session 1 allowlist |
+| fits (Noul) | 99.0% | |
+| overall | 98.6%, ECE 0.009, 0.8% confident errors | 74 ms per question on a GB10 GPU; ~1 s on CPU in this container |
+
+Live in the Session 1 stack: `cv-fit` allocates parser-cv, evaluator-cv, reporter-cv-fit at probability 1.0
+each; a `knowledge-query` intent against the three-card registry stops with `none_of_these` at 1.0 before any
+AU is invoked. The training harness (dataset builder, Kev training, benchmark, GGUF export) lives in the
+`aoa-decide` repository; the checkpoint is 52 MB.

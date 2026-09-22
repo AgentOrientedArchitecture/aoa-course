@@ -969,9 +969,11 @@ async def _decision_evaluate(
         timeout=DECISION_TIMEOUT,
     )
     response.raise_for_status()
-    answers = response.json().get("answers")
+    body = response.json()
+    answers = body.get("answers")
     if not isinstance(answers, dict):
         raise ValueError("decision service response has no answers")
+    answers["_latency_ms"] = body.get("latency_ms")
     return answers
 
 
@@ -1000,7 +1002,9 @@ async def _allocate_with_decision(
             "criteria": criteria,
         }
     }
-    answer = (await _decision_evaluate(client, state, questions))["agent"]
+    answers = await _decision_evaluate(client, state, questions)
+    answer = answers["agent"]
+    latency_ms = answers.get("_latency_ms")
     probabilities: dict[str, float] = {
         str(k): float(v) for k, v in (answer.get("probabilities") or {}).items()
     }
@@ -1057,6 +1061,7 @@ async def _allocate_with_decision(
             "none_of_these": round(probabilities.get(DECISION_NONE, 0.0), 4),
             "fit": None if fit is None else round(fit, 4),
             "outcome": outcome,
+            "latency_ms": latency_ms,
             "gap_floor": DECISION_GAP_FLOOR,
             "confidence_floor": DECISION_CONFIDENCE_FLOOR,
         },
