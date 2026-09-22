@@ -147,3 +147,17 @@ Windows Command Prompt:
 scripts\session4-up.bat
 scripts\session4-seed.bat
 ```
+
+## Decision cards (planner allocator)
+
+With `PLANNER_ALLOCATOR=decision` the lifecycle pane shows each decision as a card with three parts: what was
+decided, what the decider saw, and independent evidence that it was right.
+
+- **Workflow decision** (Goal tab): the goal, a probability bar per workflow plus `none_of_these` with the gap floor
+  marked, an outcome badge (proceed / review / gap) and a one-line explanation. A refusal marks only the Goal stage.
+- **Task list origin**: whether the tasks came from the planner model, the fixed course plan, or a fallback (with
+  the model's rejected output verbatim), and reference-plan agreement n/n.
+- **Allocation** (per task): ranked candidate bars with the gap and review floors marked; chosen, runner-up, margin
+  and fit; then checks a learner can read without the JSON: reference plan agrees or differs, the task's required
+  inputs and outputs covered by the chosen card's contract (by name or type), and the AU's execution signals once it
+  has run. Probability is what the model believes; the checks are the evidence. Raw JSON stays behind **Raw**.
