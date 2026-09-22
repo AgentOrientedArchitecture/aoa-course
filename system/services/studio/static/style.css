@@ -1161,3 +1161,29 @@ button.secondary.danger {
 .cf-name { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .cf-pick { font: 12px/1.4 var(--mono); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cf-note { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- history & calibration ------------------------------------------------ */
+.history { display: grid; gap: 14px; }
+.stat-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.stat-tile { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fbfbfa; }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-value { font: 600 22px/1.2 var(--mono); color: var(--ink); }
+.stat-note { font-size: 11px; color: var(--muted); }
+.history-chart { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.rc { width: 100%; max-width: 640px; height: auto; display: block; }
+.rc-grid { stroke: var(--border); stroke-width: 1; }
+.rc-tick, .rc-axis, .rc-label { font: 11px var(--mono); fill: var(--muted); }
+.rc-label { fill: var(--ink); }
+.rc-identity { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.rc-floor { stroke: var(--ink); stroke-width: 1; opacity: 0.35; }
+.rc-fill { fill: var(--accent); }
+.rc-empty { fill: var(--border); }
+.rc-bar:hover .rc-fill, .rc-bar:focus .rc-fill { fill: #1f4f8a; }
+.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.hist-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.hist-table th, .hist-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; vertical-align: top; }
+.hist-table th { position: sticky; top: 0; background: #fbfbfa; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.hist-table td.mono { font: 11px/1.5 var(--mono); }
+.hist-table td.hist-subject { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.hist-table tr.hist-gap td { background: #fdf6f5; }
+.hist-table tr.hist-review td { background: #fff8ec; }

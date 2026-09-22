@@ -38,6 +38,7 @@
           <button id="mode-ingest" type="button" data-mode="knowledge-ingest">Ingest</button>
           <button id="mode-graph" type="button" data-mode="wiki-graph">Graph</button>
           <button id="mode-query" type="button" data-mode="knowledge-query">Ask</button>
+          <button id="mode-history" type="button" data-mode="history">History</button>
         </div>
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "agent-card-check" %} hidden{% endif %}" data-mode-panel="agent-card-check">
@@ -147,6 +148,17 @@
           </label>
         </div>
 
+        <div class="workflow-fields hidden" data-mode-panel="history">
+          <p class="mode-note">
+            Every decision the decision model has made in recent runs, with what happened next. Agreement with the
+            course's reference plan is the only ground truth available here, so treat the calibration plot as a
+            proxy: it shows whether the model's confidence tracks that agreement, and whether the review and gap
+            floors sit where the evidence says they should.
+          </p>
+          <div id="history-root" class="history">
+            <div id="history-state" class="muted-block">No decisions loaded yet.</div>
+          </div>
+        </div>
         <div class="workflow-fields hidden" data-mode-panel="wiki-graph">
           <section class="graph-panel">
             <div class="section-head">

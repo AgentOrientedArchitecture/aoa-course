@@ -164,3 +164,13 @@ decided, what the decider saw, and independent evidence that it was right.
 - **What each allocator would pick** (per task): the decision model, the planner model's proposal, the registry's
   lexical search (with its score and the runner-up) and the course reference plan side by side, with a one-line
   verdict: all methods agree, or which ones disagree.
+
+## History and calibration
+
+The **History** tab lists every decision the decision model has made across recent traces (workflow choices
+and task allocations) joined with what happened next: agreement with the course's reference plan, agreement
+with the registry's lexical search, whether the chosen AU ran without error, and any human review. Stat tiles
+summarise it, and a reliability diagram plots observed reference agreement per confidence bin against the
+diagonal, with the gap and review floors marked. Reference agreement is a proxy for correctness and the page
+says so; it is the only ground truth the course has. Data comes from `GET /api/decisions`, which reads the
+planner's persisted traces.

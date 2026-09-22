@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 
 const WORKFLOWS = [
   "auto",
+  "history",
   "agent-card-check",
   "cv-fit",
   "flow-audit",
@@ -615,6 +616,104 @@ function renderLifecycle() {
 // ---------------------------------------------------------------------------
 // Wiki graph
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// History and calibration (phase 3)
+// ---------------------------------------------------------------------------
+
+async function loadHistory() {
+  const root = $("history-root");
+  if (!root) return;
+  const stateEl = $("history-state");
+  if (stateEl) stateEl.textContent = "Loading decisions…";
+  try {
+    const resp = await fetch("/api/decisions?limit=60");
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.error || resp.statusText);
+    renderHistory(root, body);
+  } catch (e) {
+    root.innerHTML = `<div class="muted-block">Could not load decisions: ${escapeHtml(String(e))}</div>`;
+  }
+}
+
+function pct(value) {
+  return value == null ? "–" : `${Math.round(Number(value) * 100)}%`;
+}
+
+function reliabilityChart(bins, summary) {
+  // Reliability diagram: observed agreement per confidence bin (bars) against the identity line.
+  // One series, so no legend; the table below is the accessible view.
+  const W = 520, H = 220, L = 44, R = 12, T = 14, B = 34;
+  const pw = W - L - R, ph = H - T - B;
+  const x = (v) => L + v * pw, y = (v) => T + (1 - v) * ph;
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const grid = ticks.map((t) => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" class="rc-grid"/><text x="${L - 6}" y="${y(t) + 4}" class="rc-tick" text-anchor="end">${Math.round(t * 100)}%</text>`).join("");
+  const xt = ticks.map((t) => `<text x="${x(t)}" y="${H - 12}" class="rc-tick" text-anchor="middle">${t.toFixed(2)}</text>`).join("");
+  const n = bins.length;
+  const bars = bins.map((b, i) => {
+    if (b.agreement == null) return `<rect x="${x(b.lo) + 2}" y="${y(0) - 2}" width="${pw / n - 4}" height="2" class="rc-empty"/>`;
+    const top = y(b.agreement), bottom = y(0);
+    const cx = x(b.lo) + (pw / n) / 2;
+    return `<g class="rc-bar" tabindex="0">
+      <rect x="${x(b.lo) + 2}" y="${top}" width="${pw / n - 4}" height="${Math.max(2, bottom - top)}" rx="3" class="rc-fill"/>
+      <text x="${cx}" y="${top - 5}" class="rc-label" text-anchor="middle">${pct(b.agreement)} · n=${b.n}</text>
+      <title>confidence ${b.lo.toFixed(2)}–${b.hi.toFixed(2)}: mean confidence ${pct(b.mean_confidence)}, agreement with reference ${pct(b.agreement)}, ${b.n} decisions</title>
+    </g>`;
+  }).join("");
+  const floors = [["gap floor", summary.gap_floor], ["review floor", summary.confidence_floor]].map(([label, v]) =>
+    `<line x1="${x(v)}" x2="${x(v)}" y1="${T}" y2="${y(0)}" class="rc-floor"/><text x="${x(v) + 4}" y="${T + 10}" class="rc-tick">${label} ${v}</text>`).join("");
+  return `
+    <svg viewBox="0 0 ${W} ${H}" class="rc" role="img" aria-label="Reliability diagram: observed agreement with the reference plan per confidence bin">
+      ${grid}
+      <line x1="${x(0)}" y1="${y(0)}" x2="${x(1)}" y2="${y(1)}" class="rc-identity"/>
+      ${floors}
+      ${bars}
+      ${xt}
+      <text x="${L + pw / 2}" y="${H - 1}" class="rc-axis" text-anchor="middle">model confidence</text>
+      <text transform="translate(11 ${T + ph / 2}) rotate(-90)" class="rc-axis" text-anchor="middle">agreement with reference</text>
+    </svg>`;
+}
+
+function renderHistory(root, body) {
+  const s = body.summary || {};
+  const rows = body.rows || [];
+  const tiles = [
+    ["Decisions", s.decisions ?? 0, `${s.traces ?? 0} traces`],
+    ["Reference agreement", pct(s.reference_agreement), `${s.task_decisions ?? 0} task allocations`],
+    ["Registry search agrees", pct(s.lexical_agreement), "lexical counterfactual"],
+    ["Confident disagreements", s.confident_disagreements ?? 0, "confidence ≥ 0.90, reference differs"],
+    ["Gaps / reviews", `${s.gaps ?? 0} / ${s.reviews ?? 0}`, "abstained / flagged"],
+  ].map(([k, v, note]) => `<div class="stat-tile"><span class="stat-label">${escapeHtml(k)}</span><span class="stat-value">${escapeHtml(String(v))}</span><span class="stat-note">${escapeHtml(note)}</span></div>`).join("");
+  const table = rows.slice(0, 80).map((r) => {
+    const tick = (v) => v == null ? "–" : v ? "✓" : "✗";
+    return `<tr class="hist-${escapeHtml(r.outcome || "")}">
+      <td class="mono">${escapeHtml((r.ts || "").slice(11, 19) || "")}</td>
+      <td>${escapeHtml(r.kind)}</td>
+      <td class="hist-subject" title="${escapeHtml(r.subject || "")}">${escapeHtml((r.subject || "").slice(0, 70))}</td>
+      <td class="mono">${escapeHtml(r.choice || "")}</td>
+      <td class="mono">${fmtProb(r.probability)}</td>
+      <td class="mono">${fmtProb(r.confidence)}</td>
+      <td>${outcomeBadge(r.outcome)}</td>
+      <td class="${r.reference_agrees === false ? "warn-text" : r.reference_agrees ? "ok-text" : ""}">${tick(r.reference_agrees)}</td>
+      <td class="${r.lexical_agrees === false ? "warn-text" : r.lexical_agrees ? "ok-text" : ""}">${tick(r.lexical_agrees)}</td>
+      <td>${r.kind === "task" ? tick(r.executed) : "–"}</td>
+      <td>${escapeHtml(r.review || "–")}</td>
+      <td class="mono">${escapeHtml((r.trace_id || "").slice(0, 8))}</td>
+    </tr>`;
+  }).join("");
+  root.innerHTML = `
+    <div class="stat-row">${tiles}</div>
+    <div class="history-chart">
+      <div class="section-head"><span class="section-label">Calibration</span><span class="section-meta">task allocations with a reference plan</span></div>
+      ${reliabilityChart(body.bins || [], s)}
+      <p class="decision-explain">A calibrated model's bars sit on the diagonal: at 0.9 confidence it should agree with the reference about 90% of the time. Bars above the diagonal are under-confident; below it, over-confident. The vertical lines are the floors the planner applies.</p>
+    </div>
+    <div class="section-head"><span class="section-label">Recent decisions</span><span class="section-meta">${rows.length} shown, newest first</span></div>
+    <div class="table-wrap"><table class="hist-table">
+      <thead><tr><th>time</th><th>kind</th><th>goal / task</th><th>choice</th><th>p</th><th>conf</th><th>outcome</th><th title="agrees with the course reference plan">ref</th><th title="agrees with the registry's lexical search">lex</th><th title="the chosen AU ran without error">ran</th><th>review</th><th>trace</th></tr></thead>
+      <tbody>${table}</tbody>
+    </table></div>`;
+}
 
 async function loadWikiGraph() {
   const stateLabel = $("wiki-graph-state");
@@ -1970,6 +2069,14 @@ async function submitIntent() {
     btn.disabled = false;
     return;
   }
+  if (state.mode === "history") {
+    btn.disabled = true;
+    status.textContent = "loading…";
+    await loadHistory();
+    status.textContent = "";
+    btn.disabled = false;
+    return;
+  }
   const payload = buildIntentPayload(status);
   if (!payload) return;
   const formBody = intentFormData(payload);
@@ -2202,7 +2309,7 @@ function setMode(mode) {
   for (const panel of document.querySelectorAll("[data-mode-panel]")) {
     panel.classList.toggle("hidden", panel.dataset.modePanel !== panelForMode(mode));
   }
-  $("lifecycle").classList.toggle("hidden", mode === "wiki-graph");
+  $("lifecycle").classList.toggle("hidden", mode === "wiki-graph" || mode === "history");
   const labels = {
     "agent-card-check": "Run agent card check",
     "cv-fit": "Run CV fit",
@@ -2210,12 +2317,14 @@ function setMode(mode) {
     auto: "Plan and run",
     "knowledge-ingest": "Run ingest",
     "wiki-graph": "Refresh graph",
+    history: "Refresh history",
     "knowledge-query": "Ask wiki",
     "flow-audit": "Run flow audit",
   };
   $("intent-submit").textContent = labels[mode] || "Run";
   $("intent-status").textContent = "";
   if (mode === "wiki-graph") void loadWikiGraph();
+  if (mode === "history") void loadHistory();
   if (!state.lifecycle.intent) renderLifecycle();
 }
 
