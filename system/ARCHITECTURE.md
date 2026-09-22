@@ -323,6 +323,28 @@ agents may also include a text part containing markdown for inline rendering.
 `/invoke` remains available as a compatibility endpoint and as the AOA bridge
 surface used by deterministic MCP-backed tools.
 
+## Decision allocator
+
+The planner separates *proposing* tasks from *allocating* each task to a capability. With
+`PLANNER_ALLOCATOR=decision` the allocation is made by a small local decision model rather than by the
+generative planner model: the planner sends the goal and the task purpose as state and asks one typed
+Choice over the approved AU cards (plus `none_of_these`), receiving a calibrated probability for every
+option in a single forward pass. Thresholds turn that distribution into proceed / review / gap, and the
+whole thing is recorded in the trace so Studio shows every capability considered and how sure the model
+was. The service (`services/decision/`) serves the TypeSafe `POST /v1/systemone` contract from an
+Apache-2.0 Kev checkpoint on CPU, fine-tuned on this course's own task→capability examples, so the course
+stays runnable on a laptop with no hosted decision API.
+
+With the allocator on, the studio's **Goal** tab accepts free text: the same decision model chooses the
+workflow (or refuses), the planner model proposes tasks without being shown the answer, validation becomes
+structural, and the allocator binds each task. That is the point at which the planner decides rather than
+transcribes.
+
+Why this matters for the architecture: a typed decision cannot name a capability that is not registered,
+cannot drop a step by accident, and gives the orchestrator a number to govern with. The generative model
+is still useful for writing task descriptions; it is the wrong tool for choosing between registered
+contracts.
+
 ## Capability card schema
 
 ```yaml

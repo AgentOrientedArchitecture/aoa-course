@@ -37,6 +37,17 @@ PLANNER_STRATEGY = os.environ.get("PLANNER_STRATEGY", "hybrid").strip().lower()
 PLANNER_MODEL_TIMEOUT = float(os.environ.get("PLANNER_MODEL_TIMEOUT_SECONDS", "60"))
 PLANNER_MODEL_MAX_TOKENS = int(os.environ.get("PLANNER_MODEL_MAX_TOKENS", "2048"))
 PLAN_GOVERNANCE_CAPABILITY = os.environ.get("PLAN_GOVERNANCE_CAPABILITY", "").strip()
+# Task -> capability allocation. "registry" is the original course behaviour (the planner model's pick, or the
+# registry's lexical /discover ranking). "decision" asks the decision service a typed Choice over the approved
+# AU cards plus none_of_these and applies calibrated thresholds: below the gap floor the task is a capability
+# gap; below the confidence floor the allocation proceeds but is flagged for review.
+PLANNER_ALLOCATOR = os.environ.get("PLANNER_ALLOCATOR", "registry").strip().lower()
+DECISION_URL = os.environ.get("DECISION_URL", "http://decision:7500").rstrip("/")
+DECISION_TIMEOUT = float(os.environ.get("DECISION_TIMEOUT_SECONDS", "60"))
+DECISION_GAP_FLOOR = float(os.environ.get("DECISION_GAP_FLOOR", "0.35"))
+DECISION_CONFIDENCE_FLOOR = float(os.environ.get("DECISION_CONFIDENCE_FLOOR", "0.6"))
+DECISION_NONE = "none_of_these"
+DECISION_MAX_PURPOSE = 180
 RESULT_REVIEWER_ID = os.environ.get(
     "RESULT_REVIEWER_ID",
     os.environ.get("PLAN_APPROVER_ID", "urn:aoa:human:course-result-reviewer"),
@@ -436,6 +447,96 @@ WORKFLOWS: dict[str, Workflow] = {
 }
 
 
+AUTO_KIND = "auto"
+WORKFLOW_DESCRIPTIONS: dict[str, str] = {
+    "cv-fit": "Parse a CV, score it against a job description, and write a fit report for a human reader.",
+    "cv-fit-interview": "Parse a CV, score it against a job description, and turn the verdict into targeted interview questions.",
+    "knowledge-ingest": "Parse a research note, decide what to promote into the course wiki, store it and summarise what changed.",
+    "knowledge-query": "Parse a user question into a retrieval query, rank wiki passages as evidence, and write a grounded, cited answer.",
+    "agent-card-check": "Inventory the registered capability cards and evaluate their declared EU AI Act evidence with citations.",
+    "flow-audit": "Reconstruct executed plans from planner traces and audit eligibility, human review and release ordering.",
+}
+
+
+def _is_free_text_intent(intent: dict[str, Any]) -> bool:
+    return intent.get("kind") == AUTO_KIND or (intent.get("kind") is None and bool(str(intent.get("goal") or "").strip()))
+
+
+async def _classify_workflow(client: httpx.AsyncClient, goal: str) -> dict[str, Any]:
+    """Ask the decision service which workflow a free-text goal calls for: a typed Choice over the workflow
+    descriptions plus none_of_these. Returns the decision with every workflow's probability."""
+    criteria = dict(WORKFLOW_DESCRIPTIONS)
+    criteria[DECISION_NONE] = "No available workflow satisfies this request."
+    answers = await _decision_evaluate(client, {"goal": goal}, {
+        "workflow": {
+            "type": "choice",
+            "instructions": "Which workflow should the planner run to satisfy this request? Choose none_of_these if no workflow fits.",
+            "criteria": criteria,
+        }
+    })
+    answer = answers["workflow"]
+    probabilities = {str(k): float(v) for k, v in (answer.get("probabilities") or {}).items()}
+    choice = str(answer.get("choice") or "")
+    probability = probabilities.get(choice, 0.0)
+    outcome = "gap" if choice == DECISION_NONE or probability < DECISION_GAP_FLOOR else (
+        "review" if float(answer.get("confidence") or 0.0) < DECISION_CONFIDENCE_FLOOR else "proceed")
+    return {
+        "strategy": "decision-model",
+        "goal": goal,
+        "choice": choice,
+        "probability": round(probability, 4),
+        "confidence": round(float(answer.get("confidence") or 0.0), 4),
+        "none_of_these": round(probabilities.get(DECISION_NONE, 0.0), 4),
+        "probabilities": {k: round(v, 4) for k, v in sorted(probabilities.items(), key=lambda kv: -kv[1])},
+        "outcome": outcome,
+        "latency_ms": answers.get("_latency_ms"),
+    }
+
+
+def _default_inputs_for(workflow: Workflow, intent: dict[str, Any]) -> None:
+    """A free-text goal often *is* the input the workflow needs; fill the obvious ones in place."""
+    inputs = intent.setdefault("inputs", {})
+    goal = str(intent.get("goal") or "").strip()
+    if workflow.name == "knowledge-query" and goal:
+        inputs.setdefault("question", goal)
+    if workflow.name in ("agent-card-check", "flow-audit"):
+        inputs.setdefault("estate_root", "/data/estate")
+        if workflow.name == "flow-audit":
+            inputs.setdefault("include_legacy", False)
+
+
+async def _select_workflow_for_goal(intent: dict[str, Any]) -> Workflow:
+    """Free-text intents: the decision model chooses the workflow (recorded on the intent for the trace)."""
+    goal = str(intent.get("goal") or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="a free-text intent needs a non-empty goal")
+    if PLANNER_ALLOCATOR != "decision":
+        raise HTTPException(status_code=400, detail="free-text goals need PLANNER_ALLOCATOR=decision")
+    async with httpx.AsyncClient() as client:
+        try:
+            classification = await _classify_workflow(client, goal)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=f"decision service unavailable for workflow choice: {exc}") from exc
+    intent["_classification"] = classification
+    if classification["outcome"] == "gap":
+        # A refused goal is still evidence: record it as a trace so Studio shows what was considered.
+        trace_id = uuid.uuid4().hex[:12]
+        await _record({"trace_id": trace_id, "step": "start", "workflow": AUTO_KIND, "intent": {k: v for k, v in intent.items() if k != "_classification"}})
+        await _record({"trace_id": trace_id, "step": "intent-classification", "workflow": AUTO_KIND, "goal": goal, "decision": classification})
+        await _record({"trace_id": trace_id, "step": "error", "error": "no workflow fits this goal"})
+        await _record({"trace_id": trace_id, "step": "finish", "outputs": {"error": "no workflow fits this goal"}})
+        raise HTTPException(status_code=400, detail={
+            "error": "no workflow fits this goal",
+            "trace_id": trace_id,
+            "classification": classification,
+        })
+    workflow = WORKFLOWS[classification["choice"]]
+    intent["kind"] = workflow.name
+    intent["free_text"] = True
+    _default_inputs_for(workflow, intent)
+    return workflow
+
+
 def _select_workflow(intent: dict[str, Any]) -> Workflow:
     """Pick the deterministic task breakdown for the incoming intent."""
     kind = intent.get("kind")
@@ -507,6 +608,9 @@ def _task_trace(task: TaskSpec) -> dict[str, Any]:
         "discovery": task.discovery,
         "input_map": task.input_map,
         "selected_capability": task.selected_capability,
+        # The course's fixed plan is a reference answer for the six workflows: Studio shows whether the
+        # allocation agrees with it. Empty for tasks the model invented.
+        "reference_capability": _deterministic_capability_for_task(task),
     }
 
 
@@ -606,12 +710,17 @@ def _build_planner_prompt(
     intent: dict[str, Any],
     cards: list[dict[str, Any]],
 ) -> str:
+    free_text = bool(intent.get("free_text"))
     intent_summary = {
         "kind": intent.get("kind"),
         "requested_workflow": workflow.name,
         "available_inputs": sorted((intent.get("inputs") or {}).keys()),
     }
-    examples = [_workflow_example(wf) for wf in WORKFLOWS.values()]
+    if free_text:
+        intent_summary["goal"] = intent.get("goal")
+    # A free-text goal is planned, not transcribed: the requested workflow's own example stays out of the
+    # prompt, so the task list is the model's proposal and the allocator's binding, checked structurally.
+    examples = [_workflow_example(wf) for wf in WORKFLOWS.values() if not (free_text and wf.name == workflow.name)]
     body = {
         "intent": intent_summary,
         "available_capabilities": [
@@ -665,10 +774,39 @@ async def _planner_model_complete(prompt: str) -> tuple[str, dict[str, Any]]:
     raise RuntimeError(f"planner model provider {provider!r} is not supported")
 
 
+# The plan's shape, as a JSON schema. Handed to the model provider as a structured-output constraint so the
+# sampler can only produce task *objects*: under a plain JSON grammar gpt-oss-20b reliably emitted a stray quote
+# before the second task ("{"id":...) and the plan truncated to one task.
+PLAN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "goal": {"type": "string"},
+        "tasks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "capability": {"type": "string"},
+                    "input_map": {"type": "object", "additionalProperties": {"type": "string"}},
+                },
+                "required": ["id", "purpose", "capability", "input_map"],
+            },
+        },
+    },
+    "required": ["goal", "tasks"],
+}
+PLANNER_PLAN_SCHEMA = os.environ.get("PLANNER_PLAN_SCHEMA", "true").strip().lower() == "true"
+
+
 async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]:
     host = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
     response_format = os.environ.get("OLLAMA_RESPONSE_FORMAT", "json").strip()
-    think = os.environ.get("OLLAMA_THINK", "false").strip().lower()
+    # The planner asks for a structured plan, and reasoning models (gpt-oss) return a valid task list far more
+    # reliably when allowed to think first. PLANNER_MODEL_THINK overrides the AU-wide OLLAMA_THINK setting.
+    think = os.environ.get("PLANNER_MODEL_THINK", os.environ.get("OLLAMA_THINK", "true")).strip().lower()
     payload: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -681,7 +819,9 @@ async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]
             "num_predict": PLANNER_MODEL_MAX_TOKENS,
         },
     }
-    if response_format:
+    if PLANNER_PLAN_SCHEMA and response_format == "json":
+        payload["format"] = PLAN_SCHEMA          # Ollama structured outputs: a schema, not just "json"
+    elif response_format:
         payload["format"] = response_format
     if think in {"true", "false"}:
         payload["think"] = think == "true"
@@ -711,7 +851,9 @@ async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]
         "max_tokens": PLANNER_MODEL_MAX_TOKENS,
     }
     response_format = os.environ.get("OPENAI_RESPONSE_FORMAT", "json_object").strip()
-    if response_format:
+    if PLANNER_PLAN_SCHEMA and response_format == "json_object":
+        payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "plan", "schema": PLAN_SCHEMA}}
+    elif response_format:
         payload["response_format"] = {"type": response_format}
     reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low").strip()
     if reasoning_effort:
@@ -786,6 +928,7 @@ def _validate_plan(
     intent_inputs: dict[str, Any],
     cards_by_id: dict[str, dict[str, Any]],
     workflow: Workflow,
+    strict_workflow: bool = True,
 ) -> tuple[list[TaskSpec], dict[str, Any]]:
     tasks = proposal.get("tasks")
     if not isinstance(tasks, list) or not tasks:
@@ -856,10 +999,12 @@ def _validate_plan(
     # card is not discoverable) would otherwise run and produce a
     # plausible-looking but meaningless result.
     missing_tasks = {task.id for task in workflow.tasks} - seen_task_ids
-    if missing_tasks:
+    if strict_workflow and missing_tasks:
         raise ValueError(
             f"plan is missing workflow task(s): {', '.join(sorted(missing_tasks))}"
         )
+    if not strict_workflow:
+        checks.append({"structural": True, "missing_workflow_tasks": sorted(missing_tasks)})
 
     final_outputs = prior_outputs.get(planned_tasks[-1].id, set())
     final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown", "findings_markdown"}
@@ -895,6 +1040,7 @@ async def _build_plan(
 ) -> PlanBuildResult:
     if PLANNER_STRATEGY == "deterministic":
         return _fallback_plan(workflow)
+    text = ""
     try:
         prompt = _build_planner_prompt(workflow, intent, cards)
         text, raw = await _planner_model_complete(prompt)
@@ -907,14 +1053,185 @@ async def _build_plan(
         }
         cards_by_id = {card["id"]: card for card in cards if card.get("id")}
         tasks, validation = _validate_plan(
-            proposal, intent.get("inputs", {}) or {}, cards_by_id, workflow
+            proposal, intent.get("inputs", {}) or {}, cards_by_id, workflow,
+            strict_workflow=not intent.get("free_text"),
         )
         return PlanBuildResult(tasks=tasks, source="llm", proposal=proposal, validation=validation)
     except Exception as e:  # noqa: BLE001
         if PLANNER_STRATEGY == "llm":
             raise
         logger.warning("planner model failed; falling back to deterministic plan: %r", e)
-        return _fallback_plan(workflow, reason=_planner_fallback_message(e), detail=str(e))
+        detail = str(e)
+        if text:
+            # keep what the model actually said so the trace shows why the plan was rejected
+            detail = f"{detail}; model output: {' '.join(text.split())[:600]}"
+        return _fallback_plan(workflow, reason=_planner_fallback_message(e), detail=detail)
+
+
+# ----------------------------------------------------------------------
+# Decision allocator (typed, calibrated task -> capability choice)
+# ----------------------------------------------------------------------
+
+def _allocation_goal(workflow: Workflow, intent: dict[str, Any]) -> str:
+    """The goal text the decision model sees: the intent's own words when the studio sends them, else the
+    workflow name and the deployment context. The task text is the step's purpose."""
+    goal = str(intent.get("goal") or intent.get("text") or "").strip()
+    if goal:
+        return goal
+    use_context = intent.get("use_context") or {}
+    parts = [f"workflow: {workflow.name}"]
+    for key in ("domain", "output_use", "decision_effect"):
+        if use_context.get(key):
+            parts.append(f"{key}: {use_context[key]}")
+    return "; ".join(parts)
+
+
+def _decision_criteria(au_cards: list[dict[str, Any]]) -> dict[str, str]:
+    """Candidate options exactly as the decision model is asked to choose between them: approved AU cards by
+    id with a compact purpose, plus the escape option. The model can only answer with one of these keys."""
+    criteria: dict[str, str] = {}
+    for card in au_cards:
+        card_id = str(card.get("id") or "").strip()
+        if not card_id or not _lifecycle_approved(card):
+            continue
+        purpose = " ".join(str(card.get("purpose", "")).split())
+        criteria[card_id] = purpose if len(purpose) <= DECISION_MAX_PURPOSE else purpose[: DECISION_MAX_PURPOSE - 1] + "…"
+    criteria[DECISION_NONE] = "None of the available capabilities can perform this task."
+    return criteria
+
+
+async def _decision_evaluate(
+    client: httpx.AsyncClient, state: dict[str, Any], questions: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    response = await client.post(
+        f"{DECISION_URL}/v1/systemone",
+        json={"model": "kev-latest", "state": state, "questions": questions},
+        timeout=DECISION_TIMEOUT,
+    )
+    response.raise_for_status()
+    body = response.json()
+    answers = body.get("answers")
+    if not isinstance(answers, dict):
+        raise ValueError("decision service response has no answers")
+    answers["_latency_ms"] = body.get("latency_ms")
+    return answers
+
+
+async def _counterfactual_allocations(
+    client: httpx.AsyncClient, task: TaskSpec, proposed: str | None
+) -> dict[str, Any]:
+    """What the other two allocators would have picked for this task, recorded next to the decision so the
+    trace (and Studio) can show agreement or disagreement between independent methods:
+    the registry's lexical /discover ranking and the planner model's own proposal."""
+    lexical: list[dict[str, Any]] = []
+    try:
+        discovery = await _registry_discover(client, task.discovery)
+        for candidate in (discovery.get("candidates") or [])[:3]:
+            card = candidate.get("card") or {}
+            lexical.append({"id": card.get("id"), "score": candidate.get("score"), "reasons": candidate.get("reasons", [])[:3]})
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("counterfactual lexical discovery failed for task %s: %r", task.id, exc)
+    return {
+        "registry_lexical": lexical,
+        "planner_model": proposed or None,
+        "reference_plan": _deterministic_capability_for_task(task) or None,
+    }
+
+
+async def _allocate_with_decision(
+    client: httpx.AsyncClient,
+    workflow: Workflow,
+    intent: dict[str, Any],
+    task: TaskSpec,
+    au_cards: list[dict[str, Any]],
+    proposed: str | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Ask the decision service which capability should perform this task.
+
+    Returns (candidates, query) in the same shape the registry's /discover produces, so the trace and the
+    studio render the allocation like any other discovery: every option with its probability as the score,
+    sorted, and the decision (proceed / review / gap) in the query for the `select` record.
+    """
+    criteria = _decision_criteria(au_cards)
+    state = {"goal": _allocation_goal(workflow, intent), "task": task.purpose}
+    questions = {
+        "agent": {
+            "type": "choice",
+            "instructions": (
+                "Which single capability is best suited to perform this task, given each capability's stated "
+                "purpose? Choose none_of_these only if no capability genuinely provides what the task needs."
+            ),
+            "criteria": criteria,
+        }
+    }
+    answers = await _decision_evaluate(client, state, questions)
+    answer = answers["agent"]
+    latency_ms = answers.get("_latency_ms")
+    probabilities: dict[str, float] = {
+        str(k): float(v) for k, v in (answer.get("probabilities") or {}).items()
+    }
+    choice = str(answer.get("choice") or "")
+    confidence = float(answer.get("confidence") or 0.0)
+    winner_probability = probabilities.get(choice, 0.0)
+    cards_by_id = {card.get("id"): card for card in au_cards}
+
+    if choice == DECISION_NONE or winner_probability < DECISION_GAP_FLOOR:
+        outcome = "gap"
+    elif confidence < DECISION_CONFIDENCE_FLOOR:
+        outcome = "review"
+    else:
+        outcome = "proceed"
+
+    fit = None
+    if outcome != "gap":
+        fit_answer = await _decision_evaluate(client, state, {
+            "fits": {
+                "type": "noul",
+                "instructions": (
+                    f"Does this task genuinely require the '{choice}' capability (true), "
+                    "or is it a poor/forced fit (false)?"
+                ),
+                "criteria": {"true": "Genuine, direct fit", "false": "Poor or forced fit"},
+            }
+        })
+        fit = float(fit_answer["fits"].get("noul") or 0.0)
+
+    counterfactuals = await _counterfactual_allocations(client, task, proposed)
+    ranked = sorted(probabilities.items(), key=lambda kv: kv[1], reverse=True)
+    candidates: list[dict[str, Any]] = []
+    for option, probability in ranked:
+        if option == DECISION_NONE:
+            continue
+        card = cards_by_id.get(option)
+        if card is None:
+            continue
+        reasons = [f"decision probability {probability:.2f}"]
+        if option == choice:
+            reasons.append(f"chosen with confidence {confidence:.2f}, outcome {outcome}")
+            if fit is not None:
+                reasons.append(f"fit {fit:.2f}")
+        candidates.append({"score": round(probability, 4), "reasons": reasons, "card": card})
+    if outcome == "gap":
+        candidates = []   # nothing is eligible; the planner records a gap like a failed discovery
+    query = {
+        "strategy": "decision-model",
+        "state": state,
+        "considered_capabilities": [key for key in criteria if key != DECISION_NONE],
+        "decision": {
+            "choice": choice,
+            "confidence": round(confidence, 4),
+            "probability": round(winner_probability, 4),
+            "none_of_these": round(probabilities.get(DECISION_NONE, 0.0), 4),
+            "fit": None if fit is None else round(fit, 4),
+            "outcome": outcome,
+            "latency_ms": latency_ms,
+            "gap_floor": DECISION_GAP_FLOOR,
+            "confidence_floor": DECISION_CONFIDENCE_FLOOR,
+        },
+        "counterfactuals": counterfactuals,
+        "task": _task_trace(task),
+    }
+    return candidates, query
 
 
 # ----------------------------------------------------------------------
@@ -1398,12 +1715,21 @@ async def _run_workflow(
             intent["inputs"] = intent_inputs
         intent_inputs.setdefault("include_legacy", False)
 
+    classification = intent.pop("_classification", None)
     await _record({
         "trace_id": trace_id,
         "step": "start",
         "workflow": workflow.name,
         "intent": intent,
     })
+    if classification:
+        await _record({
+            "trace_id": trace_id,
+            "step": "intent-classification",
+            "workflow": workflow.name,
+            "goal": intent.get("goal"),
+            "decision": classification,
+        })
 
     resolved_steps: list[ResolvedStep] = []
     async with httpx.AsyncClient() as client:
@@ -1501,6 +1827,27 @@ async def _run_workflow(
                 discovery = await _registry_discover(client, task.discovery)
                 candidates = discovery.get("candidates", [])
                 query = task.discovery
+            if PLANNER_ALLOCATOR == "decision":
+                # The decision model re-allocates every task, whether the planner model or the workflow
+                # definition proposed a capability: the proposal becomes one candidate among all approved
+                # AU cards, and the trace says what the model actually chose and how sure it was.
+                proposed = (
+                    task.selected_capability
+                    if plan_result.source == "llm" and task.selected_capability
+                    else None
+                )
+                try:
+                    candidates, query = await _allocate_with_decision(
+                        client, workflow, intent, task, au_cards, proposed=proposed
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("decision allocator failed for task %s; keeping %s: %r", task.id, query.get("strategy") if isinstance(query, dict) else "discovery", exc)
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "allocator-fallback",
+                        "task": task.id,
+                        "error": str(exc),
+                    })
             await _record({
                 "trace_id": trace_id,
                 "step": "discover",
@@ -1508,8 +1855,27 @@ async def _run_workflow(
                 "query": query,
                 "candidates": [_candidate_trace(candidate) for candidate in candidates],
             })
+            if isinstance(query, dict) and query.get("strategy") == "decision-model":
+                decision = query.get("decision") or {}
+                if decision.get("outcome") == "review":
+                    await _record({
+                        "trace_id": trace_id,
+                        "step": "plan-review",
+                        "task": task.id,
+                        "capability": decision.get("choice"),
+                        "confidence": decision.get("confidence"),
+                        "runner_up": (candidates[1]["card"].get("id") if len(candidates) > 1 else None),
+                        "note": "allocation confidence below the review floor; proceeding but flagged",
+                    })
             if not candidates:
                 message = f"no capability discovered for task {task.id}"
+                if isinstance(query, dict) and query.get("strategy") == "decision-model":
+                    decision = query.get("decision") or {}
+                    message = (
+                        f"capability gap for task {task.id}: the decision model chose "
+                        f"{decision.get('choice')!r} at probability {decision.get('probability')} "
+                        f"(trace {trace_id})"
+                    )
                 await _record({
                     "trace_id": trace_id,
                     "step": "error",
@@ -1613,13 +1979,21 @@ async def _startup() -> None:
 
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
-    return {"ok": True, "workflows": sorted(WORKFLOWS), "planner_strategy": PLANNER_STRATEGY}
+    return {
+        "ok": True,
+        "workflows": sorted(WORKFLOWS),
+        "planner_strategy": PLANNER_STRATEGY,
+        "planner_allocator": PLANNER_ALLOCATOR,
+    }
 
 
 @app.post("/intent")
 async def intent(request: Request) -> JSONResponse:
     body = await request.json()
-    workflow = _select_workflow(body)
+    if _is_free_text_intent(body):
+        workflow = await _select_workflow_for_goal(body)
+    else:
+        workflow = _select_workflow(body)
     trace_id, status, outputs = await _run_workflow(workflow, body)
     return JSONResponse({
         "trace_id": trace_id,

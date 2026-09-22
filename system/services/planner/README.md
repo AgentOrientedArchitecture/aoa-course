@@ -147,6 +147,59 @@ and reports the included count. Red legacy rows mean current evidence is absent,
 necessarily that the old execution failed. Legacy `hold`, `plan-approval`, and
 `resume` events remain parseable, but never count as `result-review` evidence.
 
+## Allocation: registry or decision model
+
+Binding a task to a capability is a separate decision from proposing the task list. `PLANNER_ALLOCATOR`
+selects how it is made:
+
+- `registry` (default, the original course behaviour): the planner model's pick when the plan came from
+  the model, the workflow definition's pin, or the registry's lexical `/discover` ranking otherwise.
+- `decision`: for every task the planner asks the [decision service](../decision/README.md) one typed
+  Choice over all approved AU cards plus `none_of_these`, with the goal and the task purpose as state, then
+  a yes/no fit question about the chosen card. The service returns a probability for every option, so the
+  planner can apply thresholds instead of trusting prose:
+
+  | outcome | rule | what the planner does |
+  |---|---|---|
+  | gap | `none_of_these` wins or the winner's probability < `DECISION_GAP_FLOOR` (0.35) | no candidates; the run stops with a capability gap before any AU is invoked |
+  | review | confidence < `DECISION_CONFIDENCE_FLOOR` (0.6) | binds the winner and records a `plan-review` event naming the runner-up |
+  | proceed | otherwise | binds the winner |
+
+  The `discover` record lists every considered capability with its probability as the score, and the
+  `select` record carries the chosen card; Studio renders both unchanged. The record also carries
+  `counterfactuals`: what the registry's lexical `/discover` ranking and the planner model's own proposal
+  would have picked for the same task, next to the course's reference plan, so agreement between
+  independent methods is visible per task and disagreement is a teachable moment. If the service is unreachable the
+  planner records `allocator-fallback` and keeps the registry allocation, so a missing model never blocks
+  a session.
+
+The decision model cannot invent a capability: its answer is always one of the ids the planner supplied.
+That is the difference from the generative planner path, whose free text has to be parsed and validated.
+
+## Free-text goals (`kind: auto`)
+
+With `PLANNER_ALLOCATOR=decision` the planner also accepts a goal in the user's own words:
+
+```json
+{ "kind": "auto", "goal": "Is this candidate a good fit for the data engineer role?", "inputs": { "cv_path": "...", "jd_path": "..." } }
+```
+
+The decision model first answers a typed Choice over the workflow descriptions plus `none_of_these`
+(recorded as `intent-classification`). A gap returns HTTP 400 with the probabilities and a trace so Studio
+can show what was considered. Otherwise the planner model proposes the task list for the chosen workflow
+*without* being shown that workflow's own example, the plan is validated structurally (every task binds to an
+approved AU, every required input resolves, the final task produces markdown) rather than against the fixed
+task list, and the decision model binds each task as above. For `knowledge-query` the goal doubles as the
+question; the estate workflows default `estate_root`. The studio's **Goal** tab submits this shape.
+
+Classification rule the course allocator is trained to: a *question* is a `knowledge-query` whether or not the wiki
+can answer it (the wiki evaluator decides that downstream and the reporter says so); `none_of_these` is for
+actions and artefacts no workflow produces (booking, ordering, coding, translating, playing music). Refusing at
+classification is for "this system does not do that", not "the wiki may not know".
+
+Deterministic strategy (Sessions 3 and 4) still applies after classification: the chosen workflow's fixed
+plan runs, so intent classification is real while execution stays reliable.
+
 ## Planning configuration
 
 The planner runs on port `7200` and expects
@@ -158,6 +211,9 @@ The planner runs on port `7200` and expects
 - `deterministic` — skip the model and use the built-in course plan. Session 4
   uses this strategy.
 - `llm` — require a valid model-generated plan; fail if validation fails.
+
+`PLANNER_ALLOCATOR` (`registry` | `decision`), `DECISION_URL`, `DECISION_GAP_FLOOR` and
+`DECISION_CONFIDENCE_FLOOR` configure allocation (see above).
 
 `PLAN_GOVERNANCE_CAPABILITY` enables the pre-execution eligibility check. The
 configured card must be an approved AU. If the evaluator is unavailable or its

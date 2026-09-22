@@ -147,3 +147,30 @@ Windows Command Prompt:
 scripts\session4-up.bat
 scripts\session4-seed.bat
 ```
+
+## Decision cards (planner allocator)
+
+With `PLANNER_ALLOCATOR=decision` the lifecycle pane shows each decision as a card with three parts: what was
+decided, what the decider saw, and independent evidence that it was right.
+
+- **Workflow decision** (Goal tab): the goal, a probability bar per workflow plus `none_of_these` with the gap floor
+  marked, an outcome badge (proceed / review / gap) and a one-line explanation. A refusal marks only the Goal stage.
+- **Task list origin**: whether the tasks came from the planner model, the fixed course plan, or a fallback (with
+  the model's rejected output verbatim), and reference-plan agreement n/n.
+- **Allocation** (per task): ranked candidate bars with the gap and review floors marked; chosen, runner-up, margin
+  and fit; then checks a learner can read without the JSON: reference plan agrees or differs, the task's required
+  inputs and outputs covered by the chosen card's contract (by name or type), and the AU's execution signals once it
+  has run. Probability is what the model believes; the checks are the evidence. Raw JSON stays behind **Raw**.
+- **What each allocator would pick** (per task): the decision model, the planner model's proposal, the registry's
+  lexical search (with its score and the runner-up) and the course reference plan side by side, with a one-line
+  verdict: all methods agree, or which ones disagree.
+
+## History and calibration
+
+The **History** tab lists every decision the decision model has made across recent traces (workflow choices
+and task allocations) joined with what happened next: agreement with the course's reference plan, agreement
+with the registry's lexical search, whether the chosen AU ran without error, and any human review. Stat tiles
+summarise it, and a reliability diagram plots observed reference agreement per confidence bin against the
+diagonal, with the gap and review floors marked. Reference agreement is a proxy for correctness and the page
+says so; it is the only ground truth the course has. Data comes from `GET /api/decisions`, which reads the
+planner's persisted traces.

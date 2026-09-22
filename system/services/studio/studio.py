@@ -35,6 +35,8 @@ ALLOW_WIKI_RESET = os.environ.get("STUDIO_ALLOW_WIKI_RESET", "true").strip().low
     "1", "true", "yes", "on",
 }
 SUPPORTED_WORKFLOWS = (
+    "auto",
+    "history",
     "agent-card-check",
     "cv-fit",
     "flow-audit",
@@ -252,6 +254,94 @@ async def review_run(trace_id: str, request: Request) -> JSONResponse:
             return JSONResponse({"error": repr(exc)}, status_code=502)
 
 
+def _decision_rows(trace_id: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every decision the decision model made in one trace, joined with what happened afterwards."""
+    started = next((r for r in records if r.get("step") == "start"), {}) or {}
+    ts = started.get("ts") or ""
+    intent = started.get("intent") or {}
+    goal = str(intent.get("goal") or "")
+    review = next((r.get("decision") for r in reversed(records) if r.get("step") == "result-review"), None)
+    finished = any(r.get("step") == "finish" and not (r.get("outputs") or {}).get("error") for r in records)
+    responses = {r.get("task") or r.get("capability"): r for r in records if r.get("step") == "response"}
+    rows: list[dict[str, Any]] = []
+    for r in records:
+        if r.get("step") == "intent-classification":
+            d = r.get("decision") or {}
+            rows.append({
+                "trace_id": trace_id, "ts": ts, "kind": "workflow", "subject": goal or str(intent.get("kind") or ""),
+                "choice": d.get("choice"), "probability": d.get("probability"), "confidence": d.get("confidence"),
+                "outcome": d.get("outcome"), "fit": None, "reference": None, "reference_agrees": None,
+                "lexical": None, "lexical_agrees": None, "executed": finished, "review": review,
+            })
+        elif r.get("step") == "discover" and isinstance(r.get("query"), dict) and r["query"].get("strategy") == "decision-model":
+            q = r["query"]; d = q.get("decision") or {}; task = q.get("task") or {}; cf = q.get("counterfactuals") or {}
+            reference = task.get("reference_capability") or cf.get("reference_plan") or None
+            lexical = ((cf.get("registry_lexical") or [{}])[0]).get("id") if cf.get("registry_lexical") else None
+            resp = responses.get(task.get("id"))
+            rows.append({
+                "trace_id": trace_id, "ts": ts, "kind": "task", "subject": task.get("purpose") or task.get("id"),
+                "task": task.get("id"), "choice": d.get("choice"), "probability": d.get("probability"),
+                "confidence": d.get("confidence"), "outcome": d.get("outcome"), "fit": d.get("fit"),
+                "reference": reference, "reference_agrees": (d.get("choice") == reference) if reference else None,
+                "lexical": lexical, "lexical_agrees": (d.get("choice") == lexical) if lexical else None,
+                "executed": bool(resp) and not ((resp.get("outputs") or {}).get("error")), "review": review,
+            })
+    return rows
+
+
+def _reliability_bins(rows: list[dict[str, Any]], bins: int = 5) -> list[dict[str, Any]]:
+    """Confidence vs observed agreement with the reference plan, in equal-width confidence bins.
+    Agreement with the course's reference plan is the only ground truth the course has; it is a proxy, and the
+    view says so."""
+    scored = [r for r in rows if r.get("reference_agrees") is not None and r.get("confidence") is not None]
+    out = []
+    for b in range(bins):
+        lo, hi = b / bins, (b + 1) / bins
+        members = [r for r in scored if lo <= float(r["confidence"]) < hi or (b == bins - 1 and float(r["confidence"]) == 1.0)]
+        out.append({
+            "lo": lo, "hi": hi, "n": len(members),
+            "mean_confidence": (sum(float(r["confidence"]) for r in members) / len(members)) if members else None,
+            "agreement": (sum(1 for r in members if r["reference_agrees"]) / len(members)) if members else None,
+        })
+    return out
+
+
+@app.get("/api/decisions")
+async def decisions(limit: int = 60) -> JSONResponse:
+    """History of the decision model's choices across recent traces, with reference agreement, the lexical
+    counterfactual, execution outcome and human review, plus reliability bins for the calibration view."""
+    if "history" not in ENABLED_WORKFLOWS:
+        return JSONResponse({"error": "history is not enabled"}, status_code=404)
+    rows: list[dict[str, Any]] = []
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            listing = (await client.get(f"{PLANNER_URL}/traces")).json()
+        except Exception as exc:  # noqa: BLE001
+            return JSONResponse({"error": f"planner traces unavailable: {exc}"}, status_code=502)
+        for trace_id in (listing.get("traces") or [])[: max(1, min(limit, 100))]:
+            try:
+                body = (await client.get(f"{PLANNER_URL}/traces/{trace_id}")).json()
+            except Exception:  # noqa: BLE001
+                continue
+            rows.extend(_decision_rows(trace_id, body.get("records") or []))
+    tasks = [r for r in rows if r["kind"] == "task"]
+    scored = [r for r in tasks if r["reference_agrees"] is not None]
+    lex = [r for r in tasks if r["lexical_agrees"] is not None]
+    summary = {
+        "traces": len({r["trace_id"] for r in rows}),
+        "decisions": len(rows),
+        "task_decisions": len(tasks),
+        "workflow_decisions": len([r for r in rows if r["kind"] == "workflow"]),
+        "reference_agreement": (sum(1 for r in scored if r["reference_agrees"]) / len(scored)) if scored else None,
+        "lexical_agreement": (sum(1 for r in lex if r["lexical_agrees"]) / len(lex)) if lex else None,
+        "gaps": len([r for r in rows if r["outcome"] == "gap"]),
+        "reviews": len([r for r in rows if r["outcome"] == "review"]),
+        "confident_disagreements": len([r for r in scored if r["reference_agrees"] is False and float(r.get("confidence") or 0) >= 0.9]),
+        "gap_floor": 0.35, "confidence_floor": 0.6,
+    }
+    return JSONResponse({"summary": summary, "bins": _reliability_bins(tasks), "rows": rows})
+
+
 @app.get("/api/wiki/graph")
 async def get_wiki_graph() -> JSONResponse:
     """Return a typed graph projection of the local wiki store."""
@@ -336,6 +426,7 @@ async def submit_intent(request: Request) -> JSONResponse:
         inputs = {
             key: str(form.get(key) or "")
             for key in (
+                "goal",
                 "cv_text",
                 "jd_text",
                 "note_text",
@@ -359,6 +450,9 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind not in ENABLED_WORKFLOWS:
         return JSONResponse({"error": f"workflow is not enabled: {kind}"}, status_code=404)
 
+    if kind == "auto":
+        return await _submit_free_text(inputs, files)
+
     if kind == "knowledge-ingest":
         return await _submit_knowledge_ingest(inputs, files)
 
@@ -375,6 +469,44 @@ async def submit_intent(request: Request) -> JSONResponse:
         return JSONResponse({"error": f"unknown intent kind: {kind}"}, status_code=400)
 
     return await _submit_cv_fit(inputs, files, kind=kind)
+
+
+async def _submit_free_text(
+    inputs: dict[str, Any], files: dict[str, Any] | None = None
+) -> JSONResponse:
+    """A goal in the learner's own words. Any pasted or dropped material goes to the inbox as usual and only
+    paths travel; the planner's decision model chooses the workflow, proposes the tasks and binds each one."""
+    goal = str(inputs.get("goal") or "").strip()
+    if not goal:
+        return JSONResponse({"error": "a goal is required"}, status_code=400)
+    files = files or {}
+    planner_inputs: dict[str, Any] = {}
+    for text_key, file_key, name_key, default_name, path_key in (
+        ("cv_text", "cv_file", "cv_name", "cv.txt", "cv_path"),
+        ("jd_text", "jd_file", "jd_name", "jd.txt", "jd_path"),
+        ("note_text", "note_file", "note_name", "source-note.txt", "note_path"),
+    ):
+        text = str(inputs.get(text_key) or "")
+        upload = files.get(file_key)
+        if not text.strip() and not upload:
+            continue
+        name = str(inputs.get(name_key) or default_name)
+        if upload:
+            planner_inputs[path_key] = str(await _write_upload(upload, getattr(upload, "filename", None) or name))
+        else:
+            planner_inputs[path_key] = str(_write_inbox(text, name))
+    planner_body = {"kind": "auto", "goal": goal, "inputs": planner_inputs}
+    async with httpx.AsyncClient(timeout=PLANNER_REQUEST_TIMEOUT) as client:
+        r = await client.post(f"{PLANNER_URL}/intent", json=planner_body)
+    try:
+        body = r.json()
+    except ValueError:
+        body = {"error": r.text}
+    if r.status_code >= 400:
+        detail = body.get("detail", body) if isinstance(body, dict) else body
+        message = detail.get("error") if isinstance(detail, dict) else str(detail)
+        return JSONResponse({"error": message or "planner rejected the goal", "detail": detail}, status_code=r.status_code)
+    return JSONResponse(body)
 
 
 async def _submit_cv_fit(
