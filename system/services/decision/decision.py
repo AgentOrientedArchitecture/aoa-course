@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import sys
 
-RUN = os.environ.get("DECISION_MODEL_RUN", "jaredpalmer/kev-0.8b").strip()
+RUN = os.environ.get("DECISION_MODEL_RUN", "lewisdog/aoa-course-decision-0.6b").strip()
 PORT = os.environ.get("DECISION_PORT", "7500").strip()
 DEVICE = os.environ.get("DECISION_DEVICE", "cpu").strip()
 os.environ.setdefault("KEV_DTYPE", "fp32" if DEVICE == "cpu" else "bf16")

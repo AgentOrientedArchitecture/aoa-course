@@ -53,7 +53,7 @@ services:
       - ./services/decision/models:/models
       - decision-hf-cache:/data/hf
     environment:
-      DECISION_MODEL_RUN: ${DECISION_MODEL_RUN:-jaredpalmer/kev-0.8b}
+      DECISION_MODEL_RUN: ${DECISION_MODEL_RUN:-lewisdog/aoa-course-decision-0.6b}
       DECISION_DEVICE: ${DECISION_DEVICE:-cpu}
       DECISION_PORT: "7500"
     healthcheck:

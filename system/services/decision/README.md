@@ -25,19 +25,22 @@ Endpoints: `POST /v1/systemone`, `GET /v1/models`.
 
 ## The course allocator checkpoint
 
-`models/run` (git-ignored, mount it or fetch it) is a Qwen3-0.6B-Base + LoRA r16 + pointer head, warm-started
-from `jaredpalmer/kev-0.6b` and fine-tuned for 7 minutes on this repo's own task→capability examples: the 18
-gold pairs in the planner's `WORKFLOWS`, paraphrased goals and task purposes, `none_of_these` records with the
-gold card removed, and Session 1 allowlist records (three cards only). On the held-out test split
-(356 questions, human-written originals never trained on):
+Published as [`lewisdog/aoa-course-decision-0.6b`](https://huggingface.co/lewisdog/aoa-course-decision-0.6b)
+(Apache-2.0; 52 MB adapter + head on `Qwen/Qwen3-0.6B-Base`, warm-started from `jaredpalmer/kev-0.6b`). It is
+trained for 7 minutes on this repo's own examples: the 18 task→capability pairs in the planner's `WORKFLOWS`,
+hand-written goal phrasings per workflow (also the workflow-choice labels), local paraphrases of goals and task
+purposes, `none_of_these` records (gold card removed, or candidates restricted to the Session 1 allowlist),
+wrong-card fit negatives, and off-topic requests labelled `none_of_these`. Held-out test, v0.3 (453 questions,
+human-written originals never trained on):
 
 | question | accuracy | notes |
 |---|---|---|
-| agent (Choice, 16 cards + none) | 98.1% | 97.3% on the human originals, 94.7% abstention when the gold card is absent, 90% abstention under the Session 1 allowlist |
-| fits (Noul) | 99.0% | |
-| overall | 98.6%, ECE 0.009, 0.8% confident errors | 74 ms per question on a GB10 GPU; ~1 s on CPU in this container |
+| workflow (Choice, 6 workflows + none) | 100% originals, 98.3% paraphrases | 100% refusal on 22 off-topic requests |
+| agent (Choice, 16 cards + none) | 99% | 97.4% abstention when the gold card is absent, 100% under the Session 1 allowlist |
+| fits (Noul) | 98-99% | |
+| overall | 98.7%, ECE 0.006, 0.2% confident errors | ~23 ms per question on a GB10 GPU; 1-2.5 s per question on CPU in this container |
 
-Live in the Session 1 stack: `cv-fit` allocates parser-cv, evaluator-cv, reporter-cv-fit at probability 1.0
-each; a `knowledge-query` intent against the three-card registry stops with `none_of_these` at 1.0 before any
-AU is invoked. The training harness (dataset builder, Kev training, benchmark, GGUF export) lives in the
-`aoa-decide` repository; the checkpoint is 52 MB.
+Live in the Session 1 stack: a free-text "Is Jordan a good fit for the senior data engineer role?" is classified
+`cv-fit` at 1.0 and each task bound at 1.0; "Book me a flight to Lisbon" is refused at classification with a
+trace. Mount a run at `models/run` to override, or set `DECISION_MODEL_RUN` to a Hub id. The training harness
+(dataset builder, Kev training, benchmark, GGUF export) lives in the `aoa-decide` repository.
