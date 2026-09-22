@@ -608,6 +608,9 @@ def _task_trace(task: TaskSpec) -> dict[str, Any]:
         "discovery": task.discovery,
         "input_map": task.input_map,
         "selected_capability": task.selected_capability,
+        # The course's fixed plan is a reference answer for the six workflows: Studio shows whether the
+        # allocation agrees with it. Empty for tasks the model invented.
+        "reference_capability": _deterministic_capability_for_task(task),
     }
 
 

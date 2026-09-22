@@ -1030,3 +1030,83 @@ button.secondary.danger {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+
+/* --- decision cards (planner allocation, workflow choice) --------------- */
+.decision-card {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fbfbfa;
+}
+.decision-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.decision-head .section-meta { margin-left: auto; }
+.decision-goal { margin: 0 0 8px; font-style: italic; color: var(--ink); }
+.decision-facts { margin: 8px 0 0; font: 12px/1.5 var(--mono); color: var(--ink); }
+.decision-explain { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.outcome {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font: 11px/1.4 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.outcome-proceed { color: var(--ok); border-color: var(--ok); }
+.outcome-review { color: #b7791f; border-color: #b7791f; }
+.outcome-gap { color: var(--warn); border-color: var(--warn); }
+.prob-list { display: grid; gap: 4px; }
+.prob-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font: 12px/1.4 var(--mono);
+  color: var(--muted);
+}
+.prob-row.chosen { color: var(--ink); font-weight: 600; }
+.prob-row.escape .prob-label { font-style: italic; }
+.prob-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prob-bar {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: #ecebe6;
+  overflow: hidden;
+}
+.prob-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  background: #b8b8b0;
+}
+.prob-row.chosen .prob-fill { background: var(--accent); }
+.prob-row.escape .prob-fill { background: #d9a7a6; }
+.prob-row.escape.chosen .prob-fill { background: var(--warn); }
+.prob-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.45;
+  z-index: 1;
+}
+.prob-value { text-align: right; }
+.check-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12px; }
+.check { padding-left: 18px; position: relative; color: var(--muted); }
+.check::before { content: "•"; position: absolute; left: 4px; }
+.check.ok { color: var(--ok); }
+.check.ok::before { content: "✓"; }
+.check.bad { color: var(--warn); }
+.check.bad::before { content: "✗"; }
+.check code { font: 11px/1.4 var(--mono); }
+.ok-text { color: var(--ok); }
+.task-card.gap { border-left-color: var(--warn); background: #fdf6f5; }

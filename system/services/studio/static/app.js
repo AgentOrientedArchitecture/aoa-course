@@ -7,6 +7,7 @@
 const $ = (id) => document.getElementById(id);
 
 const WORKFLOWS = [
+  "auto",
   "agent-card-check",
   "cv-fit",
   "flow-audit",
@@ -65,6 +66,10 @@ function emptyLifecycle() {
     validation: null,
     fallbackReason: "",
     fallbackDetail: "",
+    goal: "",
+    freeText: false,
+    classification: null,
+    decisionMode: false,
     tasks: [],
     taskById: new Map(),
     plan: [],
@@ -366,6 +371,14 @@ function applyLifecycleEvent(record) {
     life.status = "running";
     life.workflow = record.workflow || "";
     life.intent = record.intent || null;
+    life.goal = (record.intent && record.intent.goal) || "";
+    life.freeText = Boolean(record.intent && record.intent.free_text);
+    return;
+  }
+  if (record.step === "intent-classification") {
+    life.classification = record.decision || null;
+    life.decisionMode = true;
+    if (life.classification && life.classification.outcome === "gap") life.status = "rejected";
     return;
   }
   if (record.step === "capability-context") {
@@ -379,6 +392,8 @@ function applyLifecycleEvent(record) {
       purpose: task.purpose,
       inputMap: task.input_map || {},
       selectedCapability: task.selected_capability || "",
+      referenceCapability: task.reference_capability || "",
+      discovery: task.discovery || {},
       status: "planned",
       latency: null,
       candidates: [],
@@ -402,9 +417,29 @@ function applyLifecycleEvent(record) {
   if (record.step === "discover") {
     const task = ensureTask(record.task);
     task.candidates = record.candidates || [];
+    const query = record.query || {};
+    task.strategy = query.strategy || "";
+    if (query.strategy === "decision-model") {
+      task.decision = query.decision || null;
+      life.decisionMode = true;
+      const qt = query.task || {};
+      if (!task.referenceCapability && qt.reference_capability) task.referenceCapability = qt.reference_capability;
+      if (qt.discovery && !Object.keys(task.discovery || {}).length) task.discovery = qt.discovery;
+      if (task.decision && task.decision.outcome === "gap") task.status = "gap";
+    }
     if (!task.selectedCapability && task.candidates.length) {
       task.selectedCapability = task.candidates[0].id || "";
     }
+    return;
+  }
+  if (record.step === "plan-review") {
+    const task = ensureTask(record.task);
+    task.review = { confidence: record.confidence, runnerUp: record.runner_up || "", note: record.note || "" };
+    return;
+  }
+  if (record.step === "allocator-fallback") {
+    const task = ensureTask(record.task);
+    task.allocatorFallback = record.error || "decision service unavailable";
     return;
   }
   if (record.step === "select") {
@@ -813,6 +848,7 @@ function truncate(value, max) {
 }
 
 function lifecycleIntentTitle(life) {
+  if (life.goal) return life.goal.length > 96 ? `${life.goal.slice(0, 93)}…` : life.goal;
   const kind = (life.intent && life.intent.kind) || life.workflow || state.mode;
   if (kind === "agent-card-check") return "Inspect individual agent-card evidence";
   if (kind === "cv-fit") return "Evaluate a CV against a job description";
@@ -827,10 +863,14 @@ function lifecycleIntentTitle(life) {
 function renderLifecycleRail(life) {
   const governed = governanceStagesActive(life);
   const stages = [
-    ["intent", "Intent", Boolean(life.intent)],
+    ["intent", life.freeText || life.classification ? "Goal" : "Intent", Boolean(life.intent)],
     ["context", "Capabilities", life.capabilityContext.length > 0],
-    ["proposal", "Resolved plan", Boolean(life.plan.length || life.proposal || life.source === "deterministic")],
+    ["proposal", "Task list", Boolean(life.plan.length || life.proposal || life.source === "deterministic")],
   ];
+  if (life.decisionMode) {
+    const decided = life.tasks.filter((task) => task.decision);
+    stages.push(["allocation", "Allocation", decided.length > 0 && decided.length >= life.tasks.length]);
+  }
   if (governed) stages.push(["governance", "Eligibility", Boolean(life.governance)]);
   stages.push(["work", "Application work", life.tasks.some((task) => ["running", "done", "error"].includes(task.status))]);
   if (governed) {
@@ -845,16 +885,28 @@ function renderLifecycleRail(life) {
   }
   const rail = $("lifecycle-rail");
   rail.innerHTML = "";
-  for (const [key, label, done] of stages) {
+  const refused = life.classification && life.classification.outcome === "gap";
+  for (const [key, label, doneRaw] of stages) {
+    // A goal refused at classification never reached the later stages, whatever the error/finish records say.
+    const done = refused && key !== "intent" ? false : doneRaw;
     const li = document.createElement("li");
     li.className = done ? "done" : "pending";
     if (key === "draft" && life.status === "draft-held") {
       li.className = "held";
     }
+    if (key === "intent" && life.classification && life.classification.outcome === "gap") {
+      li.className = "error";
+    }
+    if (key === "allocation") {
+      if (life.tasks.some((task) => task.decision && task.decision.outcome === "gap")) li.className = "error";
+      else if (life.tasks.some((task) => task.decision && task.decision.outcome === "review")) li.className = "held";
+    }
     if (key === "work" && life.tasks.some((task) => task.status === "running")) {
       li.className = "active";
     }
-    if (["governance", "work", "draft", "review", "release", "result"].includes(key)
+    const refusedAtGoal = life.classification && life.classification.outcome === "gap";
+    if (!refusedAtGoal
+        && ["governance", "work", "draft", "review", "release", "result"].includes(key)
         && ["error", "rejected", "quarantined"].includes(life.status)) {
       li.classList.add("error");
     }
@@ -932,6 +984,10 @@ function isResponsibilityRecord(record) {
     "start",
     "capability-context",
     "plan-proposal",
+    "intent-classification",
+    "discover",
+    "plan-review",
+    "allocator-fallback",
     "governance-invoke",
     "plan-governance",
     "governance-release",
@@ -970,6 +1026,24 @@ function traceEventView(record) {
   }
   if (step === "capability-context") {
     return traceView(layer, status, "Registry context loaded", `${(record.capabilities || []).length} AU cards considered`, latency);
+  }
+  if (step === "intent-classification") {
+    const d = record.decision || {};
+    const st = d.outcome === "gap" ? "error" : d.outcome === "review" ? "held" : "done";
+    const title = d.outcome === "gap" ? "No workflow fits the goal" : `Goal classified as ${d.choice}`;
+    return traceView("planner", st, title, `p=${fmtProb(d.probability)} · none_of_these ${fmtProb(d.none_of_these)}`, d.latency_ms != null ? `${Math.round(d.latency_ms)}ms` : "");
+  }
+  if (step === "plan-review") {
+    return traceView("planner", "held", `Allocation flagged for review: ${task}`, `${cap} at confidence ${fmtProb(record.confidence)}${record.runner_up ? `, runner-up ${record.runner_up}` : ""}`, "");
+  }
+  if (step === "allocator-fallback") {
+    return traceView("planner", "error", `Decision service unavailable for ${task}`, "kept the registry allocation", "");
+  }
+  if (step === "discover" && record.query && record.query.strategy === "decision-model") {
+    const d = record.query.decision || {};
+    const st = d.outcome === "gap" ? "error" : d.outcome === "review" ? "held" : "done";
+    const title = d.outcome === "gap" ? `No capability fits ${task}` : `Allocated ${task} → ${d.choice}`;
+    return traceView("planner", st, title, `p=${fmtProb(d.probability)} · fit ${fmtProb(d.fit)} · ${(record.candidates || []).length} candidates`, d.latency_ms != null ? `${Math.round(d.latency_ms)}ms` : "");
   }
   if (step === "plan-proposal") {
     const validation = record.validation && record.validation.valid ? "validated" : record.fallback_reason ? "fallback" : "pending validation";
@@ -1075,6 +1149,7 @@ function traceView(layer, status, title, detail, meta) {
 
 function traceLayer(step) {
   if (step === "start") return "intent";
+  if (["intent-classification", "plan-review", "allocator-fallback"].includes(step)) return "planner";
   if (step === "capability-context" || step === "lookup" || step === "select") return "registry";
   if (step === "plan-proposal") return "planner";
   if (["governance-invoke", "plan-governance", "governance-release", "plan-rejected", "result-hold", "result-review"].includes(step)) return "governance";
@@ -1126,9 +1201,75 @@ function endpointHost(endpoint) {
   }
 }
 
+function fmtProb(value) {
+  if (value == null || Number.isNaN(Number(value))) return "–";
+  return Number(value).toFixed(2);
+}
+
+function probRow(label, value, opts = {}) {
+  const p = Math.max(0, Math.min(1, Number(value) || 0));
+  const cls = ["prob-row", opts.chosen ? "chosen" : "", opts.escape ? "escape" : ""].filter(Boolean).join(" ");
+  const marks = (opts.thresholds || []).map((t) => `<span class="prob-mark" style="left:${(t.at * 100).toFixed(1)}%" title="${escapeHtml(t.label)}"></span>`).join("");
+  return `
+    <div class="${cls}">
+      <span class="prob-label" title="${escapeHtml(opts.title || label)}">${escapeHtml(label)}</span>
+      <span class="prob-bar">${marks}<span class="prob-fill" style="width:${(p * 100).toFixed(1)}%"></span></span>
+      <span class="prob-value">${fmtProb(p)}</span>
+    </div>`;
+}
+
+function outcomeBadge(outcome) {
+  const text = outcome === "gap" ? "gap" : outcome === "review" ? "review" : outcome === "proceed" ? "proceed" : outcome || "";
+  return `<span class="outcome outcome-${escapeHtml(text || "none")}">${escapeHtml(text)}</span>`;
+}
+
+function thresholdMarks(decision) {
+  const marks = [];
+  if (decision && decision.gap_floor != null) marks.push({ at: decision.gap_floor, label: `gap floor ${fmtProb(decision.gap_floor)}` });
+  if (decision && decision.confidence_floor != null) marks.push({ at: decision.confidence_floor, label: `review floor ${fmtProb(decision.confidence_floor)}` });
+  return marks;
+}
+
+function workflowDecisionCard(life) {
+  const c = life.classification;
+  if (!c) return "";
+  const rows = Object.entries(c.probabilities || {}).map(([name, p]) =>
+    probRow(name, p, { chosen: name === c.choice, escape: name === "none_of_these", thresholds: name === c.choice ? [{ at: 0.35, label: "gap floor 0.35" }] : [] })).join("");
+  const explain = c.outcome === "gap"
+    ? "The model found no workflow that performs this request. Questions are always knowledge queries; a refusal means the system has no workflow for this kind of action."
+    : c.outcome === "review"
+      ? "A workflow was chosen but the margin over the runner-up is small; the run proceeds and the choice is flagged."
+      : "A typed choice over the workflow descriptions: the answer is always one of the listed workflows or none_of_these, never free text.";
+  return `
+    <div class="decision-card">
+      <div class="decision-head">
+        <span class="section-label">Workflow decision</span>
+        ${outcomeBadge(c.outcome)}
+        <span class="section-meta">${c.latency_ms != null ? `${Math.round(c.latency_ms)}ms` : ""}</span>
+      </div>
+      <p class="decision-goal">“${escapeHtml(c.goal || life.goal || "")}”</p>
+      <div class="prob-list">${rows}</div>
+      <p class="decision-explain">${escapeHtml(explain)}</p>
+    </div>`;
+}
+
+function taskOriginLine(life) {
+  const reference = life.tasks.filter((t) => t.referenceCapability);
+  const agree = reference.filter((t) => t.selectedCapability && t.selectedCapability === t.referenceCapability).length;
+  const origin = life.source === "llm"
+    ? (life.freeText ? "The planner model proposed this task list from the goal without seeing the course's fixed plan; it was validated structurally." : "The planner model filled in the requested workflow's task list.")
+    : life.source === "deterministic"
+      ? "The task list is the course's fixed plan for this workflow."
+      : "";
+  const ref = reference.length
+    ? `<span class="${agree === reference.length ? "ok-text" : "warn-text"}">Reference plan agreement: ${agree}/${reference.length} tasks</span>`
+    : "";
+  return `<p class="decision-explain">${escapeHtml(origin)} ${ref}</p>`;
+}
+
 function renderPlanner(life) {
   const source = life.source || "waiting";
-  $("planner-source").textContent = source;
+  $("planner-source").textContent = life.decisionMode ? `${source} + decision model` : source;
   const body = $("planner-body");
   body.innerHTML = "";
   if (!life.intent) {
@@ -1137,6 +1278,7 @@ function renderPlanner(life) {
     return;
   }
   body.className = "planner-body";
+  body.insertAdjacentHTML("beforeend", workflowDecisionCard(life));
 
   const summary = document.createElement("div");
   summary.className = "planner-summary";
@@ -1151,7 +1293,8 @@ function renderPlanner(life) {
     <span><strong>${escapeHtml(source)}</strong> planner</span>
     <span class="${validationText === "fallback" ? "warn-text" : ""}">${escapeHtml(validationText)}</span>
   `;
-  body.appendChild(summary);
+  if (!(life.classification && life.classification.outcome === "gap")) body.appendChild(summary);
+  if (life.tasks.length) body.insertAdjacentHTML("beforeend", taskOriginLine(life));
 
   if (life.fallbackReason) {
     const fallback = document.createElement("p");
@@ -1162,7 +1305,7 @@ function renderPlanner(life) {
     if (life.fallbackDetail && life.fallbackDetail !== life.fallbackReason) {
       const details = document.createElement("details");
       details.className = "compact-details";
-      details.innerHTML = `<summary>Planner fallback detail</summary><pre class="json-view">${escapeHtml(life.fallbackDetail)}</pre>`;
+      details.innerHTML = `<summary>What the planner model actually returned</summary><pre class="json-view">${escapeHtml(life.fallbackDetail)}</pre>`;
       body.appendChild(details);
     }
   }
@@ -1170,7 +1313,7 @@ function renderPlanner(life) {
   if (life.proposal) {
     const details = document.createElement("details");
     details.className = "compact-details";
-    details.innerHTML = `<summary>Planner JSON</summary><pre class="json-view">${highlightJson(life.proposal)}</pre>`;
+    details.innerHTML = `<summary>Raw proposal JSON</summary><pre class="json-view">${highlightJson(life.proposal)}</pre>`;
     body.appendChild(details);
   }
 }
@@ -1319,6 +1462,68 @@ function apiErrorMessage(payload, fallback) {
 }
 
 
+function contractChecks(task, card) {
+  // Deterministic check, independent of the model: does the chosen card's contract cover what the task requires?
+  const disc = task.discovery || {};
+  const rows = [];
+  const inputs = card && Array.isArray(card.inputs) ? card.inputs : [];
+  const outputs = card && Array.isArray(card.outputs) ? card.outputs : [];
+  for (const req of disc.required_inputs || []) {
+    const byName = inputs.find((f) => f && f.name && f.name === req.name);
+    const byType = inputs.find((f) => f && f.type && f.type === req.type);
+    rows.push({ kind: "input", spec: req.name || req.type || "?", ok: Boolean(byName || byType), how: byName ? "name" : byType ? "type" : "" });
+  }
+  for (const req of disc.required_outputs || []) {
+    const byName = outputs.find((f) => f && f.name && f.name === req.name);
+    const byType = outputs.find((f) => f && f.type && f.type === req.type);
+    rows.push({ kind: "output", spec: req.name || req.type || "?", ok: Boolean(byName || byType), how: byName ? "name" : byType ? "type" : "" });
+  }
+  return rows;
+}
+
+function allocationCard(task) {
+  const d = task.decision;
+  if (!d) return "";
+  const chosenCard = (task.candidates || []).find((c) => c.id === d.choice);
+  const ranked = [...(task.candidates || [])].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const rows = ranked.slice(0, 6).map((c) => probRow(c.id, c.score, { chosen: c.id === d.choice, title: c.purpose || c.id, thresholds: c.id === d.choice ? thresholdMarks(d) : [] })).join("")
+    + probRow("none_of_these", d.none_of_these, { escape: true, chosen: d.choice === "none_of_these" });
+  const runnerUp = ranked.find((c) => c.id !== d.choice);
+  const margin = runnerUp && d.probability != null ? d.probability - (runnerUp.score || 0) : null;
+  const facts = [
+    `chosen <strong>${escapeHtml(d.choice || "–")}</strong> at p=${fmtProb(d.probability)}`,
+    `confidence ${fmtProb(d.confidence)} (floor ${fmtProb(d.confidence_floor)})`,
+    runnerUp ? `runner-up ${escapeHtml(runnerUp.id)} at ${fmtProb(runnerUp.score)}${margin != null ? `, margin ${fmtProb(margin)}` : ""}` : "",
+    d.fit != null ? `fit ${fmtProb(d.fit)}` : "",
+  ].filter(Boolean).join(" · ");
+  const ref = task.referenceCapability
+    ? (task.referenceCapability === task.selectedCapability
+      ? `<li class="check ok">Reference plan agrees: ${escapeHtml(task.referenceCapability)}</li>`
+      : `<li class="check bad">Reference plan differs: expected ${escapeHtml(task.referenceCapability)}</li>`)
+    : `<li class="check muted">No reference plan for this task (model-proposed)</li>`;
+  const checks = contractChecks(task, chosenCard).map((r) =>
+    `<li class="check ${r.ok ? "ok" : "bad"}">${r.kind} <code>${escapeHtml(r.spec)}</code> ${r.ok ? `covered by ${r.how}` : "not covered by the chosen card"}</li>`).join("");
+  const signals = task.signals && Object.keys(task.signals).length
+    ? `<li class="check ok">Execution signals: ${escapeHtml(signalLine(task.signals))}</li>` : "";
+  const explain = d.outcome === "gap"
+    ? "No listed capability was judged able to perform this task, so the run stops before any AU is invoked."
+    : d.outcome === "review"
+      ? "Allocated, but confidence is below the review floor: proceed with caution and look at the runner-up."
+      : "";
+  return `
+    <div class="decision-card">
+      <div class="decision-head">
+        <span class="section-label">Allocation</span>
+        ${outcomeBadge(d.outcome)}
+        <span class="section-meta">${d.latency_ms != null ? `${Math.round(d.latency_ms)}ms` : ""}</span>
+      </div>
+      <div class="prob-list">${rows}</div>
+      <p class="decision-facts">${facts}</p>
+      ${explain ? `<p class="decision-explain">${escapeHtml(explain)}</p>` : ""}
+      <ul class="check-list">${ref}${checks}${signals}</ul>
+    </div>`;
+}
+
 function renderTasks(life) {
   $("task-count").textContent = String(life.tasks.length);
   const list = $("task-list");
@@ -1327,7 +1532,7 @@ function renderTasks(life) {
     const li = document.createElement("li");
     li.className = `task-card ${task.status || "pending"}`;
     const latency = task.latency == null ? "" : `<span>${task.latency.toFixed(2)}s</span>`;
-    const capability = task.selectedCapability || "not selected";
+    const capability = task.selectedCapability || (task.decision && task.decision.outcome === "gap" ? "no capability fits" : "not selected");
     li.innerHTML = `
       <div class="task-main">
         <span class="task-status">${escapeHtml(task.status || "pending")}</span>
@@ -1341,9 +1546,13 @@ function renderTasks(life) {
         ${latency}
       </div>
     `;
+    li.insertAdjacentHTML("beforeend", allocationCard(task));
+    if (task.allocatorFallback) {
+      li.insertAdjacentHTML("beforeend", `<p class="fallback-note">Decision service unavailable: ${escapeHtml(task.allocatorFallback)}. The registry allocation was kept.</p>`);
+    }
     const details = document.createElement("details");
     details.className = "compact-details";
-    details.innerHTML = `<summary>Details</summary><pre class="json-view">${highlightJson(taskDetail(task))}</pre>`;
+    details.innerHTML = `<summary>Raw</summary><pre class="json-view">${highlightJson(taskDetail(task))}</pre>`;
     li.appendChild(details);
     list.appendChild(li);
   }
@@ -1352,6 +1561,10 @@ function renderTasks(life) {
 function taskDetail(task) {
   return {
     input_map: task.inputMap,
+    decision: task.decision || undefined,
+    reference_capability: task.referenceCapability || undefined,
+    required: task.discovery && (task.discovery.required_inputs || task.discovery.required_outputs)
+      ? { inputs: task.discovery.required_inputs, outputs: task.discovery.required_outputs } : undefined,
     candidates: task.candidates,
     reasons: task.reasons,
     signals: task.signals,
