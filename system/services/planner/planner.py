@@ -447,6 +447,96 @@ WORKFLOWS: dict[str, Workflow] = {
 }
 
 
+AUTO_KIND = "auto"
+WORKFLOW_DESCRIPTIONS: dict[str, str] = {
+    "cv-fit": "Parse a CV, score it against a job description, and write a fit report for a human reader.",
+    "cv-fit-interview": "Parse a CV, score it against a job description, and turn the verdict into targeted interview questions.",
+    "knowledge-ingest": "Parse a research note, decide what to promote into the course wiki, store it and summarise what changed.",
+    "knowledge-query": "Parse a user question into a retrieval query, rank wiki passages as evidence, and write a grounded, cited answer.",
+    "agent-card-check": "Inventory the registered capability cards and evaluate their declared EU AI Act evidence with citations.",
+    "flow-audit": "Reconstruct executed plans from planner traces and audit eligibility, human review and release ordering.",
+}
+
+
+def _is_free_text_intent(intent: dict[str, Any]) -> bool:
+    return intent.get("kind") == AUTO_KIND or (intent.get("kind") is None and bool(str(intent.get("goal") or "").strip()))
+
+
+async def _classify_workflow(client: httpx.AsyncClient, goal: str) -> dict[str, Any]:
+    """Ask the decision service which workflow a free-text goal calls for: a typed Choice over the workflow
+    descriptions plus none_of_these. Returns the decision with every workflow's probability."""
+    criteria = dict(WORKFLOW_DESCRIPTIONS)
+    criteria[DECISION_NONE] = "No available workflow satisfies this request."
+    answers = await _decision_evaluate(client, {"goal": goal}, {
+        "workflow": {
+            "type": "choice",
+            "instructions": "Which workflow should the planner run to satisfy this request? Choose none_of_these if no workflow fits.",
+            "criteria": criteria,
+        }
+    })
+    answer = answers["workflow"]
+    probabilities = {str(k): float(v) for k, v in (answer.get("probabilities") or {}).items()}
+    choice = str(answer.get("choice") or "")
+    probability = probabilities.get(choice, 0.0)
+    outcome = "gap" if choice == DECISION_NONE or probability < DECISION_GAP_FLOOR else (
+        "review" if float(answer.get("confidence") or 0.0) < DECISION_CONFIDENCE_FLOOR else "proceed")
+    return {
+        "strategy": "decision-model",
+        "goal": goal,
+        "choice": choice,
+        "probability": round(probability, 4),
+        "confidence": round(float(answer.get("confidence") or 0.0), 4),
+        "none_of_these": round(probabilities.get(DECISION_NONE, 0.0), 4),
+        "probabilities": {k: round(v, 4) for k, v in sorted(probabilities.items(), key=lambda kv: -kv[1])},
+        "outcome": outcome,
+        "latency_ms": answers.get("_latency_ms"),
+    }
+
+
+def _default_inputs_for(workflow: Workflow, intent: dict[str, Any]) -> None:
+    """A free-text goal often *is* the input the workflow needs; fill the obvious ones in place."""
+    inputs = intent.setdefault("inputs", {})
+    goal = str(intent.get("goal") or "").strip()
+    if workflow.name == "knowledge-query" and goal:
+        inputs.setdefault("question", goal)
+    if workflow.name in ("agent-card-check", "flow-audit"):
+        inputs.setdefault("estate_root", "/data/estate")
+        if workflow.name == "flow-audit":
+            inputs.setdefault("include_legacy", False)
+
+
+async def _select_workflow_for_goal(intent: dict[str, Any]) -> Workflow:
+    """Free-text intents: the decision model chooses the workflow (recorded on the intent for the trace)."""
+    goal = str(intent.get("goal") or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="a free-text intent needs a non-empty goal")
+    if PLANNER_ALLOCATOR != "decision":
+        raise HTTPException(status_code=400, detail="free-text goals need PLANNER_ALLOCATOR=decision")
+    async with httpx.AsyncClient() as client:
+        try:
+            classification = await _classify_workflow(client, goal)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=f"decision service unavailable for workflow choice: {exc}") from exc
+    intent["_classification"] = classification
+    if classification["outcome"] == "gap":
+        # A refused goal is still evidence: record it as a trace so Studio shows what was considered.
+        trace_id = uuid.uuid4().hex[:12]
+        await _record({"trace_id": trace_id, "step": "start", "workflow": AUTO_KIND, "intent": {k: v for k, v in intent.items() if k != "_classification"}})
+        await _record({"trace_id": trace_id, "step": "intent-classification", "workflow": AUTO_KIND, "goal": goal, "decision": classification})
+        await _record({"trace_id": trace_id, "step": "error", "error": "no workflow fits this goal"})
+        await _record({"trace_id": trace_id, "step": "finish", "outputs": {"error": "no workflow fits this goal"}})
+        raise HTTPException(status_code=400, detail={
+            "error": "no workflow fits this goal",
+            "trace_id": trace_id,
+            "classification": classification,
+        })
+    workflow = WORKFLOWS[classification["choice"]]
+    intent["kind"] = workflow.name
+    intent["free_text"] = True
+    _default_inputs_for(workflow, intent)
+    return workflow
+
+
 def _select_workflow(intent: dict[str, Any]) -> Workflow:
     """Pick the deterministic task breakdown for the incoming intent."""
     kind = intent.get("kind")
@@ -617,12 +707,17 @@ def _build_planner_prompt(
     intent: dict[str, Any],
     cards: list[dict[str, Any]],
 ) -> str:
+    free_text = bool(intent.get("free_text"))
     intent_summary = {
         "kind": intent.get("kind"),
         "requested_workflow": workflow.name,
         "available_inputs": sorted((intent.get("inputs") or {}).keys()),
     }
-    examples = [_workflow_example(wf) for wf in WORKFLOWS.values()]
+    if free_text:
+        intent_summary["goal"] = intent.get("goal")
+    # A free-text goal is planned, not transcribed: the requested workflow's own example stays out of the
+    # prompt, so the task list is the model's proposal and the allocator's binding, checked structurally.
+    examples = [_workflow_example(wf) for wf in WORKFLOWS.values() if not (free_text and wf.name == workflow.name)]
     body = {
         "intent": intent_summary,
         "available_capabilities": [
@@ -797,6 +892,7 @@ def _validate_plan(
     intent_inputs: dict[str, Any],
     cards_by_id: dict[str, dict[str, Any]],
     workflow: Workflow,
+    strict_workflow: bool = True,
 ) -> tuple[list[TaskSpec], dict[str, Any]]:
     tasks = proposal.get("tasks")
     if not isinstance(tasks, list) or not tasks:
@@ -867,10 +963,12 @@ def _validate_plan(
     # card is not discoverable) would otherwise run and produce a
     # plausible-looking but meaningless result.
     missing_tasks = {task.id for task in workflow.tasks} - seen_task_ids
-    if missing_tasks:
+    if strict_workflow and missing_tasks:
         raise ValueError(
             f"plan is missing workflow task(s): {', '.join(sorted(missing_tasks))}"
         )
+    if not strict_workflow:
+        checks.append({"structural": True, "missing_workflow_tasks": sorted(missing_tasks)})
 
     final_outputs = prior_outputs.get(planned_tasks[-1].id, set())
     final_markdown_outputs = {"report_markdown", "answer_markdown", "ingest_markdown", "findings_markdown"}
@@ -918,7 +1016,8 @@ async def _build_plan(
         }
         cards_by_id = {card["id"]: card for card in cards if card.get("id")}
         tasks, validation = _validate_plan(
-            proposal, intent.get("inputs", {}) or {}, cards_by_id, workflow
+            proposal, intent.get("inputs", {}) or {}, cards_by_id, workflow,
+            strict_workflow=not intent.get("free_text"),
         )
         return PlanBuildResult(tasks=tasks, source="llm", proposal=proposal, validation=validation)
     except Exception as e:  # noqa: BLE001
@@ -1551,12 +1650,21 @@ async def _run_workflow(
             intent["inputs"] = intent_inputs
         intent_inputs.setdefault("include_legacy", False)
 
+    classification = intent.pop("_classification", None)
     await _record({
         "trace_id": trace_id,
         "step": "start",
         "workflow": workflow.name,
         "intent": intent,
     })
+    if classification:
+        await _record({
+            "trace_id": trace_id,
+            "step": "intent-classification",
+            "workflow": workflow.name,
+            "goal": intent.get("goal"),
+            "decision": classification,
+        })
 
     resolved_steps: list[ResolvedStep] = []
     async with httpx.AsyncClient() as client:
@@ -1811,7 +1919,10 @@ async def healthz() -> dict[str, Any]:
 @app.post("/intent")
 async def intent(request: Request) -> JSONResponse:
     body = await request.json()
-    workflow = _select_workflow(body)
+    if _is_free_text_intent(body):
+        workflow = await _select_workflow_for_goal(body)
+    else:
+        workflow = _select_workflow(body)
     trace_id, status, outputs = await _run_workflow(workflow, body)
     return JSONResponse({
         "trace_id": trace_id,

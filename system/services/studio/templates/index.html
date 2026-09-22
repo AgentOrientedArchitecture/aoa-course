@@ -25,6 +25,7 @@
       <h2>Intent Studio</h2>
       <div id="intent-form" class="intent">
         <div class="mode-tabs" role="tablist" aria-label="Workflow">
+          <button id="mode-auto"{% if studio_config.workflows[0] == "auto" %} class="active"{% endif %} type="button" data-mode="auto">Goal</button>
           <button id="mode-agent-card"{% if studio_config.workflows[0] == "agent-card-check" %} class="active"{% endif %} type="button" data-mode="agent-card-check">Agent card check</button>
           <button id="mode-cv"{% if studio_config.workflows[0] == "cv-fit" %} class="active"{% endif %} type="button" data-mode="cv-fit">CV fit</button>
           <button id="mode-flow-audit" type="button" data-mode="flow-audit">Flow audit</button>
@@ -43,6 +44,29 @@
           </p>
         </div>
 
+        <div class="workflow-fields{% if studio_config.workflows[0] != "auto" %} hidden{% endif %}" data-mode-panel="auto">
+          <p class="mode-note" id="auto-note">
+            Say what you want in your own words. The planner's decision model chooses the workflow from the
+            registered capabilities (or says none fits), proposes the tasks, and binds each one with a calibrated
+            probability you can see in the trace. Paste a CV, a job description or a note if the goal needs them.
+          </p>
+          <label class="drop-field">
+            <span class="drop-label"><strong>Goal</strong><em>plain text</em></span>
+            <textarea id="intent-goal" placeholder="e.g. Is this candidate a good fit for the data engineer role? / What does the wiki say about observed behaviour?" rows="3"></textarea>
+          </label>
+          <label class="drop-field">
+            <span class="drop-label"><strong>CV</strong> <em>optional</em></span>
+            <textarea id="auto-cv" placeholder="Paste a CV if the goal needs one." rows="4"></textarea>
+          </label>
+          <label class="drop-field">
+            <span class="drop-label"><strong>Job description</strong> <em>optional</em></span>
+            <textarea id="auto-jd" placeholder="Paste a job description if the goal needs one." rows="3"></textarea>
+          </label>
+          <label class="drop-field">
+            <span class="drop-label"><strong>Note</strong> <em>optional</em></span>
+            <textarea id="auto-note-text" placeholder="Paste a research note if the goal is to ingest it." rows="3"></textarea>
+          </label>
+        </div>
         <div class="workflow-fields{% if studio_config.workflows[0] != "cv-fit" %} hidden{% endif %}" data-mode-panel="cv-fit">
           <p class="mode-note" id="cv-fit-note" data-naive-note="Drop or paste a CV and a job description, then submit. The planner discovers the parser, evaluator, and reporter from the registry and runs them as one workflow." data-governed-note="The baseline card is ineligible, so this plan is blocked before any application AU runs. After you fix the card, execution produces a held draft; review the actual evaluation and approve or reject its exact result digest below.">
             Drop or paste a CV and a job description, then submit. The planner

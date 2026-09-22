@@ -106,3 +106,58 @@ def test_goal_prefers_intent_text_then_context():
     assert planner._allocation_goal(WORKFLOW, {"goal": "Is this candidate a fit?"}) == "Is this candidate a fit?"
     goal = planner._allocation_goal(WORKFLOW, {"use_context": {"domain": "employment", "output_use": "candidate-screening"}})
     assert goal == "workflow: cv-fit; domain: employment; output_use: candidate-screening"
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: free-text goals
+# ---------------------------------------------------------------------------
+
+class FakeWorkflowClient(FakeClient):
+    async def post(self, url, json, timeout):  # noqa: A002
+        self.requests.append(json)
+        best = max(self.probabilities, key=self.probabilities.get)
+        k = len(json["questions"]["workflow"]["criteria"])
+        confidence = (self.probabilities[best] - 1 / k) / (1 - 1 / k)
+        return _Response({"answers": {"workflow": {"type": "choice", "choice": best, "confidence": confidence, "probabilities": self.probabilities}}, "latency_ms": 12})
+
+
+def test_free_text_goal_is_classified_to_a_workflow():
+    client = FakeWorkflowClient({"cv-fit": 0.9, "cv-fit-interview": 0.05, "knowledge-query": 0.03, "none_of_these": 0.02})
+    c = asyncio.run(planner._classify_workflow(client, "Is this candidate a fit for the data engineer role?"))
+    assert c["choice"] == "cv-fit" and c["outcome"] == "proceed" and c["latency_ms"] == 12
+    assert set(client.requests[0]["questions"]["workflow"]["criteria"]) == set(planner.WORKFLOWS) | {planner.DECISION_NONE}
+
+
+def test_off_topic_goal_is_a_gap():
+    client = FakeWorkflowClient({"none_of_these": 0.85, "cv-fit": 0.1, "knowledge-query": 0.05})
+    c = asyncio.run(planner._classify_workflow(client, "Book me a flight to Lisbon"))
+    assert c["outcome"] == "gap"
+
+
+def test_free_text_intent_detection_and_default_inputs():
+    assert planner._is_free_text_intent({"kind": "auto", "goal": "x"})
+    assert planner._is_free_text_intent({"goal": "x"})
+    assert not planner._is_free_text_intent({"kind": "cv-fit", "inputs": {}})
+    intent = {"goal": "What does the wiki say about registries?", "inputs": {}}
+    planner._default_inputs_for(planner.WORKFLOWS["knowledge-query"], intent)
+    assert intent["inputs"]["question"] == intent["goal"]
+
+
+def test_free_text_plan_validation_is_structural():
+    cards = {c["id"]: {**c, "inputs": [], "outputs": [{"name": "report_markdown"}]} for c in CARDS if c["id"] != "evaluator-old"}
+    proposal = {"tasks": [{"id": "only", "purpose": "report", "capability": "reporter-cv-fit", "input_map": {}}]}
+    tasks, validation = planner._validate_plan(proposal, {}, cards, WORKFLOW, strict_workflow=False)
+    assert [t.id for t in tasks] == ["only"]
+    assert validation["checks"][-1]["missing_workflow_tasks"] == ["evaluate-cv-fit", "parse-cv", "write-cv-fit-report"]
+    try:
+        planner._validate_plan(proposal, {}, cards, WORKFLOW, strict_workflow=True)
+        raise AssertionError("strict validation should reject a plan missing workflow tasks")
+    except ValueError:
+        pass
+
+
+def test_free_text_prompt_omits_the_requested_workflow_example():
+    prompt = planner._build_planner_prompt(WORKFLOW, {"kind": "cv-fit", "free_text": True, "goal": "Is this candidate a fit?", "inputs": {"cv_path": "a", "jd_path": "b"}}, CARDS)
+    assert '"workflow": "cv-fit"' not in prompt and '"goal": "Is this candidate a fit?"' in prompt
+    strict = planner._build_planner_prompt(WORKFLOW, {"kind": "cv-fit", "inputs": {}}, CARDS)
+    assert '"workflow": "cv-fit"' in strict

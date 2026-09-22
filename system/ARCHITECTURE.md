@@ -335,6 +335,11 @@ was. The service (`services/decision/`) serves the TypeSafe `POST /v1/systemone`
 Apache-2.0 Kev checkpoint on CPU, fine-tuned on this course's own task→capability examples, so the course
 stays runnable on a laptop with no hosted decision API.
 
+With the allocator on, the studio's **Goal** tab accepts free text: the same decision model chooses the
+workflow (or refuses), the planner model proposes tasks without being shown the answer, validation becomes
+structural, and the allocator binds each task. That is the point at which the planner decides rather than
+transcribes.
+
 Why this matters for the architecture: a typed decision cannot name a capability that is not registered,
 cannot drop a step by accident, and gives the orchestrator a number to govern with. The generative model
 is still useful for writing task descriptions; it is the wrong tool for choosing between registered

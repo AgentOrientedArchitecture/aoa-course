@@ -117,7 +117,7 @@ services:
       PLANNER_URL: http://planner:7200
       INBOX_DIR: /data/inbox
       PLANNER_REQUEST_TIMEOUT: ${PLANNER_REQUEST_TIMEOUT:-420}
-      STUDIO_WORKFLOWS: ${STUDIO_WORKFLOWS:-cv-fit,knowledge-ingest,wiki-graph,knowledge-query}
+      STUDIO_WORKFLOWS: ${STUDIO_WORKFLOWS:-auto,cv-fit,knowledge-ingest,wiki-graph,knowledge-query}
     depends_on:
       registry:
         condition: service_healthy

@@ -173,6 +173,25 @@ selects how it is made:
 The decision model cannot invent a capability: its answer is always one of the ids the planner supplied.
 That is the difference from the generative planner path, whose free text has to be parsed and validated.
 
+## Free-text goals (`kind: auto`)
+
+With `PLANNER_ALLOCATOR=decision` the planner also accepts a goal in the user's own words:
+
+```json
+{ "kind": "auto", "goal": "Is this candidate a good fit for the data engineer role?", "inputs": { "cv_path": "...", "jd_path": "..." } }
+```
+
+The decision model first answers a typed Choice over the workflow descriptions plus `none_of_these`
+(recorded as `intent-classification`). A gap returns HTTP 400 with the probabilities and a trace so Studio
+can show what was considered. Otherwise the planner model proposes the task list for the chosen workflow
+*without* being shown that workflow's own example, the plan is validated structurally (every task binds to an
+approved AU, every required input resolves, the final task produces markdown) rather than against the fixed
+task list, and the decision model binds each task as above. For `knowledge-query` the goal doubles as the
+question; the estate workflows default `estate_root`. The studio's **Goal** tab submits this shape.
+
+Deterministic strategy (Sessions 3 and 4) still applies after classification: the chosen workflow's fixed
+plan runs, so intent classification is real while execution stays reliable.
+
 ## Planning configuration
 
 The planner runs on port `7200` and expects

@@ -10,7 +10,7 @@ services:
 
   studio:
     environment:
-      STUDIO_WORKFLOWS: cv-fit
+      STUDIO_WORKFLOWS: cv-fit,auto
 
   evaluator:
     environment:

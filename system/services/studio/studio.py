@@ -35,6 +35,7 @@ ALLOW_WIKI_RESET = os.environ.get("STUDIO_ALLOW_WIKI_RESET", "true").strip().low
     "1", "true", "yes", "on",
 }
 SUPPORTED_WORKFLOWS = (
+    "auto",
     "agent-card-check",
     "cv-fit",
     "flow-audit",
@@ -336,6 +337,7 @@ async def submit_intent(request: Request) -> JSONResponse:
         inputs = {
             key: str(form.get(key) or "")
             for key in (
+                "goal",
                 "cv_text",
                 "jd_text",
                 "note_text",
@@ -359,6 +361,9 @@ async def submit_intent(request: Request) -> JSONResponse:
     if kind not in ENABLED_WORKFLOWS:
         return JSONResponse({"error": f"workflow is not enabled: {kind}"}, status_code=404)
 
+    if kind == "auto":
+        return await _submit_free_text(inputs, files)
+
     if kind == "knowledge-ingest":
         return await _submit_knowledge_ingest(inputs, files)
 
@@ -375,6 +380,44 @@ async def submit_intent(request: Request) -> JSONResponse:
         return JSONResponse({"error": f"unknown intent kind: {kind}"}, status_code=400)
 
     return await _submit_cv_fit(inputs, files, kind=kind)
+
+
+async def _submit_free_text(
+    inputs: dict[str, Any], files: dict[str, Any] | None = None
+) -> JSONResponse:
+    """A goal in the learner's own words. Any pasted or dropped material goes to the inbox as usual and only
+    paths travel; the planner's decision model chooses the workflow, proposes the tasks and binds each one."""
+    goal = str(inputs.get("goal") or "").strip()
+    if not goal:
+        return JSONResponse({"error": "a goal is required"}, status_code=400)
+    files = files or {}
+    planner_inputs: dict[str, Any] = {}
+    for text_key, file_key, name_key, default_name, path_key in (
+        ("cv_text", "cv_file", "cv_name", "cv.txt", "cv_path"),
+        ("jd_text", "jd_file", "jd_name", "jd.txt", "jd_path"),
+        ("note_text", "note_file", "note_name", "source-note.txt", "note_path"),
+    ):
+        text = str(inputs.get(text_key) or "")
+        upload = files.get(file_key)
+        if not text.strip() and not upload:
+            continue
+        name = str(inputs.get(name_key) or default_name)
+        if upload:
+            planner_inputs[path_key] = str(await _write_upload(upload, getattr(upload, "filename", None) or name))
+        else:
+            planner_inputs[path_key] = str(_write_inbox(text, name))
+    planner_body = {"kind": "auto", "goal": goal, "inputs": planner_inputs}
+    async with httpx.AsyncClient(timeout=PLANNER_REQUEST_TIMEOUT) as client:
+        r = await client.post(f"{PLANNER_URL}/intent", json=planner_body)
+    try:
+        body = r.json()
+    except ValueError:
+        body = {"error": r.text}
+    if r.status_code >= 400:
+        detail = body.get("detail", body) if isinstance(body, dict) else body
+        message = detail.get("error") if isinstance(detail, dict) else str(detail)
+        return JSONResponse({"error": message or "planner rejected the goal", "detail": detail}, status_code=r.status_code)
+    return JSONResponse(body)
 
 
 async def _submit_cv_fit(

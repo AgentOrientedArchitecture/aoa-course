@@ -1744,6 +1744,21 @@ async function submitIntent() {
 }
 
 function buildIntentPayload(status) {
+  if (state.mode === "auto") {
+    const goal = $("intent-goal").value.trim();
+    if (!goal) {
+      status.textContent = "say what you want the system to do";
+      return null;
+    }
+    return {
+      kind: "auto",
+      goal,
+      cv_text: $("auto-cv").value.trim(),
+      jd_text: $("auto-jd").value.trim(),
+      note_text: $("auto-note-text").value.trim(),
+    };
+  }
+
   if (state.mode === "cv-fit" || state.mode === "cv-fit-interview") {
     const cv = $("intent-cv").value.trim();
     const jd = $("intent-jd").value.trim();
@@ -1906,6 +1921,7 @@ function setMode(mode) {
     "agent-card-check": "Run agent card check",
     "cv-fit": "Run CV fit",
     "cv-fit-interview": "Run cv-fit + interview",
+    auto: "Plan and run",
     "knowledge-ingest": "Run ingest",
     "wiki-graph": "Refresh graph",
     "knowledge-query": "Ask wiki",
