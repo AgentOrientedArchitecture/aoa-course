@@ -1808,7 +1808,8 @@ async def _run_workflow(
                     decision = query.get("decision") or {}
                     message = (
                         f"capability gap for task {task.id}: the decision model chose "
-                        f"{decision.get('choice')!r} at probability {decision.get('probability')}"
+                        f"{decision.get('choice')!r} at probability {decision.get('probability')} "
+                        f"(trace {trace_id})"
                     )
                 await _record({
                     "trace_id": trace_id,
