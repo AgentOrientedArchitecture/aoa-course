@@ -30,17 +30,18 @@ Published as [`lewisdog/aoa-course-decision-0.6b`](https://huggingface.co/lewisd
 trained for 7 minutes on this repo's own examples: the 18 task→capability pairs in the planner's `WORKFLOWS`,
 hand-written goal phrasings per workflow (also the workflow-choice labels), local paraphrases of goals and task
 purposes, `none_of_these` records (gold card removed, or candidates restricted to the Session 1 allowlist),
-wrong-card fit negatives, and off-topic requests labelled `none_of_these`. Held-out test, v0.3 (453 questions,
+wrong-card fit negatives, and off-topic requests labelled `none_of_these`. Held-out test, v0.4 (637 questions,
 human-written originals never trained on):
 
 | question | accuracy | notes |
 |---|---|---|
-| workflow (Choice, 6 workflows + none) | 100% originals, 98.3% paraphrases | 100% refusal on 22 off-topic requests |
-| agent (Choice, 16 cards + none) | 99% | 97.4% abstention when the gold card is absent, 100% under the Session 1 allowlist |
-| fits (Noul) | 98-99% | |
-| overall | 98.7%, ECE 0.006, 0.2% confident errors | ~23 ms per question on a GB10 GPU; 1-2.5 s per question on CPU in this container |
+| workflow (Choice, 6 workflows + none) | 100% originals, 98.1% paraphrases | 100% refusal on 20 off-topic requests; real questions ("Why does observed behaviour matter…?") classify as knowledge-query |
+| agent (Choice, 16 cards + none) | 100% | 96.1% abstention when the gold card is absent, 100% under the Session 1 allowlist |
+| fits (Noul) | 99-100% | |
+| overall | 99.2%, ECE 0.004, 0.2% confident errors | ~23 ms per question on a GB10 GPU; 1-2.5 s per question on CPU in this container |
 
 Live in the Session 1 stack: a free-text "Is Jordan a good fit for the senior data engineer role?" is classified
-`cv-fit` at 1.0 and each task bound at 1.0; "Book me a flight to Lisbon" is refused at classification with a
-trace. Mount a run at `models/run` to override, or set `DECISION_MODEL_RUN` to a Hub id. The training harness
+`cv-fit` at 1.0 and each task bound at 1.0; "What does the wiki say about why observed behaviour matters…?" is
+classified `knowledge-query` and then stops at allocation because Session 1 registers no wiki capabilities;
+"Book me a flight to Lisbon" is refused at classification with a trace. Mount a run at `models/run` to override, or set `DECISION_MODEL_RUN` to a Hub id. The training harness
 (dataset builder, Kev training, benchmark, GGUF export) lives in the `aoa-decide` repository.
