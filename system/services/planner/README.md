@@ -189,6 +189,11 @@ approved AU, every required input resolves, the final task produces markdown) ra
 task list, and the decision model binds each task as above. For `knowledge-query` the goal doubles as the
 question; the estate workflows default `estate_root`. The studio's **Goal** tab submits this shape.
 
+Classification rule the course allocator is trained to: a *question* is a `knowledge-query` whether or not the wiki
+can answer it (the wiki evaluator decides that downstream and the reporter says so); `none_of_these` is for
+actions and artefacts no workflow produces (booking, ordering, coding, translating, playing music). Refusing at
+classification is for "this system does not do that", not "the wiki may not know".
+
 Deterministic strategy (Sessions 3 and 4) still applies after classification: the chosen workflow's fixed
 plan runs, so intent classification is real while execution stays reliable.
 
