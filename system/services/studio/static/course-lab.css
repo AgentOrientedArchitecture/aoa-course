@@ -13,3 +13,6 @@
 #course-cases ul { list-style:none; padding:0; display:grid; gap:8px; }
 #course-cases button { text-align:left; }
 .drop-field small { color:#52635b; line-height:1.5; }
+/* The pane scrolls as a whole; keep long evidence sections from shrinking and
+   painting over the event-details control below them. */
+#trace-pane > * { flex-shrink: 0; }
