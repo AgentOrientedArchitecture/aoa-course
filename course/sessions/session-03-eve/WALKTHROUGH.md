@@ -1,5 +1,7 @@
 # Session 3 walkthrough — build natively in EVE, then adopt into AOA
 
+For the revised course, use the [connected extension](DIRECTORY.md) for its launch command and additional checkpoints. The original walkthrough remains below.
+
 Session 3 starts with a blank authored workspace. You first create and accept an
 agent with EVE's own CLI. Only after the native agent works do you adopt it into
 AOA and run it as part of the existing CV-fit workflow.

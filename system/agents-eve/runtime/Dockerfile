@@ -4,7 +4,8 @@
 # workshop's already-pinned dependencies with venue networking disabled.
 FROM node:24-slim
 
-ENV NODE_ENV=development \
+ENV NPM_CONFIG_CACHE=/tmp/aoa-npm-cache \
+    NODE_ENV=development \
     EVE_APP_ROOT=/workshop \
     EVE_PORT=3000 \
     PATH=/app/node_modules/.bin:$PATH
@@ -12,7 +13,7 @@ ENV NODE_ENV=development \
 WORKDIR /app
 
 COPY runtime/package.json runtime/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund && chmod -R a+rwX /tmp/aoa-npm-cache
 
 # The reusable AOA bridge is platform plumbing, not part of the participant's
 # EVE project. The generic entry point derives JSON input/output mapping from

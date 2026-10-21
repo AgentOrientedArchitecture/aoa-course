@@ -1,5 +1,7 @@
 # Session 2 walkthrough — the same shape becomes a knowledge system
 
+For the revised course, use the [connected extension](DECISIONS.md) for its launch command and additional checkpoints. The original walkthrough remains below.
+
 No new architecture: the ingest and query workflows reuse the pattern from
 Session 1 (parse → judge → report), and the `wiki-parser` runtime runs the
 **same parser code** as `cv-parser` — different capability card, different

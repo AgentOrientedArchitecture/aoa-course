@@ -15,7 +15,7 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator
@@ -24,6 +24,9 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+
+from allocation import allocate, validate_composition
+from case_store import CaseStore, CaseConflict
 
 logger = logging.getLogger("planner")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -41,6 +44,11 @@ RESULT_REVIEWER_ID = os.environ.get(
     "RESULT_REVIEWER_ID",
     os.environ.get("PLAN_APPROVER_ID", "urn:aoa:human:course-result-reviewer"),
 ).strip()
+
+
+ALLOCATION_MODE = os.getenv("ALLOCATION_MODE", "original")
+DURABLE_CASES = os.getenv("DURABLE_CASES", "false").lower() == "true"
+case_store = CaseStore(Path(os.getenv("CASE_DB_PATH", str(TRACES_DIR / "cases.sqlite3")))) if DURABLE_CASES else None
 
 
 # ----------------------------------------------------------------------
@@ -487,6 +495,12 @@ def _trace_path(trace_id: str) -> Path:
 async def _record(record: dict[str, Any]) -> None:
     async with state.record_lock:
         record.setdefault("ts", _now_iso())
+        if case_store:
+            run = state.runs.get(record["trace_id"])
+            await asyncio.to_thread(case_store.record, record, asdict(run) if run else None)
+            await asyncio.to_thread(case_store.project, record["trace_id"], TRACES_DIR)
+            await state.broadcast(record)
+            return
         line = json.dumps(record) + "\n"
         path = _trace_path(record["trace_id"])
         # File IO is sync but tiny — a thread keeps the event loop responsive.
@@ -1354,22 +1368,35 @@ async def _execute_prepared_run(run: PreparedRun) -> dict[str, Any]:
         run.draft_outputs = final_outputs
         run.result_digest = _result_digest(run.plan_digest, run.draft_outputs)
         run.status = "draft-held"
-        await _record({
+        records = [
+            {
             "trace_id": run.trace_id,
             "step": "result-draft",
             "workflow": run.workflow,
             "plan_digest": run.plan_digest,
             "result_digest": run.result_digest,
             "outputs": run.draft_outputs,
-        })
-        await _record({
+            },
+            {
             "trace_id": run.trace_id,
             "step": "result-hold",
             "workflow": run.workflow,
             "plan_digest": run.plan_digest,
             "result_digest": run.result_digest,
             "review_required": True,
-        })
+            },
+        ]
+        if case_store:
+            async with state.record_lock:
+                for record in records:
+                    record.setdefault("ts", _now_iso())
+                await asyncio.to_thread(case_store.record_many, records, asdict(run))
+                await asyncio.to_thread(case_store.project, run.trace_id, TRACES_DIR)
+                for record in records:
+                    await state.broadcast(record)
+        else:
+            for record in records:
+                await _record(record)
         return {
             "draft_outputs": run.draft_outputs,
             "result_digest": run.result_digest,
@@ -1455,8 +1482,28 @@ async def _run_workflow(
         })
 
         cards_by_id = {card["id"]: card for card in capability_cards if card.get("id")}
+        if ALLOCATION_MODE == "decision":
+            aliases = {task.selected_capability: task.id for task in plan_result.tasks if task.selected_capability}
+            for task in plan_result.tasks:
+                task.input_map = {name: ".".join([aliases.get(path.split(".")[0], path.split(".")[0]), *path.split(".")[1:]]) for name, path in task.input_map.items()}
         for task in plan_result.tasks:
-            if task.selected_capability:
+            if ALLOCATION_MODE == "decision":
+                baseline = next((item for item in workflow.tasks if item.id == task.id), None)
+                reference = cards_by_id.get(_deterministic_capability_for_task(baseline)) if baseline else None
+                if not reference:
+                    raise HTTPException(409, "No authoritative contract for the proposed responsibility")
+                try:
+                    selected_card, evidence = await allocate(task, reference, capability_cards, intent, client)
+                except (httpx.HTTPError, ValueError) as exc:
+                    await _record({"trace_id": trace_id, "step": "allocation-held", "task": task.id, "reason": "decision service unavailable or returned an invalid response", "error_type": type(exc).__name__})
+                    raise HTTPException(503, "Decision service unavailable; no AU was invoked. Check provider configuration and retry.") from exc
+                await _record({"trace_id": trace_id, "step": "allocation", **evidence})
+                if selected_card is None:
+                    await _record({"trace_id": trace_id, "step": "allocation-held", "task": task.id, "reason": evidence["outcome"]})
+                    raise HTTPException(409, "Allocation needs review or clarification; no AU was invoked")
+                candidates = [{"card": selected_card, "score": None, "reasons": [evidence["outcome"]]}]
+                query = {"strategy": "contract-eligibility-then-bounded-decision", "task": _task_trace(task)}
+            elif task.selected_capability:
                 card = cards_by_id.get(task.selected_capability)
                 if card is None:
                     message = f"planner selected missing capability {task.selected_capability}"
@@ -1531,6 +1578,16 @@ async def _run_workflow(
                 "card": card,
             })
 
+        if ALLOCATION_MODE == "decision":
+            try:
+                validation = validate_composition(resolved_steps, workflow, cards_by_id, _deterministic_capability_for_task, intent.get("inputs", {}))
+            except ValueError as exc:
+                await _record({"trace_id": trace_id, "step": "composition-validation", "valid": False, "error": str(exc)})
+                raise HTTPException(409, str(exc)) from exc
+            await _record({"trace_id": trace_id, "step": "composition-validation", **validation})
+            for step in resolved_steps:
+                await _record({"trace_id": trace_id, "step": "allocation-accepted", "task": step.task.id, "accepted_choice": step.capability})
+
         run = PreparedRun(
             trace_id=trace_id,
             workflow=workflow.name,
@@ -1539,6 +1596,8 @@ async def _run_workflow(
             plan_digest=_plan_digest(workflow.name, intent, resolved_steps),
             release_policy=_release_policy(workflow.name, intent),
         )
+        state.runs[trace_id] = run
+        state.run_locks.setdefault(trace_id, asyncio.Lock())
         await _record({
             "trace_id": trace_id,
             "step": "plan",
@@ -1548,8 +1607,6 @@ async def _run_workflow(
             "release_policy": run.release_policy,
             "plan": _resolved_plan_payload(resolved_steps),
         })
-        state.runs[trace_id] = run
-        state.run_locks.setdefault(trace_id, asyncio.Lock())
         run.governance = await _evaluate_prepared_plan(client, run, governance_card)
         decision = run.governance.get("decision")
 
@@ -1608,12 +1665,22 @@ app = FastAPI()
 @app.on_event("startup")
 async def _startup() -> None:
     TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    if case_store:
+        for saved in case_store.cases():
+            run = _restore_case(saved)
+            state.runs[run.trace_id] = run
+            state.run_locks[run.trace_id] = asyncio.Lock()
+            if run.status in {"running", "preparing"}:
+                run.status = "interrupted"
+                await _record({"trace_id": run.trace_id, "step": "case-interrupted", "reason": "Restart during application execution; external invocation outcome may be unknown. No automatic rerun."})
+            else:
+                await asyncio.to_thread(case_store.project, run.trace_id, TRACES_DIR)
     logger.info("planner ready: registry=%s traces=%s", REGISTRY_URL, TRACES_DIR)
 
 
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
-    return {"ok": True, "workflows": sorted(WORKFLOWS), "planner_strategy": PLANNER_STRATEGY}
+    return {"ok": True, "workflows": sorted(WORKFLOWS), "planner_strategy": PLANNER_STRATEGY, "allocation_mode": ALLOCATION_MODE, "durable_cases": DURABLE_CASES}
 
 
 @app.post("/intent")
@@ -1627,6 +1694,17 @@ async def intent(request: Request) -> JSONResponse:
         "status": status,
         "outputs": outputs,
     })
+
+
+def _restore_case(saved):
+    data = dict(saved)
+    data["resolved_steps"] = [ResolvedStep(task=TaskSpec(**item["task"]), capability=item["capability"], card=item["card"]) for item in saved["resolved_steps"]]
+    return PreparedRun(**data)
+
+
+@app.get("/runs")
+async def saved_runs():
+    return {"durable": DURABLE_CASES, "runs": [_run_snapshot(run) for run in state.runs.values()]}
 
 
 @app.get("/runs/{trace_id}")
@@ -1654,6 +1732,18 @@ async def review_run(trace_id: str, request: Request) -> JSONResponse:
 
     lock = state.run_locks.setdefault(trace_id, asyncio.Lock())
     async with lock:
+        if case_store:
+            async with state.record_lock:
+                try:
+                    saved, records = await asyncio.to_thread(case_store.review, trace_id, decision, expected_digest, review_notes, RESULT_REVIEWER_ID, _now_iso())
+                except CaseConflict as exc:
+                    raise HTTPException(409, str(exc)) from exc
+                run = _restore_case(saved)
+                state.runs[trace_id] = run
+                await asyncio.to_thread(case_store.project, trace_id, TRACES_DIR)
+                for record in records:
+                    await state.broadcast(record)
+                return JSONResponse(_run_snapshot(run))
         if run.review is not None:
             same_review = (
                 run.review.get("decision") == decision

@@ -293,6 +293,7 @@ function selectGovernanceActor(actorId, cardId = "") {
 // ---------------------------------------------------------------------------
 
 function appendTraceRow(record) {
+  window.dispatchEvent(new CustomEvent("aoa-course-record", {detail:record}));
   // Reset the trace pane when a new flow starts.
   if (record.step === "start") {
     state.currentTraceId = record.trace_id;
@@ -397,6 +398,11 @@ function applyLifecycleEvent(record) {
     if (!life.fallbackDetail && life.fallbackReason !== (record.fallback_reason || "")) {
       life.fallbackDetail = record.fallback_reason || "";
     }
+    return;
+  }
+  if (record.step === "composition-validation") {
+    life.validation = record;
+    if (!record.valid) { life.error = record.error || "Composition rejected"; life.status = "error"; }
     return;
   }
   if (record.step === "discover") {
@@ -932,6 +938,7 @@ function isResponsibilityRecord(record) {
     "start",
     "capability-context",
     "plan-proposal",
+    "composition-validation",
     "governance-invoke",
     "plan-governance",
     "governance-release",
@@ -974,6 +981,9 @@ function traceEventView(record) {
   if (step === "plan-proposal") {
     const validation = record.validation && record.validation.valid ? "validated" : record.fallback_reason ? "fallback" : "pending validation";
     return traceView(layer, status, "Planner proposed route", `${record.source || "planner"} plan, ${validation}`, latency);
+  }
+  if (step === "composition-validation") {
+    return traceView("planner", record.valid ? "done" : "error", record.valid ? "Resolved composition validated" : "Resolved composition rejected", record.scope || record.error || "", "");
   }
   if (step === "governance-invoke") {
     return traceView("governance", status, `Evaluating resolved plan`, record.capability || "plan governance", record.plan_digest || "");
@@ -1754,6 +1764,7 @@ function buildIntentPayload(status) {
     return {
       kind: state.mode,
       cv_text: cv,
+      allocation_brief: document.getElementById("allocation-brief")?.value || "",
       jd_text: jd,
       cv_name: state.cvName || "cv.txt",
       jd_name: state.jdName || "jd.txt",
@@ -1951,4 +1962,12 @@ window.addEventListener("DOMContentLoaded", () => {
   loadInitialRegistry();
   if (enabledWorkflows.has("wiki-graph")) void loadWikiGraph();
   connectEvents();
+});
+
+// Replay saved evidence through the same module-owned rendering path.
+window.addEventListener("aoa-course-replay", ({detail: records}) => {
+  state.currentTraceId = null;
+  state.records = [];
+  state.lifecycle = emptyLifecycle();
+  for (const record of records) appendTraceRow(record);
 });

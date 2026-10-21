@@ -8,6 +8,7 @@ serves the static frontend.
 from __future__ import annotations
 
 import asyncio
+from markdown_it import MarkdownIt
 import json
 import logging
 import os
@@ -187,6 +188,7 @@ async def index(request: Request) -> HTMLResponse:
             "planner_url": PLANNER_URL,
             "studio_config": {
                 "workflows": ENABLED_WORKFLOWS,
+                "revised": os.getenv("AOA_REVISED", "false").lower() == "true",
                 "allow_wiki_reset": ALLOW_WIKI_RESET,
             },
         },
@@ -216,6 +218,20 @@ async def get_capability(capability_id: str) -> JSONResponse:
             return JSONResponse(r.json())
         except httpx.HTTPError as exc:
             return JSONResponse({"error": repr(exc)}, status_code=502)
+
+
+@app.get("/api/saved-cases")
+async def saved_cases():
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(f"{PLANNER_URL}/runs")
+        return JSONResponse(response.json(), status_code=response.status_code)
+
+
+@app.get("/api/course-traces/{trace_id}")
+async def course_trace(trace_id: str):
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(f"{PLANNER_URL}/traces/{trace_id}")
+        return JSONResponse(response.json(), status_code=response.status_code)
 
 
 @app.get("/api/runs/{trace_id}")
@@ -337,6 +353,7 @@ async def submit_intent(request: Request) -> JSONResponse:
             key: str(form.get(key) or "")
             for key in (
                 "cv_text",
+                "allocation_brief",
                 "jd_text",
                 "note_text",
                 "question",
@@ -406,6 +423,7 @@ async def _submit_cv_fit(
 
     planner_body = {
         "kind": kind,
+        "selection_context": inputs.get("allocation_brief") or jd_text[:16000] or "Assess CV fit against the supplied job description",
         "use_context": {
             "domain": "employment",
             "data_subjects": ["candidates"],
@@ -518,6 +536,21 @@ async def events() -> StreamingResponse:
             hub.subscribers.discard(queue)
 
     return StreamingResponse(_gen(), media_type="text/event-stream")
+
+
+
+
+
+@app.get("/course/{document:path}", response_class=HTMLResponse)
+async def course_document(document: str):
+    root = Path(os.getenv("COURSE_DOCS_DIR", "/data/course")).resolve()
+    path = (root / document).resolve()
+    if not path.is_relative_to(root) or path.suffix != ".md" or not path.is_file():
+        raise HTTPException(404, "Course document not found")
+    rendered = MarkdownIt("commonmark", {"html": False}).enable("table").render(path.read_text())
+    return HTMLResponse("<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<title>AOA course</title><style>body{font:17px/1.65 system-ui;max-width:1000px;margin:40px auto;padding:0 24px;color:#21352e;background:#fafbf9}a{color:#245e89}pre{overflow:auto;background:#edf1ed;padding:18px;border-radius:8px}code{font-size:.86em}table{border-collapse:collapse;width:100%;font-size:.9em}td,th{border:1px solid #d0d9d3;padding:10px;text-align:left;vertical-align:top}h1,h2,h3{line-height:1.2}nav{padding-bottom:20px;border-bottom:1px solid #ccd7d0}</style>"
+        + "<nav><a href='/'>Studio</a> · <a href='/course/REVISED-COURSE.md'>Course guide</a> · <a href='/course/REVISED-INSTRUCTOR.md'>Instructor runbook</a> · <a href='/course/REVISED-VALIDATION.md'>Validation</a></nav><main>" + rendered + "</main></html>")
 
 
 if __name__ == "__main__":

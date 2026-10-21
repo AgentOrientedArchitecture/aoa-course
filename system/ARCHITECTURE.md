@@ -496,3 +496,14 @@ Qwen-family model, run locally through Ollama or through a service provider.
 Switching model, provider, or hosting location is a `.env` change and a
 Compose restart away. The registry, the agents, the capability cards, and the
 planner all stay still.
+
+
+## Revised course profile (October 2026)
+
+`scripts/revised-up.sh` opts into contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. Original launchers retain the original planner allocation and promotion paths. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
+
+Cerebras generation and TypeSafe decisions have distinct adapters and configuration. Ollama can supply either generation or an explicitly unscored decision baseline. The decision service does not grant authority or invoke an AU.
+
+With `DURABLE_CASES=true`, SQLite persists case snapshots and ordered events; the earlier in-memory description applies to the original profile. Draft/hold and review/release are transactional. JSONL remains a projection for existing audit consumers. Interrupted invocation is marked for inspection, not blindly replayed. The course runs a single planner process; its in-memory request locks are not a distributed concurrency design.
+
+AGNTCY Directory v1.8.0 is an optional local service for actual OASF push/pull/search. Directory declarations never mutate local lifecycle approval. The contract-comparison tool checks the adopted card and leaves task eligibility and governance to the existing estate.

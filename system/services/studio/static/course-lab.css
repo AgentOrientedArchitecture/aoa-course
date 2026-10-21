@@ -1,0 +1,15 @@
+.course-inspector { border-top: 3px solid #507568; }
+.course-help { line-height: 1.5; max-width: 85ch; color: #53615e; }
+.course-diagram { overflow-x: auto; margin: 12px 0; }
+.course-diagram svg { min-width: 660px; width: 100%; display: block; font-family: system-ui,sans-serif; color: #243b33; }
+.course-decision { border: 1px solid #cbd8d2; border-radius: 8px; padding: 12px; margin: 12px 0; }
+.course-decision > summary { cursor: pointer; font-weight: 600; }
+.course-decision table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13px; }
+.course-decision th,.course-decision td { text-align:left; padding: 9px; vertical-align:top; border-bottom: 1px solid #d9e2dc; }
+.course-decision th:first-child,.course-decision td:first-child { min-width: 160px; }
+.course-decision th:last-child,.course-decision td:last-child { min-width: 110px; }
+.course-table-scroll { overflow-x:auto; }
+.course-decision pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+#course-cases ul { list-style:none; padding:0; display:grid; gap:8px; }
+#course-cases button { text-align:left; }
+.drop-field small { color:#52635b; line-height:1.5; }

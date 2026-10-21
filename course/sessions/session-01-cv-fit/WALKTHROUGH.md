@@ -1,5 +1,7 @@
 # Session 1 walkthrough — build, inspect, then change a live agent
 
+For the revised course, use the [connected extension](DECISIONS.md) for its launch command and additional checkpoints. The original walkthrough remains below.
+
 The CV-fit workflow: three governed agents (`parser-cv` → `evaluator-cv` →
 `reporter-cv-fit`) co-operating through the registry, planner, and studio.
 This walkthrough is self-contained; ~25 minutes at an unhurried pace.

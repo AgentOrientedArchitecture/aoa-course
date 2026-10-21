@@ -20,6 +20,8 @@ code, using ``tool-wiki-store`` for cited regulation passages; their
 from __future__ import annotations
 
 import json
+import os
+from _base.decisions import promote as decide_promotion
 import time as _time
 
 from _base.base import Context, run
@@ -45,7 +47,7 @@ WIKI_QUERY_SYSTEM_PROMPT = (
 
 
 async def handle(capability_id: str, inputs: dict, ctx: Context) -> dict:
-    if capability_id == "evaluator-cv":
+    if capability_id in {"evaluator-cv", "evaluator-cv-data", "evaluator-cv-frontend"}:
         return await _evaluate_cv(inputs, ctx)
     if capability_id == "evaluator-promote":
         return await _promote_note(inputs, ctx)
@@ -108,6 +110,9 @@ async def _promote_note(inputs: dict, ctx: Context) -> dict:
         return error_envelope("parsed_note (object) is required")
     if not isinstance(source_path, str) or not source_path.strip():
         return error_envelope("source_path is required")
+
+    if os.getenv("WIKI_DECISION_MODE", "generation") == "typed":
+        return await decide_promotion(parsed_note, source_path, ctx.skills)
 
     prompt = (
         f"{ctx.skills}\n\n"

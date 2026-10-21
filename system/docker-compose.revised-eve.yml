@@ -1,0 +1,7 @@
+services:
+  eve-workshop-native:
+    environment:
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+  eve-workshop-wrapped:
+    environment:
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}

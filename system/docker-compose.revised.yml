@@ -1,0 +1,124 @@
+# Additive profile: use scripts/revised-up.sh. Original profiles remain available.
+x-generation: &generation
+  OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+x-decision: &decision
+  DECISION_URL: http://decision:7250
+  DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
+  DECISION_MIN_PROBABILITY: ${DECISION_MIN_PROBABILITY:-0.65}
+  DECISION_ALLOW_UNSCORED: ${DECISION_ALLOW_UNSCORED:-false}
+services:
+  registry:
+    environment:
+      REGISTRY_CARD_ALLOWLIST: ${COURSE_REGISTRY_ALLOWLIST:-tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-notes,parser-query,parser-estate,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-promote,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-ingest-summary,reporter-answer,reporter-agent-evidence,reporter-flow-audit,interviewer-questions}
+  decision:
+    profiles: [session1, session2, session3, session4]
+    build: ./services/decision
+    image: aoa-course/decision:latest
+    container_name: aoa-decision
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:7250:7250"]
+    environment:
+      DECISION_LOCAL_CONTEXT_TOKENS: ${DECISION_LOCAL_CONTEXT_TOKENS:-8192}
+      DECISION_PROVIDER: ${DECISION_PROVIDER:-typesafe}
+      DECISION_MODEL: ${DECISION_MODEL:-jev-1.13.0}
+      DECISION_BASE_URL: ${DECISION_BASE_URL:-https://api.typesafe.ai}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      DECISION_API_KEY: ${DECISION_API_KEY:-}
+      DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
+  planner:
+    environment:
+      <<: [*generation, *decision]
+      ALLOCATION_MODE: decision
+      DURABLE_CASES: "true"
+      CASE_DB_PATH: /data/traces/cases.sqlite3
+  studio:
+    volumes:
+      - ../course:/data/course:ro
+    environment:
+      AOA_REVISED: "true"
+  cv-parser:
+    environment: *generation
+  wiki-parser:
+    environment: *generation
+  estate-parser:
+    environment: *generation
+  evaluator:
+    environment:
+      <<: [*generation, *decision]
+      WIKI_DECISION_MODE: typed
+      # Explicitly retain every original capability, with specialists in their own runtimes.
+      CAPABILITY_ALLOWLIST: ${COURSE_EVALUATOR_ALLOWLIST:-evaluator-cv,evaluator-promote,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence}
+  reporter:
+    environment: *generation
+
+  cv-data-evaluator:
+    profiles: [session1, session2, session3, session4]
+    build:
+      context: ./agents
+      dockerfile: evaluator/Dockerfile
+    image: aoa-course/evaluator:latest
+    container_name: aoa-cv-data-evaluator
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./agents/evaluator/capabilities:/app/capabilities:ro
+      - ./inbox:/data/inbox:ro
+    environment:
+      <<: *generation
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:cv-data-evaluator
+      AGENT_NAME: cv-data-evaluator
+      AGENT_HOST: cv-data-evaluator
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: evaluator-cv-data
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL:-gpt-oss-120b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-document-text:
+        condition: service_started
+
+  cv-frontend-evaluator:
+    profiles: [session1, session2, session3, session4]
+    build:
+      context: ./agents
+      dockerfile: evaluator/Dockerfile
+    image: aoa-course/evaluator:latest
+    container_name: aoa-cv-frontend-evaluator
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./agents/evaluator/capabilities:/app/capabilities:ro
+      - ./inbox:/data/inbox:ro
+    environment:
+      <<: *generation
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:cv-frontend-evaluator
+      AGENT_NAME: cv-frontend-evaluator
+      AGENT_HOST: cv-frontend-evaluator
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: evaluator-cv-frontend
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL:-gpt-oss-120b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-document-text:
+        condition: service_started

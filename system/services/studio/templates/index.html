@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <title>AOA Studio</title>
   <link rel="stylesheet" href="/static/style.css">
+  {% if studio_config.revised %}<link rel="stylesheet" href="/static/course-lab.css">{% endif %}
 </head>
 <body>
   <header>
-    <h1>AOA Studio</h1>
+    <h1>AOA Studio</h1>{% if studio_config.revised %}<a href="/course/REVISED-COURSE.md" target="_blank" rel="noopener">Course guide</a>{% endif %}
     <span id="status" class="status disconnected">connecting…</span>
   </header>
 
@@ -231,5 +232,6 @@
     window.STUDIO_CONFIG = {{ studio_config | tojson }};
   </script>
   <script type="module" src="/static/app.js"></script>
+  {% if studio_config.revised %}<script src="/static/course-lab.js"></script>{% endif %}
 </body>
 </html>

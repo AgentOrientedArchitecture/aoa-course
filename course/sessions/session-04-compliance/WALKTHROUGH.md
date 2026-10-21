@@ -1,5 +1,7 @@
 # Session 4 walkthrough — card check, held result, and flow audit
 
+For the revised course, use the [connected extension](DURABLE-CASES.md) for its launch command and additional checkpoints. The original walkthrough remains below.
+
 Session 4 has exactly three core governance learning stages: **Agent card
 check**, **CV fit**, and **Flow audit**. Studio also provides optional **Graph**
 and **Ask** evidence-exploration utilities; they are not extra stages.

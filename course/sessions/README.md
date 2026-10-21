@@ -1,5 +1,7 @@
 # Course sessions
 
+**Revised course:** [Cerebras, TypeSafe and the four connected live demos](../REVISED-COURSE.md). The original material below is retained.
+
 One folder per hands-on session. Each folder follows the same layout:
 
 - **`WALKTHROUGH.md`** — the learner instructions for the session. Start here.

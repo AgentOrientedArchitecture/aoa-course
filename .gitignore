@@ -38,3 +38,12 @@ system/agents-eve/workshop/agent/
 system/agents-eve/workshop/capability-card.yaml
 system/agents-eve/workshop/.eve/
 system/agents-eve/workshop/.workflow-data/
+
+# Revised course local tools, checks and durable state
+.course-tools/
+.course-data/
+.venv-course/
+.env.revised
+system/services/planner/traces/*.sqlite3*
+# Preserved local training artefacts from the earlier decision experiment
+system/services/decision/models/
