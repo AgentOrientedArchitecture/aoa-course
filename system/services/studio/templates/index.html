@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <title>AOA Studio</title>
-  <link rel="stylesheet" href="/static/style.css">
-  {% if studio_config.revised %}<link rel="stylesheet" href="/static/course-lab.css">{% endif %}
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  {% if studio_config.revised %}<link rel="stylesheet" href="/static/course-lab.css?v={{ asset_version }}">{% endif %}
 </head>
 <body>
   <header>
@@ -231,7 +231,7 @@
   <script>
     window.STUDIO_CONFIG = {{ studio_config | tojson }};
   </script>
-  <script type="module" src="/static/app.js"></script>
-  {% if studio_config.revised %}<script src="/static/course-lab.js"></script>{% endif %}
+  <script type="module" src="/static/app.js?v={{ asset_version }}"></script>
+  {% if studio_config.revised %}<script src="/static/course-lab.js?v={{ asset_version }}"></script>{% endif %}
 </body>
 </html>

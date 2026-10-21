@@ -8,6 +8,7 @@ serves the static frontend.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from markdown_it import MarkdownIt
 import json
 import logging
@@ -61,6 +62,7 @@ ENABLED_WORKFLOWS = _configured_workflows()
 INBOX_DIR = Path(os.environ.get("INBOX_DIR", "/data/inbox"))
 
 BASE_DIR = Path(__file__).parent
+ASSET_VERSION = hashlib.sha256(b"".join((BASE_DIR / "static" / name).read_bytes() for name in ("app.js", "course-lab.js", "course-lab.css"))).hexdigest()[:12]
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -184,6 +186,7 @@ async def index(request: Request) -> HTMLResponse:
         "index.html",
         {
             "request": request,
+            "asset_version": ASSET_VERSION,
             "registry_url": REGISTRY_URL,
             "planner_url": PLANNER_URL,
             "studio_config": {
