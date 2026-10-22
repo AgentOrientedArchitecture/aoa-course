@@ -8,6 +8,39 @@ evidence exploration; they are not additional governance stages.
 
 ## What Studio shows
 
+The view bar provides **Studio · all controls**, **Capability cards**, **AU
+selection**, and **Run review**. Studio retains the original forms, registry,
+dependency diagram, trace, graph and exact-result review controls. The focused
+views present the same data; they do not execute agents or change allocations.
+
+- Capability cards open in **Readable** view. **Complete JSON** retains the
+  entire fetched record. Both views use the same object; unknown fields remain
+  available under technical metadata and in JSON. **Copy JSON** uses the browser
+  clipboard where permitted, otherwise opens JSON for manual selection.
+- AU selection separates proposed task, eligible and excluded candidates,
+  choice, whole-plan composition validation and accepted binding. Passing
+  validation must precede the accepted-binding record. Missing events are
+  described as missing, never inferred as success. The original allocation and
+  wiki-promotion evidence remains expandable below the dependency diagram.
+- Run review shows each recorded AU response, its complete output JSON,
+  observed signals and matching invocation inputs. File paths remain source
+  references; they do not imply the file contents are included. Review prompts
+  are questions for the learner, not automated findings about output quality.
+- A held draft still uses the original exact-result review controls, visible
+  below the Run review view. Release and quarantine retain their existing
+  semantics and required reviewer notes.
+
+Open a saved case from **Studio** or **AU selection**. The persistent banner
+identifies recorded evidence. While inspecting that snapshot, unrelated live
+events cannot replace the selected case. **Refresh saved evidence** reads the
+latest stored events; **Follow live runs**, or submitting a new intent, resumes
+the live feed. Neither inspection action starts a new workflow. Human review
+actions remain explicit writes to the exact selected result.
+
+The page uses one main scroll, wrapping identifiers and keyboard-operable
+capability selectors. The full registry and every configured course workflow
+remain accessible in Studio.
+
 - **Registry** lists registered capabilities, Agent IDs, lifecycle actors and
   status, version, kind, and current `skills_hash`.
 - **Intent Studio** renders intent, capability context, resolved tasks,
@@ -92,6 +125,11 @@ in the governance learning arc.
 
 ## Course-state limitation
 
+The following in-memory limitation describes the original profile. The revised
+profile with `DURABLE_CASES=true` persists cases in SQLite and can reopen saved
+evidence after a planner restart; see the revised-profile section of
+`system/ARCHITECTURE.md`. Studio's saved-case list reports which mode is active.
+
 Studio proxies active-run reads and result reviews to planner memory. If the
 planner restarts, the trace JSONL remains but an existing held draft can no
 longer be reviewed. Submit a new intent and review its new draft. This is not
@@ -131,6 +169,17 @@ approval into result review.
 | `GET` | `/healthz` | `{ "ok": true }` |
 
 ## Running locally
+
+Frontend evidence projections have dependency-free Node tests:
+
+```bash
+node --test tests/test_studio_inspection.mjs
+```
+
+For a browser check, use a saved case. Toggle Readable/Complete JSON, inspect
+eligible and excluded AUs, compare choice with validation and acceptance, and
+select each recorded output in Run review. Verify original forms, raw trace,
+graph and exact-result review remain accessible for the relevant session.
 
 Start and seed Session 4 from the repository root.
 

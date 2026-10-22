@@ -5,8 +5,8 @@
   host.innerHTML = `<div class="section-head"><span class="section-label">Plan and decisions</span><button type="button" id="course-saved">Open a saved case</button></div>
     <p class="course-help">Inspect the proposed work, eligible AUs and the accepted bindings. A model choice becomes executable only after the whole plan passes validation.</p>
     <div id="course-diagram" class="course-diagram">Run a workflow to see its recorded plan.</div>
-    <div id="course-decisions"></div><div id="course-cases"></div>`;
-  document.getElementById("lifecycle").prepend(host);
+    <details class="course-raw-allocations"><summary>Full allocation and promotion evidence</summary><div id="course-decisions"></div></details><div id="course-cases"></div>`;
+  document.getElementById("allocation-inspector").after(host);
   const brief = document.createElement("label");
   brief.className = "drop-field";
   brief.innerHTML = `<span class="drop-label"><strong>Assessment emphasis</strong></span><textarea id="allocation-brief" rows="2" placeholder="For example: assess production data pipelines and data reliability, or frontend accessibility and design systems."></textarea><small>The planner uses this brief to choose among compatible assessment AUs. Candidate descriptions are declarations; the exercise measures their results.</small>`;
@@ -14,6 +14,11 @@
 
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   let active = null, records = [];
+  window.addEventListener("aoa-course-reset", () => {
+    active = null; records = [];
+    document.getElementById("course-diagram").textContent = "No recorded plan in this case.";
+    document.getElementById("course-decisions").replaceChildren();
+  });
   window.addEventListener("aoa-course-record", ({detail: record}) => {
     if (record.step === "start") { active = record.trace_id; records = []; }
     if (record.trace_id !== active) return;
@@ -50,7 +55,7 @@
     let content=allocations.map(record=>{
       const decision=record.decision, candidates=record.candidates || [];
       return `<details class="course-decision" ${record.model_called?'open':''}><summary>${esc(record.task.replaceAll('-',' '))} · ${record.model_called?'model selection':'contract selection'}</summary>
-        <p>${record.model_called?`${esc(decision.provider)} / ${esc(decision.model)} · ${Number(decision.latency_seconds).toFixed(2)} s · ${decision.winner_probability==null?'No probability estimate':`Model probability ${(decision.winner_probability*100).toFixed(1)}%`}`:'Only one eligible capability; no decision-model call.'}</p>
+        <p>${record.model_called?`${esc(decision?.provider || 'provider not recorded')} / ${esc(decision?.model || 'model not recorded')} · ${Number.isFinite(decision?.latency_seconds) ? decision.latency_seconds.toFixed(2)+' s' : 'Latency not recorded'} · ${decision?.winner_probability==null?'No probability estimate':`Model probability ${(decision?.winner_probability*100).toFixed(1)}%`}`:'Only one eligible capability; no decision-model call.'}</p>
         <div class="course-table-scroll"><table><thead><tr><th>Eligible AU</th><th>Declared purpose</th><th>Model probability</th></tr></thead><tbody>${candidates.filter(c=>c.eligible).map(c=>`<tr><td>${esc(c.id)}</td><td>${esc(c.purpose)}</td><td>${decision?.probabilities?.[c.id]==null?'—':`${(decision.probabilities[c.id]*100).toFixed(1)}%`}</td></tr>`).join('')}</tbody></table></div>
         ${decision?.probabilities?.no_suitable_capability==null?'':`<p>No suitable capability: ${(decision.probabilities.no_suitable_capability*100).toFixed(1)}%. Model probability is not a guarantee of correctness.</p>`}
         <p>Returned choice: <strong>${esc(record.choice||'none')}</strong>. Accepted binding: <strong>${esc(accepted.get(record.task)||'none')}</strong>.</p>
@@ -78,7 +83,9 @@
           if(!response.ok)throw new Error('Could not load saved evidence');
           const body=await response.json();
           window.dispatchEvent(new CustomEvent("aoa-course-replay", {detail:body.records}));
-          target.insertAdjacentHTML('afterbegin','<p role="status">Saved evidence loaded. Review controls below refer to this exact saved result.</p>');
+          let notice=target.querySelector('.course-case-status');
+          if(!notice){notice=document.createElement('p');notice.className='course-case-status';notice.setAttribute('role','status');target.prepend(notice);}
+          notice.textContent='Saved evidence loaded. Exact-result controls are available in Run review when this case has a held draft.';
         } catch(error){target.textContent=error.message;}
       });
     } catch(error){target.textContent=error.message;}

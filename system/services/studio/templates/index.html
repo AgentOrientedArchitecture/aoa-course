@@ -3,15 +3,27 @@
 <head>
   <meta charset="utf-8">
   <title>AOA Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="/static/inspection.css?v={{ asset_version }}">
   {% if studio_config.revised %}<link rel="stylesheet" href="/static/course-lab.css?v={{ asset_version }}">{% endif %}
 </head>
-<body>
+<body data-workspace="studio">
   <header>
     <h1>AOA Studio</h1>{% if studio_config.revised %}<a href="/course/REVISED-COURSE.md" target="_blank" rel="noopener">Course guide</a>{% endif %}
     <span id="status" class="status disconnected">connecting…</span>
   </header>
 
+  <nav class="workspace-navigation" aria-label="Studio views">
+    <button type="button" data-workspace-view="studio" aria-pressed="true">Studio · all controls</button>
+    <button type="button" data-workspace-view="cards" aria-pressed="false">Capability cards</button>
+    <button type="button" data-workspace-view="selection" aria-pressed="false">AU selection</button>
+    <button type="button" data-workspace-view="review" aria-pressed="false">Run review</button>
+  </nav>
+  <section id="inspection-evidence-banner" class="inspection-evidence-banner" hidden aria-label="Trace source">
+    <div><strong id="inspection-evidence-status"></strong><p id="inspection-evidence-help"></p></div>
+    <div class="inspection-controls"><button type="button" id="inspection-refresh-case">Refresh saved evidence</button><button type="button" id="inspection-follow-live">Follow live runs</button></div>
+  </section>
   <main>
     <section id="registry-pane" class="pane">
       <h2>Registry</h2>
@@ -143,6 +155,32 @@
         </div>
       </div>
       <div id="lifecycle" class="lifecycle">
+        <section id="allocation-inspector" class="inspection-surface" aria-label="AU selection">
+          <h2>AU selection</h2>
+          <p class="inspection-muted">Inspect each task's declared candidates, the returned choice and the evidence that allowed its binding.</p>
+          <div id="inspection-task-tabs" class="inspection-controls" aria-label="Select a task"></div>
+          <div id="inspection-selection-content" hidden>
+            <div id="inspection-stages" class="inspection-stages" aria-label="Selection stages">
+              <button type="button" data-inspect-stage="task" aria-pressed="false">Proposed task</button>
+              <button type="button" data-inspect-stage="eligible" aria-pressed="false">Eligible AUs</button>
+              <button type="button" data-inspect-stage="choice" aria-pressed="true">Choice</button>
+              <button type="button" data-inspect-stage="validation" aria-pressed="false">Composition check</button>
+              <button type="button" data-inspect-stage="binding" aria-pressed="false">Accepted binding</button>
+            </div>
+            <div class="inspection-selection-grid"><aside id="inspection-candidates"></aside><article id="inspection-stage-body" class="inspection-panel" aria-live="polite"></article></div>
+            <p id="inspection-plan-notice" class="inspection-notice"></p>
+          </div>
+        </section>
+        <section id="run-inspector" class="inspection-surface" aria-label="Recorded run review">
+          <h2>Run review</h2><p id="inspection-run-status" class="inspection-notice" role="status">No run selected</p>
+          <div id="inspection-output-tabs" class="inspection-controls" aria-label="Select an AU output"></div>
+          <div id="inspection-output-content" hidden>
+            <div class="inspection-result-grid">
+              <article class="inspection-panel"><h3 id="inspection-output-heading">Recorded output</h3><div id="inspection-output-summary"></div><details><summary>Complete output JSON</summary><pre id="inspection-output-json" class="inspection-json"></pre></details><div id="inspection-output-signals"></div></article>
+              <aside class="inspection-panel"><h3>Evidence for this output</h3><p class="inspection-muted">Inputs recorded at invocation. A file path is a reference, not the contents of the source file.</p><div id="inspection-input-evidence"></div><h4>Questions for review</h4><p id="inspection-review-prompt"></p><p class="inspection-notice">Successful execution and output-shape checks do not establish factual accuracy.</p><button type="button" id="inspection-review-link" hidden>Go to exact-result review</button></aside>
+            </div>
+          </div>
+        </section>
         <section class="lifecycle-summary">
           <div>
             <span class="section-label">Intent</span>
@@ -223,6 +261,13 @@
 
     <section id="card-pane" class="pane">
       <h2 id="detail-title">Capability card</h2>
+      <div id="card-view-controls" class="inspection-controls" hidden aria-label="Capability representation">
+        <button type="button" data-card-view="readable" aria-pressed="true">Readable</button>
+        <button type="button" data-card-view="json" aria-pressed="false">Complete JSON</button>
+        <button type="button" id="card-copy">Copy JSON</button>
+      </div>
+      <span id="card-copy-status" class="inspection-muted" role="status"></span>
+      <div id="card-readable" hidden></div>
       <pre id="card-body" class="card-body">Click a capability on the left.</pre>
     </section>
   </main>

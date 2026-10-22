@@ -1,3 +1,5 @@
+import { createStudioInspector } from "./studio-inspector.js";
+
 // Studio frontend.
 //
 // Three panes (registry, trace, capability card) plus an intent form and a
@@ -40,7 +42,9 @@ const state = {
   capabilities: new Map(),     // id -> card
   governanceEvents: [],
   selectedCapability: null,
+  cardRequest: 0,
   currentTraceId: null,
+  savedEvidence: false,
   records: [],
   lifecycle: emptyLifecycle(),
   wikiGraph: { nodes: [], edges: [] },
@@ -53,6 +57,8 @@ const state = {
   jdFile: null,
   noteFile: null,
 };
+
+const inspection = createStudioInspector({ renderMarkdown, selectCapability });
 
 function emptyLifecycle() {
   return {
@@ -116,7 +122,7 @@ function renderRegistry() {
     const lifecycle = card.lifecycle || {};
     li.innerHTML = `
       <span class="cap-kind ${kind}">${kind}</span>
-      <span class="cap-id">${escapeHtml(card.id)}</span>
+      <button type="button" class="cap-id cap-select" aria-pressed="${card.id === state.selectedCapability}">${escapeHtml(card.id)}</button>
       <span class="cap-meta">${escapeHtml(agentId)}</span>
       <span class="cap-governance">
         ${lifecycle.status ? `<span class="life-status">${escapeHtml(lifecycle.status)}</span>` : ""}
@@ -150,17 +156,24 @@ function shortActor(actorId) {
 }
 
 async function selectCapability(id) {
+  const changed = state.selectedCapability !== id;
+  const request = ++state.cardRequest;
   state.selectedCapability = id;
   state.selectedWikiNode = null;
   $("detail-title").textContent = "Capability card";
   renderRegistry();
-  const resp = await fetch(`/api/capabilities/${encodeURIComponent(id)}`);
-  if (!resp.ok) {
-    setDetailText(`Could not load card for ${id}`);
-    return;
+  if (changed) setDetailText(`Loading ${id}…`);
+  try {
+    const resp = await fetch(`/api/capabilities/${encodeURIComponent(id)}`);
+    if (state.selectedCapability !== id || request !== state.cardRequest) return;
+    if (!resp.ok) throw new Error(`Could not load card for ${id}`);
+    const card = await resp.json();
+    if (state.selectedCapability !== id || request !== state.cardRequest) return;
+    setDetailJson(card, true);
+    inspection.showCard(card);
+  } catch (error) {
+    if (state.selectedCapability === id && request === state.cardRequest) setDetailText(`Could not load card for ${id}: ${error.message}`);
   }
-  const card = await resp.json();
-  setDetailJson(card);
 }
 
 function applyRegistryEvent(payload) {
@@ -292,8 +305,8 @@ function selectGovernanceActor(actorId, cardId = "") {
 // Trace pane
 // ---------------------------------------------------------------------------
 
-function appendTraceRow(record) {
-  window.dispatchEvent(new CustomEvent("aoa-course-record", {detail:record}));
+function appendTraceRow(record, { replay = false } = {}) {
+  if (state.savedEvidence && !replay) return;
   // Reset the trace pane when a new flow starts.
   if (record.step === "start") {
     state.currentTraceId = record.trace_id;
@@ -311,6 +324,7 @@ function appendTraceRow(record) {
     return;
   }
   state.records.push(record);
+  window.dispatchEvent(new CustomEvent("aoa-course-record", {detail:record}));
   applyLifecycleEvent(record);
   renderLifecycle();
 
@@ -579,6 +593,7 @@ function renderLifecycle() {
   renderTasks(life);
   renderResultReview(life);
   renderResult(life);
+  inspection.renderRun(state.records, life, state.savedEvidence);
 }
 
 // ---------------------------------------------------------------------------
@@ -1646,12 +1661,14 @@ function renderInlineMarkdown(text) {
 }
 
 function setDetailText(text) {
+  inspection.clearCard();
   const body = $("card-body");
   body.classList.remove("json-view");
   body.textContent = text;
 }
 
-function setDetailJson(value) {
+function setDetailJson(value, capability = false) {
+  if (!capability) inspection.clearCard();
   const body = $("card-body");
   body.classList.add("json-view");
   body.innerHTML = highlightJson(value);
@@ -1726,6 +1743,7 @@ async function submitIntent() {
   const payload = buildIntentPayload(status);
   if (!payload) return;
   const formBody = intentFormData(payload);
+  state.savedEvidence = false;
 
   btn.disabled = true;
   status.textContent = "running…";
@@ -1966,8 +1984,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
 // Replay saved evidence through the same module-owned rendering path.
 window.addEventListener("aoa-course-replay", ({detail: records}) => {
+  if (!Array.isArray(records)) return;
+  state.savedEvidence = true;
   state.currentTraceId = null;
   state.records = [];
   state.lifecycle = emptyLifecycle();
-  for (const record of records) appendTraceRow(record);
+  $("trace-list").innerHTML = "";
+  window.dispatchEvent(new CustomEvent("aoa-course-reset"));
+  for (const record of records) appendTraceRow(record, { replay: true });
+  renderLifecycle();
+});
+
+window.addEventListener("aoa-follow-live", () => {
+  state.savedEvidence = false;
+  renderLifecycle();
 });

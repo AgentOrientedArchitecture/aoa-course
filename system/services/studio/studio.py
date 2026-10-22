@@ -62,7 +62,10 @@ ENABLED_WORKFLOWS = _configured_workflows()
 INBOX_DIR = Path(os.environ.get("INBOX_DIR", "/data/inbox"))
 
 BASE_DIR = Path(__file__).parent
-ASSET_VERSION = hashlib.sha256(b"".join((BASE_DIR / "static" / name).read_bytes() for name in ("app.js", "course-lab.js", "course-lab.css"))).hexdigest()[:12]
+ASSET_VERSION = hashlib.sha256(b"".join(
+    path.read_bytes() for path in sorted((BASE_DIR / "static").iterdir())
+    if path.is_file() and path.suffix in {".js", ".mjs", ".css"}
+)).hexdigest()[:12]
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
