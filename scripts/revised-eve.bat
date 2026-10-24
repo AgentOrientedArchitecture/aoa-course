@@ -4,12 +4,13 @@ set "MODE=%~1"
 if not defined MODE set "MODE=native"
 call "%~dp0revised-compose.bat" 3
 if errorlevel 1 exit /b %ERRORLEVEL%
-shift
+rem Keep argument zero (this script's path) intact for later helper calls.
+shift /1
 set "EXTRA_ARGS="
 :args
 if "%~1"=="" goto dispatch
 set EXTRA_ARGS=%EXTRA_ARGS% "%~1"
-shift
+shift /1
 goto args
 :dispatch
 if /I "%MODE%"=="build" goto build
