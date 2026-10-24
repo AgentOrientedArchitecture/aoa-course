@@ -8,18 +8,22 @@ Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`
 ./scripts/revised-eve.sh adopt
 ```
 
+In Windows Command Prompt, use `scripts\revised-eve.bat native`, then `scripts\revised-eve.bat adopt`. The standard `session3-up` and `session3-adopt` launchers also select this revised path when `.env.revised` is present. See the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop).
+
 The pinned `eve init` may try to start its default agent before the provider-neutral configuration is added. If it reports a default-model metadata error, continue to the original walkthrough’s `agent.ts` configuration checkpoint, then run `eve dev` again. The revised launcher runs native authoring as the host user so Linux workshop files remain editable.
 
 The adopted EVE agent joins the existing CV/interview composition. It remains learner-authored; neither the adapter nor the Directory rewrites its behaviour.
 
 ## Publish to a real local Directory
 
+This part uses macOS/Linux shell commands. On Windows, run the Directory lab in WSL2; the installer does not provide a native Windows binary.
+
 ```bash
 ./scripts/directory-install.sh
 python3 scripts/directory-lab.py start
 ```
 
-Leave that terminal open, or run the service under a persistent remote terminal on Spark. It listens on loopback port 8890 and keeps its state under `.course-data/directory`. This is AGNTCY Directory v1.8.0, not an imitation registry.
+Leave that terminal open, or run the service under a persistent remote terminal on Spark. It listens on loopback port 8890 and keeps its state under `.course-data/directory`. This is AGNTCY Directory v1.8.0, not an imitation registry. Stop it with Ctrl+C in that terminal; the course's `down` script stops Compose services and does not stop this separate host process.
 
 In a second terminal:
 

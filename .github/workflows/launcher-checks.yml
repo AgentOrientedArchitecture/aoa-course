@@ -1,0 +1,25 @@
+name: Course launchers
+on:
+  push:
+    branches: [codex/october-course-rebuild]
+    paths: ['scripts/**', 'tests/test_launchers.py', '.github/workflows/launcher-checks.yml']
+  pull_request:
+    paths: ['scripts/**', 'tests/test_launchers.py', '.github/workflows/launcher-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  launchers:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check actual launchers without Docker or provider calls
+        run: python -m unittest discover -s tests -p test_launchers.py -v

@@ -1,0 +1,213 @@
+"""Exercise the actual shell/batch entry points with harmless Docker stand-ins.
+
+No daemon, provider keys or course data are used. Windows runs native cmd.exe
+and an executable stand-in (a .cmd would change batch control flow).
+"""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+WINDOWS = os.name == 'nt'
+EXT = '.bat' if WINDOWS else '.sh'
+
+
+class Launchers(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tools_dir = tempfile.TemporaryDirectory(prefix='aoa launcher tools ')
+        tools = Path(cls.tools_dir.name)
+        if WINDOWS:
+            source = tools / 'mock.cs'
+            source.write_text(r'''
+using System;
+using System.IO;
+using System.Diagnostics;
+using System.Web.Script.Serialization;
+public class Mock {
+  public static int Main(string[] args) {
+    string tool = Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName);
+    var row = new { tool = tool, argv = args, cwd = Directory.GetCurrentDirectory(),
+      registry = Environment.GetEnvironmentVariable("COURSE_REGISTRY_ALLOWLIST") ?? "",
+      evaluator = Environment.GetEnvironmentVariable("COURSE_EVALUATOR_ALLOWLIST") ?? "" };
+    File.AppendAllText(Environment.GetEnvironmentVariable("MOCK_LOG"), new JavaScriptSerializer().Serialize(row) + "\n");
+    string fail = Environment.GetEnvironmentVariable("MOCK_FAIL_COMMAND");
+    return tool == "docker" && Array.IndexOf(args, fail) >= 0 ? 17 : 0;
+  }
+}
+''')
+            ps = tools / 'compile.ps1'
+            ps.write_text("$ErrorActionPreference='Stop'\nAdd-Type -Path $env:MOCK_SOURCE -OutputAssembly $env:MOCK_EXE -OutputType ConsoleApplication -ReferencedAssemblies System.dll,System.Core.dll,System.Web.Extensions.dll\n")
+            env = {**os.environ, 'MOCK_SOURCE': str(source), 'MOCK_EXE': str(tools/'docker.exe')}
+            subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(ps)], env=env, check=True)
+            shutil.copy2(tools/'docker.exe', tools/'curl.exe')
+        else:
+            source = '''#!%s
+import json,os,sys
+row={'tool':os.path.basename(sys.argv[0]),'argv':sys.argv[1:],'cwd':os.getcwd(),'registry':os.getenv('COURSE_REGISTRY_ALLOWLIST',''),'evaluator':os.getenv('COURSE_EVALUATOR_ALLOWLIST','')}
+with open(os.environ['MOCK_LOG'],'a') as f:f.write(json.dumps(row)+'\\n')
+sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.argv[1:] else 0)
+''' % sys.executable
+            for name in ('docker', 'curl'):
+                p = tools/name
+                p.write_text(source)
+                p.chmod(0o755)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tools_dir.cleanup()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='aoa course with spaces ')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        shutil.copytree(ROOT/'scripts', self.root/'scripts')
+        self.log = self.root/'commands.jsonl'
+        self.env = {k:v for k,v in os.environ.items() if not k.startswith(('AOA_', 'COURSE_', 'MOCK_'))}
+        self.env.update(PATH=self.tools_dir.name + os.pathsep + os.environ['PATH'], MOCK_LOG=str(self.log))
+        (self.root/'.env').write_text('MODEL=old-model\n')
+        (self.root/'.env.revised').write_text('MODEL=course-model\n')
+
+    def invoke(self, name, *args, expect=0):
+        script = self.root/'scripts'/(name+EXT)
+        if WINDOWS:
+            result = subprocess.run(subprocess.list2cmdline([str(script), *args]), shell=True,
+                                    cwd=self.tools_dir.name, env=self.env, capture_output=True, text=True, timeout=20)
+        else:
+            result = subprocess.run(['bash', str(script), *args], cwd=self.tools_dir.name,
+                                    env=self.env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, expect, result.stdout + result.stderr)
+        return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
+
+    def clean_log(self):
+        self.log.write_text('')
+
+    def assert_revised(self, row):
+        argv = row['argv']
+        self.assertIn('system/docker-compose.revised.yml', argv)
+        self.assertLess(argv.index('.env'), argv.index('.env.revised'))
+        self.assertEqual(Path(row['cwd']).resolve(), self.root.resolve())
+
+    def test_session_starts_select_revised_and_forward_arguments(self):
+        for session in (1, 2, 4):
+            with self.subTest(session=session):
+                self.clean_log()
+                rows = self.invoke(f'session{session}-up', '--wait', '--wait-timeout', '90')
+                self.assertEqual(len(rows), 1)
+                row = rows[0]
+                self.assert_revised(row)
+                self.assertIn(f'session{session}', row['argv'])
+                self.assertEqual(row['argv'][-3:], ['--wait', '--wait-timeout', '90'])
+                self.assertIn('evaluator-cv-data', row['registry'])
+                self.assertEqual('evaluator-plan-governance' in row['evaluator'], session == 4)
+
+    def test_original_course_is_preserved_and_can_be_forced(self):
+        self.env['AOA_REVISED'] = '0'
+        row = self.invoke('session1-up')[0]
+        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
+        self.assertNotIn('.env.revised', row['argv'])
+        self.clean_log()
+        self.env.pop('AOA_REVISED')
+        (self.root/'.env.revised').unlink()
+        row = self.invoke('session2-up')[0]
+        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
+
+    def test_explicit_revised_without_second_env_and_local_ollama(self):
+        (self.root/'.env.revised').unlink()
+        self.env.update(AOA_REVISED='1', AOA_LOCAL='true')
+        row = self.invoke('session1-up')[0]
+        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assertIn('local', row['argv'])
+        self.assertNotIn('.env.revised', row['argv'])
+
+    def test_invalid_selection_stops_before_docker(self):
+        self.env['AOA_REVISED'] = 'mistyped'
+        self.assertEqual(self.invoke('session1-up', expect=2), [])
+        self.env.pop('AOA_REVISED')
+        self.assertEqual(self.invoke('revised-up', '5', expect=2), [])
+        self.assertEqual(self.invoke('revised-up', '3', expect=2), [])
+
+    def test_down_and_logs_include_every_service_without_deleting_data(self):
+        sentinel = self.root/'system/services/planner/traces/cases.sqlite3'
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_bytes(b'preserve this saved case')
+        for name in ('down', 'logs'):
+            with self.subTest(name=name):
+                self.clean_log()
+                row = self.invoke(name)[0]
+                self.assert_revised(row)
+                for profile in ('session1','session2','session3','session4','session3-lab-native','session3-lab-wrapped','local'):
+                    self.assertIn(profile, row['argv'])
+                self.assertIn('system/docker-compose.revised-eve.yml', row['argv'])
+                self.assertNotIn('-v', row['argv'])
+                self.assertNotIn('--volumes', row['argv'])
+                self.assertEqual(sentinel.read_bytes(), b'preserve this saved case')
+
+    def test_shutdown_retains_explicit_user_options_and_exit_code(self):
+        self.env['MOCK_FAIL_COMMAND'] = 'down'
+        rows = self.invoke('down', '--timeout', '30', expect=17)
+        self.assertEqual(rows[0]['argv'][-2:], ['--timeout','30'])
+
+    def test_eve_prebuild_does_not_create_or_run_agent(self):
+        row = self.invoke('session3-build', '--no-cache')[0]
+        self.assert_revised(row)
+        self.assertIn('system/docker-compose.revised-eve.yml', row['argv'])
+        self.assertEqual(row['argv'][-2:], ['build','--no-cache'])
+        self.assertFalse((self.root/'system/agents-eve/workshop').exists())
+
+    def test_eve_native_stops_estate_then_builds_and_runs(self):
+        rows = self.invoke('session3-up')
+        self.assertEqual(len(rows), 3)
+        self.assertIn('down', rows[0]['argv'])
+        self.assertEqual(rows[1]['argv'][-2:], ['build','eve-workshop-native'])
+        self.assertIn('run', rows[2]['argv'])
+        self.assertIn('HOME=/tmp', rows[2]['argv'])
+        self.assertEqual(rows[2]['argv'][-1], 'eve-workshop-native')
+        self.assertFalse((self.root/'system/agents-eve/workshop/capability-card.yaml').exists())
+
+    def test_failed_build_never_enters_workshop(self):
+        self.env['MOCK_FAIL_COMMAND'] = 'build'
+        rows = self.invoke('session3-up', expect=17)
+        self.assertEqual(len(rows), 2)
+        self.assertFalse(any('run' in row['argv'] for row in rows))
+
+    def test_adopt_requires_authored_files_and_preserves_existing_card(self):
+        self.assertEqual(self.invoke('session3-adopt', expect=1), [])
+        workspace = self.root/'system/agents-eve/workshop'
+        for name in ('agent/agent.ts','agent/instructions.md','agent/channels/eve.ts'):
+            p = workspace/name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text('learner-authored content')
+        card = workspace/'capability-card.yaml'
+        card.write_text('custom learner contract')
+        rows = self.invoke('session3-adopt')
+        self.assertEqual(rows[0]['argv'][-2:], ['build','eve-workshop-native'])
+        self.assertIn('npm', rows[1]['argv'])
+        self.assertIn('--force-recreate', rows[2]['argv'])
+        self.assertEqual([r['tool'] for r in rows[3:]], ['curl','curl'])
+        self.assertEqual(card.read_text(), 'custom learner contract')
+        self.assertEqual((workspace/'agent/agent.ts').read_text(), 'learner-authored content')
+        self.clean_log()
+        self.env['AOA_REVISED'] = '0'
+        rows = self.invoke('session3-adopt')
+        self.assertNotIn('system/docker-compose.revised.yml', rows[0]['argv'])
+        self.assertEqual(rows[0]['argv'][-2:], ['build','eve-workshop-native'])
+        self.assertIn('npm', rows[1]['argv'])
+        self.assertEqual(card.read_text(), 'custom learner contract')
+
+    def test_provider_check_uses_revised_overlay_with_only_revised_env(self):
+        (self.root/'.env').unlink()
+        rows = self.invoke('test_model_provider')
+        row = rows[-1]
+        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assertIn('.env.revised', row['argv'])
+        self.assertIn('_base.provider_test', row['argv'])
+
+
+if __name__ == '__main__':
+    unittest.main()

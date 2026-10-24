@@ -3,6 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source ./scripts/course-mode.sh
+if [[ "$course_revised" == true ]]; then
+  exec ./scripts/revised-up.sh 1 "$@"
+fi
+
 compose=(docker compose)
 if [[ -f .env ]]; then
   compose+=(--env-file .env)

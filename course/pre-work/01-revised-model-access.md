@@ -1,6 +1,6 @@
 # Revised model access
 
-Use Docker and the existing course repository. Windows learners can run the revised shell launchers in WSL2; the original Windows launchers remain available for the original course.
+Use Docker and the existing course repository. macOS/Linux use `.sh` launchers; Windows Command Prompt uses the matching `.bat` launchers with Docker Desktop running Linux containers. WSL2 remains an alternative for Windows and is required for the optional AGNTCY Directory lab's current installer.
 
 ## Get the October course
 
@@ -8,17 +8,16 @@ Use branch **`codex/october-course-rebuild`**. The revised course and Studio ins
 
 For a fresh participant-install test, clone into a new directory. This avoids reusing saved cases, uploaded inputs or an authored EVE workshop from an earlier run. Keep the existing checkout and its data.
 
-On **macOS**, use Terminal. On **Windows**, run these commands in a **WSL2 Linux terminal**, with Docker available there. The revised launchers are shell scripts; the original `.bat` scripts launch the original course path.
+On **macOS/Linux**, use Terminal. On **Windows**, use Command Prompt, or a WSL2 Linux terminal with Docker available there. The following clone and check commands work in either:
 
 ```bash
-git clone --branch codex/october-course-rebuild --single-branch \
-  https://github.com/AgentOrientedArchitecture/aoa-course.git aoa-course-october-test
+git clone --branch codex/october-course-rebuild --single-branch https://github.com/AgentOrientedArchitecture/aoa-course.git aoa-course-october-test
 cd aoa-course-october-test
 git status --short --branch
 docker compose version
 ```
 
-Confirm the branch name and that Docker Compose is available before continuing. Configure one model route below, then use `revised-up.sh`, rather than the original `session1-up` launcher.
+Confirm the branch name and that Docker Compose is available before continuing. Configure one model route below, then use the matching session launcher. The presence of `.env.revised` selects the revised course automatically.
 
 The recorded end-to-end validation is on Spark. Fresh macOS and Windows walkthroughs are pending; see [validation record](../REVISED-VALIDATION.md). Record any setup or instruction failures as part of those tests.
 
@@ -32,9 +31,11 @@ In a fresh checkout:
 cp .env.cerebras-typesafe.example .env.revised
 ```
 
+In Windows Command Prompt, use `copy .env.cerebras-typesafe.example .env.revised` instead. For the local route below, use the same copy command with `.env.local-revised.example`.
+
 Add the keys in your local editor before starting. Git transfers the example configuration, not the private keys stored on Spark. If `.env.revised` already exists, inspect it before replacing it.
 
-The launchers load `.env` first, then `.env.revised`. The example leaves key variables unset so existing keys in `.env` are retained.
+The revised launchers load `.env` first, then `.env.revised`. Values set in the second file override the first; exported terminal variables take precedence over both. The example leaves key variables unset so existing keys in `.env` are retained. The original course selection loads only `.env`.
 
 Generation uses the existing OpenAI-compatible adapter, Cerebras's endpoint and `gpt-oss-120b`. Decisions use TypeSafe's separate typed-choice API with the version pinned to `jev-1.13.0`. A model ID is recorded with each decision; the stable version avoids following the latest alias during a class.
 
@@ -50,11 +51,28 @@ The decision baseline uses Ollama's constrained JSON output and temperature zero
 
 Host Ollama is reached from containers at `host.docker.internal:11434`. For container Ollama, set both model endpoints to `http://ollama:11434`, set `AOA_LOCAL=1` when starting and ensure the named models are pulled into that container. Local and hosted routes use the same AU contracts and inspectable execution path.
 
-## Start
+## Start and stop
 
-```bash
-./scripts/revised-up.sh 1
-```
+Run from the repository root after creating `.env.revised`:
+
+| Action | macOS/Linux or WSL2 | Windows Command Prompt |
+|---|---|---|
+| Check generation provider access | `./scripts/test_model_provider.sh` | `scripts\test_model_provider.bat` |
+| Session 1: CV | `./scripts/session1-up.sh` | `scripts\session1-up.bat` |
+| Session 2: wiki | `./scripts/session2-up.sh` | `scripts\session2-up.bat` |
+| Session 3: pre-build images | `./scripts/session3-build.sh` | `scripts\session3-build.bat` |
+| Session 3: native EVE authoring | `./scripts/session3-up.sh` | `scripts\session3-up.bat` |
+| Session 3: adopt the tested agent | `./scripts/session3-adopt.sh` | `scripts\session3-adopt.bat` |
+| Session 4: compliance | `./scripts/session4-up.sh` | `scripts\session4-up.bat` |
+| Seed Session 4 evidence after startup | `./scripts/session4-seed.sh` | `scripts\session4-seed.bat` |
+| Follow service logs | `./scripts/logs.sh` | `scripts\logs.bat` |
+| Stop course services | `./scripts/down.sh` | `scripts\down.bat` |
+
+Session 3's native authoring step stops the running AOA services so learners can inspect EVE on its own. After authoring and native testing, exit that shell and use the adoption launcher. Adoption builds the image before installing dependencies, retains existing learner files/cards, and checks both agent health and registry presence before reporting success.
+
+`down` includes every original and revised Compose service, including the decision service, specialist CV evaluators, EVE and container Ollama. It retains volumes, saved cases, wiki state and authored workshop files by default. `logs` covers the same service set; add a service name to narrow it. Stop a separately started AGNTCY Directory with Ctrl+C in its own terminal. Host-installed Ollama is also independent of Compose.
+
+The explicit revised entry points remain available on both platforms: `revised-up.sh/.bat 1`, `2` or `4`, and `revised-eve.sh/.bat build`, `native` or `adopt`. They always choose the revised configuration. The ordinary session launchers instead honour `AOA_REVISED`: `1`/`true` forces revised, `0`/`false` forces original, and unset/`auto` selects by the presence of `.env.revised`. On macOS/Linux, for example, `AOA_REVISED=0 ./scripts/session1-up.sh` runs the original course. In Windows Command Prompt, run `set AOA_REVISED=0` first; `set AOA_REVISED=` restores automatic selection.
 
 Open `http://localhost:8080`. Check `http://localhost:7250/healthz` from the host: it names the decision provider/model and says whether configuration is present. It does **not** claim a successful provider call. Run the first CV example to verify actual access.
 

@@ -4,6 +4,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source ./scripts/course-mode.sh
+if [[ "$course_revised" == true ]]; then
+  exec ./scripts/revised-eve.sh adopt "$@"
+fi
+
 workspace="system/agents-eve/workshop"
 template="system/agents-eve/runtime/templates/interviewer-questions.yaml"
 card="$workspace/capability-card.yaml"
@@ -39,13 +44,13 @@ files=(
   -f system/docker-compose.session3-lab.yml
 )
 
+"${compose[@]}" "${files[@]}" build eve-workshop-native
+
 # Dependencies are installed into the bind-mounted learner workspace by the
 # pinned container, never by a host Node installation. This also upgrades
 # workshops created before node_modules stopped using a named volume.
 "${compose[@]}" "${files[@]}" run --rm --no-deps \
   eve-workshop-native npm install --offline --no-audit --no-fund
-
-"${compose[@]}" "${files[@]}" build eve-workshop-native
 
 "${compose[@]}" "${files[@]}" \
   --profile session3 \

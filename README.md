@@ -2,7 +2,7 @@
 
 **Revised course:** [Cerebras, TypeSafe and the four connected live demos](course/REVISED-COURSE.md). The original material below is retained.
 
-**October laptop walkthrough:** use branch `codex/october-course-rebuild` and follow [the revised setup guide](course/pre-work/01-revised-model-access.md) first. It includes the exact fresh-clone command for macOS and Windows through WSL2. The original launch commands below do not enable the revised course overlay.
+**October laptop walkthrough:** use branch `codex/october-course-rebuild` and follow [the revised setup guide](course/pre-work/01-revised-model-access.md) first. It covers macOS/Linux shell scripts and native Windows batch files. The `session*-up`, EVE build/adoption and provider-check scripts select the revised course when `.env.revised` exists. The direct Docker commands below retain the original configuration; use the scripts for October.
 
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
 The system is a reference implementation for learning the architecture shape,
@@ -139,6 +139,12 @@ instead, add `--profile local` to either command and set
 
 There are also thin helper scripts for the common paths:
 
+With `.env.revised` present, these start the October course. Without it, they
+retain the original course. Set `AOA_REVISED=1` to select October explicitly,
+or `AOA_REVISED=0` to select the original course even when `.env.revised` exists.
+See the [launcher table](course/pre-work/01-revised-model-access.md#start-and-stop)
+for both operating systems and configuration precedence.
+
 ```bash
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
@@ -167,6 +173,11 @@ scripts\down.bat
 For the included Ollama container with a helper script, prefix it with
 `AOA_LOCAL=1` on macOS/Linux, or run `set AOA_LOCAL=1` first on Windows. The
 host-machine Ollama path does not need `AOA_LOCAL=1`.
+
+`down.sh` and `down.bat` stop all course Compose services, including decisions,
+the specialist CV evaluators and adopted EVE. They retain saved data and Docker
+volumes by default. `logs` covers the same services. The separate AGNTCY
+Directory runs in its own terminal: stop it with Ctrl+C there.
 
 Then open [http://localhost:8080](http://localhost:8080) for the studio.
 Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and

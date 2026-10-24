@@ -44,4 +44,23 @@ uv pip install --python .venv-course/bin/python -r tests/requirements.txt
 
 Live run evidence remains in the planner's persisted traces and the ignored `.course-data/` fixture directory on Spark. The local EVE validation fixture is separate from `system/agents-eve/workshop`, which remains ready for learner authoring. The source branch is the continuation point; temporary test fixtures are not course source.
 
-The current Spark preview runs Session 3 with the isolated EVE validation fixture. Use the revised launchers in the guide to switch sessions; original source material and all saved cases remain available.
+The 21 October Spark preview used Session 3 with the isolated EVE validation fixture; this is not a claim about which services are running now. Use the launchers in the guide to switch sessions; original source material and all saved cases remain available.
+
+## Launcher checks, 24 October 2026
+
+The standard session, EVE build/adoption and provider-check launchers now select the revised configuration when `.env.revised` is present, on both shell and Windows batch paths. Explicit original-course selection remains available. Stop/log commands include every original and revised Compose service; stopping retains saved data and volumes by default.
+
+- Eleven launcher tests pass on macOS using harmless Docker/curl stand-ins. They execute the actual scripts from a path containing spaces and check session selection, original-course access, local Ollama selection, configuration precedence, argument/error propagation, EVE build/adoption ordering, learner-file preservation and shutdown coverage.
+- Every shell script passes `bash -n`.
+- Real Docker Compose configuration validation passes for all four revised sessions with both example model routes, and for the combined stop/log service configuration. These checks do not start or stop containers.
+- The `Course launchers` GitHub Actions workflow runs the same tests on Linux, macOS and native Windows. Its results are recorded against each pushed commit.
+
+These checks validate launcher behaviour. They do not replace the fresh Mac/Windows walkthroughs with Docker and live providers, which remain pending. AGNTCY Directory is a separate foreground process, and the current Windows Directory instructions use WSL2.
+
+To repeat just the launcher checks without Docker or provider keys:
+
+```bash
+python -m unittest discover -s tests -p test_launchers.py -v
+```
+
+Use `python3` if that is the Python command on your machine.

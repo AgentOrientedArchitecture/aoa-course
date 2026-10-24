@@ -4,6 +4,10 @@ setlocal EnableExtensions
 
 cd /d "%~dp0.."
 
+call "%~dp0course-mode.bat"
+if errorlevel 1 exit /b %ERRORLEVEL%
+if "%COURSE_REVISED%"=="1" goto revised
+
 set "WORKSPACE=system\agents-eve\workshop"
 set "TEMPLATE=system\agents-eve\runtime\templates\interviewer-questions.yaml"
 set "CARD=%WORKSPACE%\capability-card.yaml"
@@ -28,12 +32,12 @@ if /I "%AOA_LOCAL%"=="true" set "LOCAL_ARGS=--profile local"
 
 set "COMPOSE=docker compose %ENV_ARGS% %LOCAL_ARGS% -f system/docker-compose.yml -f system/docker-compose.session3.yml -f system/docker-compose.session3-lab.yml"
 
+%COMPOSE% build eve-workshop-native
+if errorlevel 1 exit /b %ERRORLEVEL%
+
 rem Install dependencies into the bind-mounted learner workspace from the
 rem pinned container cache; no host Node installation is required.
 %COMPOSE% run --rm --no-deps eve-workshop-native npm install --offline --no-audit --no-fund
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-%COMPOSE% build eve-workshop-native
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 %COMPOSE% ^
@@ -90,3 +94,7 @@ exit /b 0
 echo Missing one or more EVE agent files under %WORKSPACE%\agent.
 echo Run scripts\session3-up.bat, then create and test the agent with eve init and eve dev.
 exit /b 1
+
+:revised
+call "%~dp0revised-eve.bat" adopt %*
+exit /b %ERRORLEVEL%

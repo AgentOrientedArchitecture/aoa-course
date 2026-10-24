@@ -2,7 +2,7 @@
 
 ## Before the class
 
-- Start on the reviewed revision of `codex/october-course-rebuild` in Spark's `aoa-course`.
+- Start on the reviewed revision of `codex/october-course-rebuild` in `aoa-course`, on Spark or the teaching laptop. Use the [launcher table](pre-work/01-revised-model-access.md#start-and-stop) for macOS/Linux and Windows commands.
 - Use the [provider setup](pre-work/01-revised-model-access.md). Verify actual Cerebras and TypeSafe calls, account quota and access from the teaching environment. Keep the local route ready and label it when used.
 - Build all images before the session. EVE retains its pinned native workspace and framework version; do not replace learner files to make a demo pass.
 - Run `.venv-course/bin/python -m pytest -q tests` after installing `tests/requirements.txt` into that isolated environment. These are adapter/policy/storage checks, not model-quality certification.
@@ -28,7 +28,7 @@ For stable-model utility, judge each output against explicit task criteria befor
 
 ## Remote use
 
-Spark remains the build and execution location. From an authorised computer, forward port 8080 to view Studio; no public exposure is required. Docker services and Directory's detached process can outlive the Mac connection. Use the branch and commit in the validation record when continuing from another client. Final presentation rendering can remain on the Mac.
+Spark remains available for remote builds and execution; a local laptop checkout can run the same course independently. From an authorised computer, forward port 8080 to view Spark's Studio; no public exposure is required. Docker services and a Directory process in a persistent terminal can outlive the Mac connection. Use the reviewed branch and commit when continuing from another client. Private provider keys and persisted runtime data do not travel with Git. Final presentation rendering can remain on the Mac.
 
 ## Scope still open for a later course iteration
 

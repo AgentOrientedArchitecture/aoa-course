@@ -7,6 +7,9 @@ compose=(docker compose)
 if [[ -f .env ]]; then
   compose+=(--env-file .env)
 fi
+if [[ -f .env.revised ]]; then
+  compose+=(--env-file .env.revised)
+fi
 
 exec "${compose[@]}" \
   -f system/docker-compose.yml \
@@ -14,6 +17,8 @@ exec "${compose[@]}" \
   -f system/docker-compose.session3.yml \
   -f system/docker-compose.session3-lab.yml \
   -f system/docker-compose.session4.yml \
+  -f system/docker-compose.revised.yml \
+  -f system/docker-compose.revised-eve.yml \
   --profile session1 \
   --profile session2 \
   --profile session3 \
