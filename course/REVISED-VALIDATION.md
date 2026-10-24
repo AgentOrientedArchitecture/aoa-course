@@ -53,7 +53,7 @@ The standard session, EVE build/adoption and provider-check launchers now select
 - Eleven launcher tests pass on macOS using harmless Docker/curl stand-ins. They execute the actual scripts from a path containing spaces and check session selection, original-course access, local Ollama selection, configuration precedence, argument/error propagation, EVE build/adoption ordering, learner-file preservation and shutdown coverage.
 - Every shell script passes `bash -n`.
 - Real Docker Compose configuration validation passes for all four revised sessions with both example model routes, and for the combined stop/log service configuration. These checks do not start or stop containers.
-- The `Course launchers` GitHub Actions workflow runs the same tests on Linux, macOS and native Windows. Its results are recorded against each pushed commit.
+- The `Course launchers` GitHub Actions workflow passed all 11 tests on Linux, macOS and native Windows at commit `a029f79`: [cross-platform results](https://github.com/AgentOrientedArchitecture/aoa-course/actions/runs/40096715858). The first Windows run caught an EVE helper-path error after argument processing; the corrected scripts passed the complete rerun.
 
 These checks validate launcher behaviour. They do not replace the fresh Mac/Windows walkthroughs with Docker and live providers, which remain pending. AGNTCY Directory is a separate foreground process, and the current Windows Directory instructions use WSL2.
 
