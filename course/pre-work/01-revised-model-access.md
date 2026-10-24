@@ -2,9 +2,37 @@
 
 Use Docker and the existing course repository. Windows learners can run the revised shell launchers in WSL2; the original Windows launchers remain available for the original course.
 
+## Get the October course
+
+Use branch **`codex/october-course-rebuild`**. The revised course and Studio inspection views are on this branch, not `main`. The separate `aoa-course-v2` prototype and `feat/decision-allocator` branch are not prerequisites for this walkthrough.
+
+For a fresh participant-install test, clone into a new directory. This avoids reusing saved cases, uploaded inputs or an authored EVE workshop from an earlier run. Keep the existing checkout and its data.
+
+On **macOS**, use Terminal. On **Windows**, run these commands in a **WSL2 Linux terminal**, with Docker available there. The revised launchers are shell scripts; the original `.bat` scripts launch the original course path.
+
+```bash
+git clone --branch codex/october-course-rebuild --single-branch \
+  https://github.com/AgentOrientedArchitecture/aoa-course.git aoa-course-october-test
+cd aoa-course-october-test
+git status --short --branch
+docker compose version
+```
+
+Confirm the branch name and that Docker Compose is available before continuing. Configure one model route below, then use `revised-up.sh`, rather than the original `session1-up` launcher.
+
+The recorded end-to-end validation is on Spark. Fresh macOS and Windows walkthroughs are pending; see [validation record](../REVISED-VALIDATION.md). Record any setup or instruction failures as part of those tests.
+
 ## Hosted route
 
 Copy `.env.cerebras-typesafe.example` to `.env.revised`. Add keys privately as `CEREBRAS_API_KEY` and `TYPESAFE_API_KEY`; alternatively keep keys in the ignored `.env` and leave them out of `.env.revised`. Never commit populated environment files.
+
+In a fresh checkout:
+
+```bash
+cp .env.cerebras-typesafe.example .env.revised
+```
+
+Add the keys in your local editor before starting. Git transfers the example configuration, not the private keys stored on Spark. If `.env.revised` already exists, inspect it before replacing it.
 
 The launchers load `.env` first, then `.env.revised`. The example leaves key variables unset so existing keys in `.env` are retained.
 

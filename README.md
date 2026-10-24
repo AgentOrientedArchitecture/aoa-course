@@ -2,6 +2,8 @@
 
 **Revised course:** [Cerebras, TypeSafe and the four connected live demos](course/REVISED-COURSE.md). The original material below is retained.
 
+**October laptop walkthrough:** use branch `codex/october-course-rebuild` and follow [the revised setup guide](course/pre-work/01-revised-model-access.md) first. It includes the exact fresh-clone command for macOS and Windows through WSL2. The original launch commands below do not enable the revised course overlay.
+
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
 The system is a reference implementation for learning the architecture shape,
 not a production deployment platform.
