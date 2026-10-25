@@ -84,6 +84,7 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
             result = subprocess.run(['bash', str(script), *args], cwd=self.tools_dir.name,
                                     env=self.env, capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, expect, result.stdout + result.stderr)
+        self.last_stdout = result.stdout
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
     def clean_log(self):
@@ -165,6 +166,12 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
 
     def test_eve_native_stops_estate_then_builds_and_runs(self):
         rows = self.invoke('session3-up')
+        locations = [line for line in self.last_stdout.splitlines() if line.startswith('Workshop on ')]
+        self.assertEqual(len(locations), 1, self.last_stdout)
+        machine, _, workshop = locations[0].partition(': ')
+        hostname = self.env['COMPUTERNAME'] if WINDOWS else subprocess.check_output(['hostname'], text=True).strip()
+        self.assertEqual(machine, f'Workshop on {hostname}')
+        self.assertEqual(Path(workshop).resolve(), (self.root/'system/agents-eve/workshop').resolve())
         self.assertEqual(len(rows), 3)
         self.assertIn('down', rows[0]['argv'])
         self.assertEqual(rows[1]['argv'][-2:], ['build','eve-workshop-native'])

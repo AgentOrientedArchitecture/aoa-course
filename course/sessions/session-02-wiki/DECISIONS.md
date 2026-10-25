@@ -1,22 +1,59 @@
-# Wiki: a decision inside the AU
+# Wiki promotion reference
 
-Start `./scripts/session2-up.sh`, or `scripts\session2-up.bat`, with `.env` configured. Retain the original [wiki walkthrough](WALKTHROUGH.md), including ingest, graph, retrieval and citations. The [wiki architecture diagram](../../ARCHITECTURE.md#session-2-the-decision-is-the-aus-main-model-output) shows which component supplies the judgement and which one writes the result.
+Optional background for [Session 2](WALKTHROUGH.md). The walkthrough contains
+the ingest comparisons, graph inspection, grounded queries and review questions.
 
-The parser still uses the generation model to extract the note. The promotion AU now asks a bounded question: **promote, reject, or review**. The decision model supplies the judgement; code assembles the existing promotion contract from parsed fields and preserves each retained quote. The reporter writes to the wiki only when `promote` is true.
+## A decision as the AU's main output
 
-## Compare three inputs
+Session 1 used a decision model to allocate a task to an eligible AU. Here
+`evaluator-promote` uses the decision model to fulfil its own responsibility:
+should this note enter the wiki? Its bounded output is `promote`, `reject` or
+`review`.
 
-1. Use `quickstart-note/agent-registry-lessons.txt`. Predict whether its architecture content warrants promotion. Inspect the returned decision and retained passages.
-2. Use `quickstart-note/not-for-wiki-fairytale.txt`. Verify that an irrelevant source does not create wiki content.
-3. Enter: “Someone said the new agent system cut costs dramatically. No figures, method, dates or source were supplied.” Predict whether the result should be review or reject. Inspect what actually happens; the expected label is a discussion rubric, not a guaranteed model answer.
+![Extraction, decision and conditional publication](../../diagrams/wiki-decision.svg)
 
-The Studio exposes decision provenance, latency, usage and probability when the provider supplies it. Low probability becomes review; a promote decision without usable passages also becomes review. Review items are withheld in the trace, not automatically published. A full editorial approval queue is outside this exercise.
+The parser still needs generation to extract the note's fields. The promotion
+code sends those fields, the source path and the promotion rubric to the
+decision service. It then constructs the existing promotion contract from
+the parsed content, without asking the model for another paraphrase.
 
-A preserved parser quote is not proof that the parser copied it correctly from the original. Compare the displayed quote with the raw note. The lesson includes source fidelity and evaluation, rather than claiming the decision model solves extraction errors.
+## Decisions and publication
 
-## Review questions
+| Returned evidence | Effective outcome | Store behaviour |
+|---|---|---|
+| Accepted `promote` with usable passages | `promote` | Reporter calls `write_ingest`. |
+| Accepted `reject` | `reject` | Reporter records `stored.skipped=true`; no store write. |
+| `review` | `review` | Same withholding behaviour; no editorial approval queue. |
+| Probability below the configured threshold | `review` | Withheld, even if the returned choice was `promote`. |
+| `promote` without usable passages | `review` | Withheld. |
+| No probability and unscored decisions disallowed | `review` | Withheld. |
 
-- Which parts of this AU still need generation, and which now have a bounded output?
-- What is the cost of a false promotion compared with an unnecessary review?
-- Does confidence over three choices tell us whether the source itself is true?
-- What would you measure before moving this policy into a production knowledge pipeline?
+A provider error or unknown choice fails the AU invocation. It is not a
+successful `review` decision. Inspect the trace rather than interpreting all
+missing wiki content as model rejection.
+
+`promotion.decision_evidence` retains the service response, including provider,
+model, latency and available usage/probability evidence. `decision_outcome`
+records the effective outcome after the caller's checks. Compare both when
+explaining why a note was withheld.
+
+## What still needs evaluation
+
+The probability threshold is a teaching policy, not a calibrated quality
+claim. The local Ollama route has no probability estimate; its explicitly
+unscored policy differs from the hosted TypeSafe route. In either case,
+structured output can still be wrong.
+
+Retained quotes match the parser's output. That is useful provenance but does
+not prove the parser copied the source correctly. Compare the quote with the
+original note, then separately assess relevance, source reliability and the
+cost of false promotion or unnecessary review.
+
+The reporter's query answers use retrieved passages deterministically. That
+limits unsupported generation at the final step, but does not repair a bad
+source, extraction error or irrelevant retrieval. Trace citations back to
+source text before treating an answer as supported.
+
+The [course architecture guide](../../ARCHITECTURE.md#session-2-the-decision-is-the-aus-main-model-output)
+shows the boundaries between parser, decision service, promotion AU, reporter
+and wiki tool.

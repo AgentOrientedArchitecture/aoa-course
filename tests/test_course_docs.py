@@ -60,8 +60,44 @@ def test_document_route_does_not_expand_repo_access(docs, path):
 def test_real_course_guides_and_all_diagrams(monkeypatch):
     monkeypatch.setenv('COURSE_DOCS_DIR', str(ROOT / 'course'))
     client = TestClient(studio.app)
-    for path in ['ARCHITECTURE.md', 'sessions/session-03-eve/ADOPTION.md', 'sessions/session-03-eve/DIRECTORY.md']:
+    for path in ['COURSE.md', 'INSTRUCTOR.md', 'VALIDATION.md', 'pre-work/SETUP.md',
+                 'ARCHITECTURE.md', 'sessions/session-03-eve/ADOPTION.md',
+                 'sessions/session-03-eve/DIRECTORY.md']:
         assert client.get('/course/' + path).status_code == 200
+    for path in (ROOT / 'course/sessions').glob('session-*/WALKTHROUGH.md'):
+        assert client.get('/course/' + path.relative_to(ROOT / 'course').as_posix()).status_code == 200
     for path in (ROOT / 'course/diagrams').glob('*.svg'):
         assert client.get('/course/diagrams/' + path.name).status_code == 200
+    client.close()
+
+
+@pytest.mark.parametrize('old,new', [
+    ('REVISED-COURSE.md', 'COURSE.md'),
+    ('REVISED-INSTRUCTOR.md', 'INSTRUCTOR.md'),
+    ('REVISED-VALIDATION.md', 'VALIDATION.md'),
+    ('pre-work/00-setup-and-api-access.md', 'pre-work/SETUP.md'),
+    ('pre-work/01-revised-model-access.md', 'pre-work/SETUP.md'),
+])
+def test_old_bookmarks_redirect_to_the_single_current_document(monkeypatch, old, new):
+    monkeypatch.setenv('COURSE_DOCS_DIR', str(ROOT / 'course'))
+    client = TestClient(studio.app, follow_redirects=False)
+    result = client.get('/course/' + old)
+    assert result.status_code == 308
+    assert result.headers['location'] == '/course/' + new
+    client.close()
+
+
+def test_repository_source_links_work_without_exposing_more_local_files(monkeypatch):
+    monkeypatch.setenv('COURSE_DOCS_DIR', str(ROOT / 'course'))
+    client = TestClient(studio.app)
+    page = client.get('/course/sessions/session-03-eve/WALKTHROUGH.md')
+    assert 'https://github.com/AgentOrientedArchitecture/aoa-course/blob/main/course/sessions/session-01-cv-fit/cv-examples/jordan-okafor.txt' in page.text
+    assert 'href="../../pre-work/SETUP.md"' in page.text
+    overview = client.get('/course/ARCHITECTURE.md')
+    assert 'https://github.com/AgentOrientedArchitecture/aoa-course/blob/main/system/services/planner/planner.py' in overview.text
+    assert 'src="diagrams/components.svg"' in overview.text
+    assert client.get('/course/../system/services/planner/planner.py').status_code == 404
+    folder = client.get('/course/sessions/', follow_redirects=False)
+    assert folder.status_code == 308
+    assert folder.headers['location'] == '/course/sessions/README.md'
     client.close()

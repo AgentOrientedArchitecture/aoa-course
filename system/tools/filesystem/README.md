@@ -51,11 +51,15 @@ path outside the root returns an MCP error.
 
 `capability-card.yaml` registers this tool with the AOA registry. Note
 `kind: tool` and `provenance.model: none` — there is no LLM behind the
-capability. The planner does not branch on `kind`; this card is invoked the
-same way any AU is invoked.
+capability. AU allocation excludes `kind: tool` cards. AUs discover this tool
+through the local registry and invoke its registered HTTP bridge; the bridge
+calls the deterministic MCP implementation. AGNTCY publishes AUs, not these tools.
 
 ## Running locally
 
-`docker compose up tool-filesystem` brings the container up on port 7401.
+From the repository root, `./scripts/session2-up.sh` or
+`scripts\session2-up.bat` starts it with the configured session. Session 2 limits
+its filesystem root to the inbox. Session 4 uses the `estate-filesystem` service
+with the same tool address and read-only mounts for registry and trace evidence.
 Inside the container, the bridge spawns the MCP server as a long-lived
 subprocess and pipes JSON-RPC over its stdin/stdout.

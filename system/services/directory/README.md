@@ -4,7 +4,7 @@ The image combines the official `dir-ctl` **v1.8.0** binary with Python and the 
 
 The course uses AGNTCY's single-process daemon inside this container. It does not deploy the upstream multi-service server/PostgreSQL/OCI topology. This retains the lab's existing SQLite/local-store behaviour and `.course-data/directory` data location. See the [upstream deployment options](https://dir.agntcy.org/latest/dir/dir-deployment-local/) and [CLI container documentation](https://dir.agntcy.org/latest/dir/dir-quickstart/).
 
-Use `scripts/directory.sh` or `scripts\directory.bat` from the repository root. The [learner walkthrough](../../../course/sessions/session-03-eve/DIRECTORY.md) contains the full sequence.
+Use `scripts/directory.sh` or `scripts\directory.bat` from the repository root. The [learner walkthrough](../../../course/sessions/session-03-eve/WALKTHROUGH.md) contains the full sequence.
 
 - `up` builds, starts in the background and waits for a real CLI search health check.
 - `export`, `push`, `search`, `pull` and `check` execute the helper inside the running container. `cli` exposes the real upstream CLI.
@@ -26,8 +26,8 @@ This check uses synthetic registry metadata and no model calls. It tests browser
 
 ## Runtime discovery adapter
 
-Revised Sessions 3–4 start `directory-bridge` from the same image alongside the upstream daemon. This small course-owned HTTP adapter polls the active local registry and real A2A cards every five seconds, publishes changed OASF records and retains old records. `POST /sync` waits for the expected active estate; `GET /records` performs real Directory search/pull, with pagination, and returns those records. The adapter has no model credentials and exposes no host port.
+Sessions 3–4 start `directory-bridge` from the same image alongside the upstream daemon. This small course-owned HTTP adapter polls the active local registry and real A2A cards every five seconds, publishes changed OASF records and retains old records. `POST /sync` waits for the expected active estate; `GET /records` performs real Directory search/pull, with pagination, and returns those records. The adapter has no model credentials and exposes no host port.
 
 The planner joins retrieved records against current local adoption, lifecycle and binding hashes. It records the content IDs and fails closed on missing/stale publications or a Directory outage. The adapter does not implement a replacement registry or authorise external agents. All running AUs are published; deterministic tools remain local. Every course AU has an explicit mapping checked against OASF v1.0.0; new capability IDs fail publication until a mapping is reviewed. Taxonomy labels do not establish measured performance or legal certification.
 
-`directory.sh sync --wait 120` / `directory.bat sync --wait 120` triggers publication explicitly. Native authoring still runs without AOA. The original manual export/push/pull/check commands are retained.
+`directory.sh sync --wait 120` / `directory.bat sync --wait 120` triggers publication explicitly. Native authoring still runs without AOA. Manual export/push/pull/check commands remain available for inspecting a single record.

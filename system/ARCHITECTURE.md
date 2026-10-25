@@ -1,12 +1,12 @@
 # Architecture
 
-For the October implementation, start with [How the course system works](../course/ARCHITECTURE.md), including component and request-flow diagrams. This reference retains the base-course detail; revised-profile differences are identified below and in the final section. [EVE and AGNTCY adoption](../course/sessions/session-03-eve/ADOPTION.md) provides the external-integration walkthrough.
+Start with [How the course system works](../course/ARCHITECTURE.md), including component and request-flow diagrams. This reference explains the implementation behind the four [session walkthroughs](../course/sessions/README.md). [EVE and AGNTCY adoption](../course/sessions/session-03-eve/ADOPTION.md) provides more detail about the external integration.
 
 A small, container-shaped, readable AOA system. This is a reference
 implementation for learning the shape of AOA, not a deployment platform. It
-keeps the moving parts explicit: Sessions 1 and 2 establish three workflows,
-three agent codebases, nine AU capabilities in the base profiles, three deterministic tools, and
-three plumbing services. The parser codebase is deployed as separate governed
+keeps the moving parts explicit: Sessions 1 and 2 establish CV assessment,
+knowledge ingest and knowledge query using three Python agent codebases,
+separate specialist evaluators, deterministic tools and a small control plane. The parser codebase is deployed as separate governed
 parser runtimes so Session 2 can show that new Agent IDs plus new capability
 contracts and `instructions.md` files create materially different agents
 without changing parser code. AU-to-AU orchestration uses A2A Agent Cards and
@@ -37,7 +37,9 @@ missing evidence is restored by rerunning the seed script.
 
 ## What the system does
 
-Six workflows run through one registry:
+Six workflows use local capability contracts. Sessions 1–2 discover AUs through
+the local registry; Sessions 3–4 discover them through AGNTCY Directory and
+require matching local adoption records:
 
 **CV evaluation** (Session 1):
 
@@ -45,10 +47,12 @@ Six workflows run through one registry:
 parser-cv → evaluator-cv → reporter-cv-fit
 ```
 
-You submit a CV and a job description through the studio. The planner queries
-the registry for `parser-cv` and starts it with A2A `message/send`; the parser
-returns structured CV data. The planner then starts `evaluator-cv` with the
-parsed CV and the job description; the evaluator returns scores and a verdict.
+You submit a CV, a job description and an optional assessment emphasis through
+Studio. The planner proposes tasks, checks contracts and allocates eligible
+AUs before any application work. It invokes `parser-cv` over A2A
+`message/send`; the parser returns structured CV data. The selected general,
+data or frontend evaluator receives that CV and the job description and
+returns scores and a verdict.
 Finally the planner starts `reporter-cv-fit`, which produces a structured
 fit-verdict report. Every step is visible in the studio's trace pane.
 
@@ -141,7 +145,7 @@ carry the employment composition and complete automatically.
 
 Each is something you can see on screen as you build:
 
-1. **An Agentic Unit is `model + capability + instructions.md + maybe tools`.** Some AUs have no tools — the reporter is the example. Read any agent folder to see all four parts.
+1. **An Agentic Unit owns a bounded capability contract and its implementation.** The implementation can use generation, a bounded decision model or deterministic logic. The Python scaffold separates its contract, instructions, tool dependencies and wiring. Some capabilities have no tools; others use registered tools. EVE has its own authored layout behind the same outward contract.
 2. **A registered capability isn't always an AU.** The tools in `tools/` register in the same registry the agents use. The registry holds capabilities; whether they're fulfilled by an AU over A2A or by a deterministic tool exposed through MCP is a property of the entry, not of the registry.
 3. **One codebase can become more than one governed agent.** `cv-parser` and `wiki-parser` run the same parser image, same `agent.py`, same model, and same document-text tool. Different Agent IDs, capability cards, and `instructions.md` files make them different governed agents with different contracts.
 4. **Identity and behaviour are separate.** `agent_id` is the stable governed runtime actor shown in the registry and trace. Registry lifecycle actors such as `published_by` and `approved_by` show who moved a card through governance. `instructions.md` shapes a capability's working behaviour, and `skills_hash` records which behavioural version produced an observation.
@@ -151,9 +155,8 @@ Each is something you can see on screen as you build:
 
 ## The agent set
 
-Three Python agent codebases, deployed as five distinct governed runtimes by
-Session 4 in the base profiles. The revised overlay also starts separate
-`cv-data-evaluator` and `cv-frontend-evaluator` runtimes:
+Three Python agent codebases are deployed as seven distinct governed runtimes
+by Session 4. Each session registers only its active capability set:
 
 | Runtime | Codebase | Capabilities |
 |---|---|---|
@@ -161,6 +164,8 @@ Session 4 in the base profiles. The revised overlay also starts separate
 | `wiki-parser` | `parser` | `parser-notes`, `parser-query` |
 | `estate-parser` | `parser` | `parser-estate` |
 | `evaluator` | `evaluator` | `evaluator-cv`, `evaluator-promote`, `evaluator-wiki-query`, `evaluator-plan-governance`, `evaluator-agent-evidence`, `evaluator-flow-evidence` |
+| `cv-data-evaluator` | `evaluator` | `evaluator-cv-data` |
+| `cv-frontend-evaluator` | `evaluator` | `evaluator-cv-frontend` |
 | `reporter` | `reporter` | `reporter-cv-fit`, `reporter-answer`, `reporter-ingest-summary`, `reporter-agent-evidence`, `reporter-flow-audit` |
 
 Session 3 adds one more governed runtime, authored with EVE (TypeScript/Node)
@@ -186,11 +191,13 @@ Plus, in `tools/`:
 
 ## The four parts of an AU
 
-Every AU has four addressable parts plus a stamped runtime identity:
+Each Python-scaffold AU has four addressable parts plus a stamped runtime
+identity. These filenames are one implementation pattern, not a requirement
+for every adopted framework:
 
 1. **Capability card** (`capability-card.yaml`) — the contract. Public. Mounted read-only in the container, exposed at `/cards/<id>`, and **hot-reloaded** when its host file changes.
 2. **`instructions.md`** — practical know-how for fulfilling the capability: prompt structure, judgement rubric, examples, edge cases. Mounted read-only and **hot-reloaded** — editing it on disk changes the capability's behaviour without a restart.
-3. **`tools.yaml`** — the capability ids this agent will call. May reference other AUs or pure tools. May be empty.
+3. **`tools.yaml`** — the tool capability ids this agent will call. The course uses registered MCP-backed tools here; the planner handles AU-to-AU orchestration. May be empty.
 4. **`agent.py`** — the wiring. Built on the shared FastAPI scaffold in `agents/_base/`.
 
 At boot the shared scaffold stamps each card with `agent_id` and `identity`
@@ -213,6 +220,9 @@ require rerunning `session3-adopt`.
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Stamps demo governance lifecycle actors (`published_by`, `approved_by`, reviewer/deprecation fields). Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
 | **planner** | Receives intents from Studio. Builds and validates a plan, resolves concrete cards, runs deterministic eligibility before application lookup, sequences eligible AU work with A2A `message/send`, freezes the final draft, and releases or quarantines it after exact-result review. Records all control and application events to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Shows registry, resolved work, eligibility and wiki evidence, responsibility trace, held draft, result digest, reviewer notes, and release/quarantine outcome; submits exact-result review and subscribes to registry/trace SSE. |
+| **decision** | Calls TypeSafe or the local constrained-choice baseline. Returns a choice and provider evidence; it does not invoke AUs or grant execution authority. |
+| **agntcy-directory** | Actual upstream Directory daemon and catalogue storing and retrieving OASF descriptions in Sessions 3–4. |
+| **directory-bridge** | Course adapter that publishes running AUs and retrieves Directory records for comparison with current local bindings. |
 
 ## Container topology
 
@@ -224,34 +234,40 @@ docker-compose.yml services:
   registry             FastAPI    7100
   planner              FastAPI    7200
   studio               FastAPI    8080
+  decision             FastAPI    7250
+  agntcy-directory     dirctl     8890 (catalogue host: 8891; Sessions 3–4)
+  directory-bridge     FastAPI    internal only (Sessions 3–4)
   cv-parser            FastAPI    8888 (host: 7301)
   wiki-parser          FastAPI    8888 (host: 7304)
   estate-parser        FastAPI    8888 (host: 7306; Session 4)
   evaluator            FastAPI    8888 (host: 7302)
   reporter             FastAPI    8888 (host: 7303)
+  cv-data-evaluator    FastAPI    8888 (internal only)
+  cv-frontend-evaluator FastAPI   8888 (internal only)
   tool-filesystem      MCP        7401
   tool-document-text   MCP+bridge 7402
   tool-wiki-store      MCP+bridge 7403
   ollama               profile: local, optional
 ```
 
-Session 1 starts the CV-only subset: registry, planner, studio,
-tool-document-text, `cv-parser`, evaluator, and reporter. Session 2 adds
+Session 1 starts the CV-only subset: registry, planner, Studio, decision
+service, document-text tool, CV parser, three evaluator runtimes and reporter. Session 2 adds
 `wiki-parser` and the knowledge tools. Session 3 begins differently:
 `session3-up` runs only the native EVE workshop, and `session3-adopt` then starts
 the AOA services and generic EVE bridge around the learner's accepted files.
 Session 4 adds `estate-parser`, enables the plan-governance, agent-evidence,
-and flow-evidence capabilities, exposes read-only registry/trace mounts to
-`tool-filesystem`, presents three core governance stages plus optional Graph and
+and flow-evidence capabilities, and uses the `estate-filesystem` container
+with read-only registry/trace mounts under the same `tool-filesystem` contract.
+It presents three core governance stages plus optional Graph and
 Ask evidence utilities, and sets the planner strategy to deterministic. The
 wiki tool remains explicit in AU tool traces and evidence reports. Optional
 Ollama runs only when the `local` profile is enabled.
 
-Every agent container has the same shape: a FastAPI app that mounts its
+Python-scaffold agent containers share a shape: a FastAPI app that mounts its
 `capabilities/` folder as a volume, registers itself with the registry on boot,
 exposes `/a2a`, `/.well-known/agent-card.json`, `/invoke`, and `/cards/<id>`,
 and watches mounted capability cards and `instructions.md` files for hot
-reload. Read one agent and you've read them all.
+reload. The EVE runtime uses its own framework plus the adoption bridge.
 
 ## A2A surface
 
@@ -268,13 +284,15 @@ the same `agent_id` onto each registered capability card. A2A skills are
 intentionally lighter than AOA capability cards, so the full capability-card
 contracts are advertised through a second A2A extension.
 
-The planner still uses the AOA registry to ground concrete capabilities. In
-this small course registry only approved cards are discoverable. The planner
-sends compact AU capability summaries to the planner model and asks for a JSON
-task plan. The runtime validates that the plan uses registered capabilities,
+The planner checks current approved local contracts. Sessions 3–4 also require
+matching AU records retrieved from AGNTCY; Directory publication alone is not
+permission to execute. In Sessions 1–2 the planner sends compact AU capability
+summaries to the generation model and asks for a JSON task plan. The runtime validates that the plan uses registered capabilities,
 maps required inputs, references only available prior outputs, and ends in a
 markdown-producing result. If validation fails, the deterministic course plan
-is used; Session 4 skips model planning and uses deterministic plans directly.
+is used and the fallback is recorded. Sessions 3–4 skip model task planning
+and use fixed plans directly. Contract eligibility and decision-model AU
+allocation still run before whole-composition validation.
 
 After discovery binds every task to a card, the planner records the concrete
 plan and computes a 16-character SHA-256 `plan_digest` over canonical workflow,
@@ -402,7 +420,7 @@ A browser surface at `localhost:8080` with two roles:
 
 **Intent:**
 
-- **Submit an intent.** Free-form text, sent to the planner.
+- **Submit an intent.** The selected workflow form supplies document paths, a question or other structured input to the planner. It is a bounded workflow interface, not unrestricted business-process generation.
 - **Choose a mode.** CV fit for Session 1; ingest, graph, and wiki query for
   Session 2; CV fit + interview after Session 3 adoption; three core governance
   stages (Agent card check, CV fit, and Flow audit) plus optional Graph and Ask
@@ -430,91 +448,80 @@ bind-mounted for inspection: `system/inbox/` holds submitted inputs,
 `system/services/planner/traces/` holds JSONL traces, and
 `system/services/registry/data/cards.json` holds live registry state.
 
-In the original profile (`DURABLE_CASES=false`), active `PreparedRun` objects,
-frozen outputs and locks live only in planner memory. Restarting leaves trace
-files but loses the draft needed for result review. In the revised profile,
-SQLite restores the held case and supports transactional, idempotent review;
-see the [case lifecycle](../course/ARCHITECTURE.md#session-4-a-result-that-survives-the-process).
-Neither mode supplies general recovery for external side effects.
+SQLite stores case snapshots and ordered events, restores held drafts after a
+planner restart and supports transactional, idempotent review. See the
+[case lifecycle](../course/ARCHITECTURE.md#session-4-a-result-that-survives-the-process).
+The planner code also supports an in-memory development setting,
+`DURABLE_CASES=false`: restarting then leaves JSONL but loses held drafts.
+The course Compose definition sets persistence to true. Neither setting
+supplies general recovery for external side effects.
 
 ## Running locally
 
-Use Docker Compose profiles to start the part of the system needed for the
-session.
+Follow [Course setup](../course/pre-work/SETUP.md) from the repository root.
+One `.env.example` supplies one private `.env`; the public session launchers
+select the profiles, allowed capabilities and discovery backend from
+`system/docker-compose.yml`. Running Compose directly with only a profile does
+not reproduce those launcher settings.
 
-The direct commands below illustrate the base profiles. For October, use the
-[current shell/Windows launchers](../course/pre-work/01-revised-model-access.md#start-and-stop)
-with `.env.revised` present.
+| Stage | macOS / Linux | Windows Command Prompt |
+|---|---|---|
+| CV assessment | `./scripts/session1-up.sh` | `scripts\session1-up.bat` |
+| Wiki | `./scripts/session2-up.sh` | `scripts\session2-up.bat` |
+| EVE image pre-build | `./scripts/session3-build.sh` | `scripts\session3-build.bat` |
+| Native EVE workshop | `./scripts/session3-up.sh` | `scripts\session3-up.bat` |
+| Adopt accepted EVE agent | `./scripts/session3-adopt.sh` | `scripts\session3-adopt.bat` |
+| Governance | `./scripts/session4-up.sh` | `scripts\session4-up.bat` |
+| Seed governance corpus | `./scripts/session4-seed.sh` | `scripts\session4-seed.bat` |
+| Stop the course | `./scripts/down.sh` | `scripts\down.bat` |
 
-Session 1 starts only the CV-fit path:
+Session 3 deliberately separates native acceptance from adoption. Follow its
+[walkthrough](../course/sessions/session-03-eve/WALKTHROUGH.md) without switching
+between guides. After adoption, AGNTCY provides AU discovery for new Session 3
+plans. Session 4 continues that discovery path and adds governance. The stop
+commands preserve authored files, wiki data, case state and model volumes.
 
-```bash
-docker compose --env-file .env \
-  -f system/docker-compose.yml \
-  -f system/docker-compose.yml \
-  --profile session1 \
-  up --build -d --remove-orphans
-```
+Open `http://localhost:8080` after starting an AOA stack. Registry cards appear
+as the active agents and tools register. The native EVE workshop has its own
+terminal and development interface before adoption.
 
-Session 2 starts the full knowledge-management path:
+The default hosted route uses Cerebras `gpt-oss-120b` for generation and
+TypeSafe `jev-1.13.0` for bounded decisions. The same `.env.example` documents
+the local Ollama option and alternate OpenAI-compatible providers. Changing a
+provider does not change the AU contracts; restart through the appropriate
+launcher to apply the environment and check the provider before a workflow.
 
-```bash
-docker compose --env-file .env \
-  -f system/docker-compose.yml \
-  --profile session2 \
-  up --build -d --remove-orphans
-```
+## Planning, selection and persistence
 
-For Session 3, pre-build with `session3-build`, open only the native EVE
-workshop with `session3-up`, and start the composed AOA system only after native
-acceptance with `session3-adopt`. These are the public Session 3 entry points;
-the guided sequence is in
-[`course/sessions/session-03-eve/WALKTHROUGH.md`](../course/sessions/session-03-eve/WALKTHROUGH.md).
+The course combines contract eligibility, bounded semantic allocation,
+whole-composition validation, typed wiki promotion and persistent cases.
+Specialist CV evaluators have separate Agent IDs and runtimes with compatible
+contracts.
 
-For Session 4, start the deterministic stack with three core stages plus
-optional Graph and Ask evidence exploration, then seed and verify the inspectable
-governance/evidence corpus.
+Sessions 1–2 default to hybrid task planning; Sessions 3–4 use fixed course
+plans. AU allocation runs in all four sessions. Planning, allocation,
+orchestration and result review share the planner service; the course does not
+register a separate Planner AU. It executes the accepted tasks sequentially.
+Models operate within a fixed workflow catalogue, with code checking required
+responsibilities and evidence dependencies.
 
-macOS or Linux:
+Cerebras generation and TypeSafe decisions have distinct adapters and
+configuration. Ollama can supply generation or an explicitly unscored decision
+baseline. The decision service does not grant authority or invoke an AU.
+A valid output shape and a high model probability do not establish semantic
+correctness; the configured acceptance threshold is an uncalibrated teaching
+policy.
 
-```bash
-./scripts/session4-up.sh
-./scripts/session4-seed.sh
-```
+SQLite persists case snapshots and ordered events. Draft/hold and review/release
+are transactional. JSONL remains a projection for the audit consumers.
+Interrupted invocation is marked for inspection, not blindly replayed. The
+course runs a single planner process; its in-memory request locks are not a
+distributed concurrency design or an exactly-once guarantee for external work.
 
-Windows Command Prompt:
-
-```bat
-scripts\session4-up.bat
-scripts\session4-seed.bat
-```
-
-Open `http://localhost:8080` after starting an AOA stack and you'll see the
-registry pane populate as agents and tools register.
-
-Configure the model via `.env`:
-
-```
-PROVIDER=ollama|openai|anthropic
-MODEL=...
-OPENAI_BASE_URL=...   # optional for OpenAI-compatible hosted providers
-```
-
-The intended baseline is a smaller model, for example `gpt-oss:120b` or a
-Qwen-family model, run locally through Ollama or through a service provider.
-Switching model, provider, or hosting location is a `.env` change and a
-Compose restart away. The registry, the agents, the capability cards, and the
-planner all stay still.
-
-
-## Revised course profile (October 2026)
-
-The standard session scripts always select the current course from one `.env` and one Compose definition. Earlier configuration files are preserved under `archive/configuration-before-consolidation/`. The revised profile adds contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
-
-Sessions 1–2 default to hybrid task planning; Sessions 3–4 use fixed course plans. Revised AU allocation still runs in all four sessions. Planning, allocation, orchestration and result review share the planner service; the course does not register a separate Planner AU. It executes the accepted tasks sequentially. The models operate within a fixed course workflow catalogue, with code checking required responsibilities and evidence dependencies.
-
-Cerebras generation and TypeSafe decisions have distinct adapters and configuration. Ollama can supply either generation or an explicitly unscored decision baseline. The decision service does not grant authority or invoke an AU.
-
-With `DURABLE_CASES=true`, SQLite persists case snapshots and ordered events; the earlier in-memory description applies to the original profile. Draft/hold and review/release are transactional. JSONL remains a projection for existing audit consumers. Interrupted invocation is marked for inspection, not blindly replayed. The course runs a single planner process; its in-memory request locks are not a distributed concurrency design.
-
-AGNTCY Directory v1.8.0 is an optional local service for actual OASF push/pull/search. Directory declarations never mutate local lifecycle approval. The contract-comparison tool checks the adopted card and leaves task eligibility and governance to the existing estate.
+AGNTCY Directory v1.8.0 is required for new AU discovery in Sessions 3–4.
+The course adapter publishes running AUs, retrieves OASF records and matches
+contract/runtime hashes against current approved local cards. Missing or stale
+publications stop a new plan; there is no local discovery fallback. Directory
+declarations never mutate local lifecycle approval. The exercise does not
+implement federation, verified publisher identity, SLIM or an enterprise trust
+service. Tools continue to resolve through the local registry.

@@ -1,6 +1,6 @@
 # Adopting EVE with AGNTCY Directory
 
-The business already has CV parsing and assessment. It now needs interview questions based on that assessment. We build that capability in **EVE**, accept it in its own development environment, and then make it usable by the existing AOA system. From revised Session 3 onwards, **AGNTCY Directory supplies the planner's AU discovery**. All running AUs are published, including the EVE interviewer; local adoption and lifecycle checks still control which discovered capabilities may be selected.
+The business already has CV parsing and assessment. It now needs interview questions based on that assessment. We build that capability in **EVE**, accept it in its own development environment, and then make it usable by the existing AOA system. From Session 3 onwards, **AGNTCY Directory supplies the planner's AU discovery**. All running AUs are published, including the EVE interviewer; local adoption and lifecycle checks still control which discovered capabilities may be selected.
 
 This is the course's concrete test of framework independence. The Python planner can use a TypeScript agent running in a third-party framework because the integration boundary describes the work, inputs, outputs and invocation. It does not require rewriting the agent in the Python scaffold.
 
@@ -80,7 +80,7 @@ Directory's content ID identifies the published record. It is distinct from the 
 
 | Stage | Action | Evidence to retain |
 |---|---|---|
-| 1 · Prepare | Use the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop); pre-build Session 3 images | Pinned EVE image and configured model route |
+| 1 · Prepare | Use the [launcher table](../../pre-work/SETUP.md#start-and-stop); pre-build Session 3 images | Pinned EVE image and configured model route |
 | 2 · Author | Start native EVE; follow the [walkthrough](WALKTHROUGH.md) through `eve init`, provider configuration and `eve dev` | Learner files; native output for the supplied synthetic input |
 | 3 · Accept natively | Check five questions, field/word limits, grounding and no hiring decision | The observed reply and any failure/correction |
 | 4 · Adopt | Exit the native shell and run `session3-adopt.sh` or `.bat` | Healthy bridge, local card and automatic publication of the running AU estate |
@@ -89,7 +89,7 @@ Directory's content ID identifies the published record. It is distinct from the 
 | 7 · Compose | In Studio choose **CV fit + interview**, using the same CV/JD fixtures | AGNTCY discovery event, EVE content ID, accepted binding, A2A request and five returned questions |
 | 8 · Challenge | Change a copy of the discovery record's contract hash; check it again | A mismatch, with no change to local adoption or lifecycle state |
 
-In the revised course, a specialist evaluator may be selected before the EVE step. Inspect that accepted binding. The Session 3 task plan is fixed to keep attention on the adoption boundary; AU allocation still uses the revised contract/decision path.
+A specialist evaluator may be selected before the EVE step. Inspect that accepted binding. The Session 3 task plan is fixed to keep attention on the adoption boundary; AU allocation still uses the contract/decision path.
 
 EVE and Directory both run through Docker on Windows. Use the same Windows checkout and Command Prompt for `session3-adopt.bat` and `directory.bat`; no separate WSL checkout or host Python is needed. The shell launcher provides the same Directory operations on macOS/Linux. Directory records and exported files remain in `.course-data`, and the course stop/log scripts include the Directory container. The [original native-host route](NATIVE-DIRECTORY.md) remains available as an alternative.
 
@@ -128,6 +128,6 @@ Repository links below work in GitHub or an editor; Studio only serves the learn
 
 ## What has been verified?
 
-The [21 October validation](../../REVISED-VALIDATION.md) records real EVE scaffolding, adoption, a direct five-question response and a complete CV-to-EVE composition on Spark. It also records real Directory storage, indexing, search, retrieval and a local contract comparison. Those observations support the integration claim.
+The [recorded integration checks](../../VALIDATION.md) records real EVE scaffolding, adoption, a direct five-question response and a complete CV-to-EVE composition on Spark. It also records real Directory storage, indexing, search, retrieval and a local contract comparison. Those observations support the integration claim.
 
 Fresh Mac/Windows walkthroughs and Lewis's timed rehearsal remain separate acceptance steps. The lab does not establish cross-company trust, production readiness, universal A2A conformance, or deployment of the rest of AGNTCY. The useful evidence is the working call across the boundary and the artefacts that let us inspect it.

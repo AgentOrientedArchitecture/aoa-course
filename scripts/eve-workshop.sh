@@ -15,6 +15,7 @@ case "$mode" in
   if [[ "${AOA_LOCAL:-false}" == "true" || "${AOA_LOCAL:-0}" == "1" ]]; then
     "${compose[@]}" "${files[@]}" up -d ollama
   fi
+  echo "Workshop on $(hostname): $(pwd)/system/agents-eve/workshop"
   exec "${compose[@]}" "${files[@]}" run --rm --no-deps --service-ports --user "$(id -u):$(id -g)" -e HOME=/tmp "$@" eve-workshop-native;;
  adopt)
   mkdir -p "${COURSE_DIRECTORY_DATA_ROOT:-.course-data}"

@@ -123,17 +123,22 @@ about the EU AI Act through the grounded knowledge-query workflow and inspect
 its passage citations and tool retrieval. These utilities are not extra stages
 in the governance learning arc.
 
-## Course-state limitation
+## Saved cases
 
-The following in-memory limitation describes the original profile. The revised
-profile with `DURABLE_CASES=true` persists cases in SQLite and can reopen saved
-evidence after a planner restart; see the revised-profile section of
-`system/ARCHITECTURE.md`. Studio's saved-case list reports which mode is active.
+The course sets `DURABLE_CASES=true`. Studio proxies run reads and result
+reviews to the planner, which persists cases in SQLite. After a planner
+restart, open the saved case and review the same held draft. The saved-case
+list reports whether persistence is enabled. See the
+[Session 4 walkthrough](../../../course/sessions/session-04-compliance/WALKTHROUGH.md).
 
-Studio proxies active-run reads and result reviews to planner memory. If the
-planner restarts, the trace JSONL remains but an existing held draft can no
-longer be reviewed. Submit a new intent and review its new draft. This is not
-production persistence or crash-idempotent workflow recovery.
+An interrupted external invocation is marked for inspection and is not
+automatically replayed. Persisted case state does not establish exactly-once
+external effects.
+
+For isolated development, the planner also supports `DURABLE_CASES=false`. In
+that configuration a restart retains JSONL but loses held drafts from memory;
+review then requires a new intent. The standard course launchers use persisted
+cases.
 
 ## Internals
 
@@ -159,7 +164,7 @@ approval into result review.
 | `GET` | `/` | Studio page |
 | `GET` | `/events` | merged registry and planner SSE stream |
 | `POST` | `/api/intent` | proxied planner response after input persistence |
-| `GET` | `/api/runs/{trace_id}` | active in-memory planner run and held draft |
+| `GET` | `/api/runs/{trace_id}` | planner run and held draft, including restored saved cases |
 | `POST` | `/api/runs/{trace_id}/review` | exact-`result_digest` approval/rejection with required notes |
 | `POST` | `/api/runs/{trace_id}/approval` | compatibility alias for result review |
 | `GET` | `/api/capabilities` | initial registry snapshot |

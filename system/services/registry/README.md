@@ -4,12 +4,12 @@ A small HTTP service that holds the set of registered capabilities.
 
 Agents and tools `POST /register` on boot. The studio subscribes to `/stream`
 to keep its registry pane live. The registry supports `POST /discover` for
-deterministic ranking. In the revised course the planner reads `GET /list`,
+deterministic ranking. In Sessions 1–2 the planner reads `GET /list`,
 then performs contract eligibility and bounded decision allocation in its own
 service before invoking the selected card.
 `GET /find?id=<id>` remains available for direct lookup and inspection.
 
-This remains the local adoption/lifecycle authority. In revised Sessions 3–4,
+This remains the local adoption/lifecycle authority. In Sessions 3–4,
 AGNTCY Directory becomes the planner's AU discovery source: a course adapter
 publishes running AUs with their actual A2A cards, and the planner matches
 retrieved records against current local approvals and bindings. Directory does

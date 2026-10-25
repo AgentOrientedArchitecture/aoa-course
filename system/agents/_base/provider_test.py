@@ -92,7 +92,7 @@ def _failure_hint(provider: str) -> str:
     if provider == "openai":
         if urlsplit(os.environ.get("OPENAI_BASE_URL", "")).hostname == "api.cerebras.ai":
             return (
-                "Set CEREBRAS_API_KEY in .env or .env.revised and use the "
+                "Set CEREBRAS_API_KEY in .env and use the "
                 "course launcher. It maps that key to the adapter's "
                 "OPENAI_API_KEY. Check the exact MODEL id and provider access."
             )

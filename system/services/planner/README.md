@@ -5,36 +5,36 @@ capabilities, checks pre-execution eligibility, orchestrates application AUs,
 and controls release of the completed result. It owns the correlated JSONL
 trace.
 
-The base system uses hybrid model planning with deterministic validation and
+Sessions 1–2 use hybrid model planning with deterministic validation and
 fallback. Sessions 3 and 4 set `PLANNER_STRATEGY=deterministic`, so their enabled
 workflows use fixed course plans. This service also implements orchestration
 and result review; it is not a separately registered Planner AU.
 
-## Revised allocation
+## AU allocation
 
-With `ALLOCATION_MODE=decision`, the service obtains the registry's `/list`,
-filters cards against a task's reference contract and calls the decision
-service only when multiple eligible AUs remain. A single eligible AU requires
+With `ALLOCATION_MODE=decision`, the service obtains candidate cards through
+the session's discovery path, filters them against a task's reference contract
+and calls the decision service only when multiple eligible AUs remain. A single eligible AU requires
 no model choice. No fit, low probability or a provider error stops allocation
 before application execution. `validate_composition` checks required tasks,
 input/output compatibility and evidence dependencies before accepted bindings
 are recorded. See the [selection diagram](../../../course/ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au).
 
-Revised Sessions 3–4 set `DISCOVERY_BACKEND=agntcy`. Before planning/allocation,
+Sessions 3–4 set `DISCOVERY_BACKEND=agntcy`. Before planning/allocation,
 the service retrieves actual Directory search/pull results from the course
 `directory-bridge`, then matches OASF binding hashes and A2A modules against
 current approved local AU cards. The registry list is the adoption authority,
 not a substitute discovery result. Missing/stale publications or unavailable
 Directory stop new runs with no AU invocation and no local discovery fallback.
 Trace events retain content IDs, accepted/excluded records and missing bindings.
-Tools remain local; they are not AU candidates. Sessions 1–2 and the original
-profile retain local discovery. Held-result review requires no new discovery.
+Tools remain local; they are not AU candidates. Sessions 1–2 use the local registry
+list for discovery. Held-result review requires no new discovery.
 
 Task planning and AU allocation are separate settings: fixed Session 3/4 plans
 can still receive decision-model allocation. The workflow catalogue and
 reference contracts bound what the model can propose. Execution is sequential.
-The workflow diagrams below use the original general CV evaluator; the revised
-allocator may select `evaluator-cv-data` or `evaluator-cv-frontend` for that task.
+The workflow diagrams below name the general CV evaluator; the allocator may
+select `evaluator-cv-data` or `evaluator-cv-frontend` for that task.
 
 ## Workflows
 
@@ -120,20 +120,21 @@ or authorization credentials.
 ## Held-run state
 
 Trace files persist under `/data/traces/`, bind-mounted to
-`system/services/planner/traces/`. The persistence mode matters:
+`system/services/planner/traces/`. The course sets `DURABLE_CASES=true`.
+`case_store.py` persists snapshots and ordered events in SQLite at
+`CASE_DB_PATH`. Held drafts restore after restart. Draft/hold and
+review/release-or-quarantine transactions are atomic. Identical review retries
+return the stored outcome; conflicts receive HTTP 409. JSONL is a projection
+regenerated for existing audit consumers.
 
-- Original profile, `DURABLE_CASES=false`: active runs, drafts and locks live in
-  memory. Restart leaves JSONL evidence but requires a new intent for review.
-- Revised profile, `DURABLE_CASES=true`: `case_store.py` persists snapshots and
-  ordered events in SQLite at `CASE_DB_PATH`. Held drafts restore after restart.
-  Draft/hold and review/release-or-quarantine transactions are atomic. Identical
-  review retries return the stored outcome; conflicts receive HTTP 409. JSONL
-  is a projection regenerated for existing audit consumers.
+For isolated development, the planner code also supports `DURABLE_CASES=false`.
+That stores active runs and drafts in memory: restarting retains JSONL evidence
+but requires a new intent for review. It is not a separate learner setup.
 
 On startup, previously running/preparing cases become `interrupted` and are not
 automatically rerun. Request locks are still in-process, and the course runs one
 planner process. This is not a distributed workflow service or an exactly-once
-guarantee for external effects. See the [case diagram and exercise](../../../course/sessions/session-04-compliance/DURABLE-CASES.md).
+guarantee for external effects. See the [Session 4 walkthrough](../../../course/sessions/session-04-compliance/WALKTHROUGH.md).
 
 ## Endpoints
 

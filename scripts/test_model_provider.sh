@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ ! -f .env && ! -f .env.revised ]]; then
-  echo "error=.env or .env.revised is required in the repository root" >&2
+  echo "error=.env is required in the repository root; copy .env.example first" >&2
   exit 1
 fi
 

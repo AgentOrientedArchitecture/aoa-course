@@ -1,6 +1,6 @@
 # How the course system works
 
-This guide describes the **October implementation on `main`**, using the standard `.env` setup. Start with the [setup and launcher table](pre-work/01-revised-model-access.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
+This guide describes the **course implementation on `main`**, using the standard `.env` setup. Start with the [setup and launcher table](pre-work/SETUP.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
 
 The course builds one estate across four examples: assess a CV, curate a wiki, adopt an EVE interviewer, then review a persistent business result. A capability is a job the system can ask for; an Agentic Unit is the runtime responsible for fulfilling its contract. A model is one possible implementation component inside that boundary.
 
@@ -15,10 +15,10 @@ The course builds one estate across four examples: assess a CV, curate a wiki, a
 | **Planner service** | Constructs a bounded task plan, allocates AUs, validates composition, orchestrates calls and controls result release. These distinct responsibilities share one Python process. | `http://localhost:7200/healthz`; proposal source, allocation evidence and accepted plan |
 | **Decision service** | Calls TypeSafe's typed-choice API, or the explicitly unscored Ollama baseline. Returns a choice and available provenance. The caller decides whether to accept it. | `http://localhost:7250/healthz`; choice, eligible alternatives, provider/model and latency in the trace |
 | **Python AUs** | Parser, evaluator and reporter codebases deployed with particular cards, instructions and Agent IDs. Specialists are separate evaluator runtimes. | The selected card and its `instructions.md`, `skills_hash`, inputs, outputs and signals |
-| **EVE AU** | The learner's TypeScript agent running in the real EVE runtime, behind a course-owned adoption bridge. | Native EVE at `http://localhost:7310`; adopted card at `http://localhost:7311/.well-known/agent-card.json` |
+| **EVE AU** | The learner's TypeScript agent running in the real EVE runtime, behind a course-owned adoption bridge. | Native `eve dev` terminal UI; adopted card at `http://localhost:7311/.well-known/agent-card.json` |
 | **Tool bridges** | Deterministic capabilities for files, document extraction and wiki storage. Registered HTTP bridges call the local MCP implementations. | `kind: tool`; tool invocations within the AU trace |
 | **Case store** | SQLite snapshots and ordered events, used to restore runs and commit exact-result review. | Saved case, status, result digest and review; `system/services/planner/traces/cases.sqlite3` |
-| **AGNTCY Directory** | A real Directory daemon and CLI in Docker. In revised Sessions 3–4 it supplies AU discovery for every new plan; a course adapter publishes running AUs and retrieves OASF records. | Published record, content ID, search/pull result and comparison with a local card |
+| **AGNTCY Directory** | A real Directory daemon and CLI in Docker. In Sessions 3–4 it supplies AU discovery for every new plan; a course adapter publishes running AUs and retrieves OASF records. | Published record, content ID, search/pull result and comparison with a local card |
 
 These URLs refer to the machine running the course. On Spark use your configured connection or forwarding; `localhost` on a different laptop is a different machine. Directory exposes loopback port 8890 for the CLI and [8891 for its upstream catalogue](http://localhost:8891); its CLI and helper run inside the container through `directory.sh/.bat`. The helper reaches `registry:7100` on the course Docker network. Directory records are separate from Studio's runtime-registry pane and persist under `.course-data/directory`. Open exported/pulled `.course-data/*.json` files to inspect the full OASF descriptions. Automatic runtime records embed actual A2A cards and appear in the catalogue. Manual template-only exports remain CLI/editor-readable; see [viewing OASF descriptions](sessions/session-03-eve/DIRECTORY.md#view-the-oasf-descriptions).
 
@@ -36,7 +36,7 @@ The entire resolved composition then passes a further check: every required resp
 
 The general, data and frontend evaluators have compatible public contracts and different instructions. Choosing the data evaluator changes the runtime doing the assessment, not the parser or reporter contract. Compare actual results before concluding that the choice improved quality. The course records observations; it does not automatically train the selector or maintain a measured-quality marketplace.
 
-**Inspect in Studio:** proposal source → eligible candidates → returned choice → composition validation → accepted AU → actual output. Continue with the [CV exercise](sessions/session-01-cv-fit/DECISIONS.md).
+**Inspect in Studio:** proposal source → eligible candidates → returned choice → composition validation → accepted AU → actual output. Continue with the [CV exercise](sessions/session-01-cv-fit/WALKTHROUGH.md).
 
 ## Session 2: the decision is the AU's main model output
 
@@ -46,15 +46,15 @@ The general, data and frontend evaluators have compatible public contracts and d
 
 `reporter-ingest-summary` calls the wiki store only when promotion is true. Uncertain material is recorded and withheld; there is no separate human promotion queue. The query workflow remains `parser-query → evaluator-wiki-query → reporter-answer`, with retrieval and ranking over the stored passages.
 
-This is a separate use of a decision model from AU allocation: the judgement is the core work of this AU. Continue with the [wiki exercise](sessions/session-02-wiki/DECISIONS.md).
+This is a separate use of a decision model from AU allocation: the judgement is the core work of this AU. Continue with the [wiki exercise](sessions/session-02-wiki/WALKTHROUGH.md).
 
 ## Session 3: adopting another framework and using external discovery
 
 ![EVE native authoring, AOA adoption and independent AGNTCY Directory discovery](diagrams/eve-adoption.svg)
 
-The course uses real EVE and AGNTCY components, with explicit integration code between them and AOA. EVE supplies the agent framework and runtime. AGNTCY Directory stores portable descriptions. The course bridge adds the local capability contract, identity, invocation surface and trace boundary. From revised Session 3 onwards, AGNTCY supplies the discovered AU records. The local registry remains the authority for adoption, contract, runtime binding and lifecycle; it also retains tool lookup. The planner requires both a current Directory publication and an approved matching local AU.
+The course uses real EVE and AGNTCY components, with explicit integration code between them and AOA. EVE supplies the agent framework and runtime. AGNTCY Directory stores portable descriptions. The course bridge adds the local capability contract, identity, invocation surface and trace boundary. From Session 3 onwards, AGNTCY supplies the discovered AU records. The local registry remains the authority for adoption, contract, runtime binding and lifecycle; it also retains tool lookup. The planner requires both a current Directory publication and an approved matching local AU.
 
-Read [Adopting EVE with AGNTCY Directory](sessions/session-03-eve/ADOPTION.md) before the lab. It explains the actual invocation, the three different descriptions, the proof at each boundary and the work still required to adopt an externally owned agent. Then follow [native authoring](sessions/session-03-eve/WALKTHROUGH.md) and the [Directory exercise](sessions/session-03-eve/DIRECTORY.md).
+Follow the complete [Session 3 walkthrough](sessions/session-03-eve/WALKTHROUGH.md). The optional [adoption explanation](sessions/session-03-eve/ADOPTION.md) covers the actual invocation, three descriptions, evidence at each boundary and work still required to adopt an externally owned agent.
 
 ## Session 4: a result that survives the process
 
@@ -64,7 +64,7 @@ Before application invocation, the deterministic governance evaluator checks the
 
 Review binds to the exact result digest and requires notes. Approval releases the same payload; rejection quarantines it. Snapshot and review/release events commit in one SQLite transaction. An identical retry returns the recorded outcome; a conflicting review is rejected. JSONL is regenerated from the stored events for the original audit tools.
 
-A restart during execution marks the case interrupted. The implementation cannot know whether an external effect occurred, so it does not automatically replay that invocation. The course uses a single planner process, not a distributed workflow engine or Cloudflare Durable Objects deployment. Its configured reviewer ID is a classroom actor label, not authenticated reviewer identity. Continue with the [durable case exercise](sessions/session-04-compliance/DURABLE-CASES.md).
+A restart during execution marks the case interrupted. The implementation cannot know whether an external effect occurred, so it does not automatically replay that invocation. The course uses a single planner process, not a distributed workflow engine or Cloudflare Durable Objects deployment. Its configured reviewer ID is a classroom actor label, not authenticated reviewer identity. Continue with the [durable case exercise](sessions/session-04-compliance/WALKTHROUGH.md).
 
 ## What changes between sessions
 
@@ -92,4 +92,4 @@ Sessions 3 and 4 deliberately fix task planning to keep attention on adoption an
 
 Source links work in the repository or a local editor. Studio serves the learner `course/` documentation and diagrams; it does not expose arbitrary repository source files.
 
-For the verification already performed and its limits, see the [validation record](REVISED-VALIDATION.md). These diagrams describe code and configuration, not a claim that every diagrammed path has been rehearsed on both learner laptops.
+For the verification already performed and its limits, see the [validation record](VALIDATION.md). These diagrams describe code and configuration, not a claim that every diagrammed path has been rehearsed on both learner laptops.

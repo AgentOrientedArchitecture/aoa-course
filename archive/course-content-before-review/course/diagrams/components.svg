@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+<title id="title">The course system</title><desc id="desc">One browser, a small control plane, and independently running capabilities.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#516775"/></marker></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#203847}.title{font-size:30px;font-weight:700}.sub{font-size:18px;fill:#536875}.head{font-size:23px;font-weight:700}.body{font-size:18px}.label{font-size:16px;fill:#405866;paint-order:stroke;stroke:#fafbf9;stroke-width:7px;stroke-linejoin:round}</style>
+<rect width="1200" height="800" fill="#fafbf9"/>
+<text x="40" y="48" class="title">The course system</text>
+<text x="40" y="82" class="sub">One browser, a small control plane, and independently running capabilities.</text>
+<rect x="450" y="120" width="300" height="100" rx="12" fill="#ffffff" stroke="#5b6c78" stroke-width="1.5"/>
+<rect x="450" y="135" width="5" height="70" rx="2" fill="#5b6c78"/>
+<text x="470" y="155" class="head" text-anchor="start">Studio · 8080</text>
+<text x="470" y="185" class="body" text-anchor="start">Submit work; inspect evidence</text>
+<text x="470" y="211" class="body" text-anchor="start">Review the held result</text>
+<rect x="40" y="290" width="300" height="145" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="40" y="305" width="5" height="115" rx="2" fill="#32649a"/>
+<text x="60" y="325" class="head" text-anchor="start">Registry · 7100</text>
+<text x="60" y="355" class="body" text-anchor="start">Capability contracts and IDs</text>
+<text x="60" y="381" class="body" text-anchor="start">Lifecycle metadata</text>
+<text x="60" y="407" class="body" text-anchor="start">Cards persist in cards.json</text>
+<rect x="450" y="270" width="300" height="180" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="450" y="285" width="5" height="150" rx="2" fill="#32649a"/>
+<text x="470" y="305" class="head" text-anchor="start">Planner service · 7200</text>
+<text x="470" y="335" class="body" text-anchor="start">Propose and validate a plan</text>
+<text x="470" y="361" class="body" text-anchor="start">Select and invoke AUs</text>
+<text x="470" y="387" class="body" text-anchor="start">Manage result review</text>
+<text x="470" y="413" class="body" text-anchor="start">These roles share a process</text>
+<rect x="860" y="290" width="300" height="145" rx="12" fill="#fff3dc" stroke="#94621c" stroke-width="1.5"/>
+<rect x="860" y="305" width="5" height="115" rx="2" fill="#94621c"/>
+<text x="880" y="325" class="head" text-anchor="start">Decision API · 7250</text>
+<text x="880" y="355" class="body" text-anchor="start">A bounded named choice</text>
+<text x="880" y="381" class="body" text-anchor="start">TypeSafe or local Ollama</text>
+<text x="880" y="407" class="body" text-anchor="start">No authority to invoke an AU</text>
+<rect x="450" y="540" width="300" height="135" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="450" y="555" width="5" height="105" rx="2" fill="#23775b"/>
+<text x="470" y="575" class="head" text-anchor="start">Agentic Units</text>
+<text x="470" y="605" class="body" text-anchor="start">Python runtimes or EVE</text>
+<text x="470" y="631" class="body" text-anchor="start">Each fulfils its public contract</text>
+<text x="470" y="657" class="body" text-anchor="start">Models and tools live inside</text>
+<rect x="40" y="540" width="300" height="135" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="40" y="555" width="5" height="105" rx="2" fill="#23775b"/>
+<text x="60" y="575" class="head" text-anchor="start">Tool bridges</text>
+<text x="60" y="605" class="body" text-anchor="start">Document text, files, wiki</text>
+<text x="60" y="631" class="body" text-anchor="start">Registered as kind: tool</text>
+<text x="60" y="657" class="body" text-anchor="start">HTTP bridge → MCP server</text>
+<rect x="860" y="540" width="300" height="135" rx="12" fill="#f0ecfa" stroke="#715391" stroke-width="1.5"/>
+<rect x="860" y="555" width="5" height="105" rx="2" fill="#715391"/>
+<text x="880" y="575" class="head" text-anchor="start">Case store</text>
+<text x="880" y="605" class="body" text-anchor="start">SQLite snapshots and events</text>
+<text x="880" y="631" class="body" text-anchor="start">JSONL audit projection</text>
+<text x="880" y="657" class="body" text-anchor="start">Revised profile</text>
+<path d="M600 220V270" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="680" y="249" class="label" text-anchor="middle">intent / review</text>
+<path d="M450 335H340" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="395" y="322" class="label" text-anchor="middle">read cards</text>
+<path d="M750 335H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="805" y="322" class="label" text-anchor="middle">ask for choice</text>
+<path d="M600 450V540" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="686" y="500" class="label" text-anchor="middle">A2A invocation</text>
+<path d="M450 600H340" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="395" y="587" class="label" text-anchor="middle">tool call</text>
+<path d="M750 410H800V600H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="819" y="500" class="label" text-anchor="middle">persist</text>
+<text x="40" y="725" class="sub" text-anchor="start">AUs and tools publish cards to the registry at boot. Studio receives registry and trace events.</text>
+<text x="40" y="755" class="sub" text-anchor="start">Generation calls use Cerebras or Ollama. External Directory discovery is shown in the Session 3 diagram.</text>
+</svg>

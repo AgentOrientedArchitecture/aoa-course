@@ -1,27 +1,19 @@
 # Course sessions
 
-**Revised course:** [Cerebras, TypeSafe and the four connected live demos](../REVISED-COURSE.md). The original material below is retained.
+Complete the [setup](../pre-work/SETUP.md), then follow one walkthrough per session.
+Each includes its start commands, exercises, inspection checkpoints, review questions
+and stop command. Other documents in the folder are optional references.
 
-Start the October walkthrough with the [architecture guide](../ARCHITECTURE.md), then the session's revised guide: [CV allocation](session-01-cv-fit/DECISIONS.md), [wiki decisions](session-02-wiki/DECISIONS.md), [EVE/AGNTCY adoption](session-03-eve/ADOPTION.md), or [durable cases](session-04-compliance/DURABLE-CASES.md). These explain how to use the original walkthroughs with the revised profile.
+| Session | Complete walkthrough | What you do |
+|---|---|---|
+| 1 · CV fit | [Start Session 1](session-01-cv-fit/WALKTHROUGH.md) | Inspect planning, choose between compatible evaluators and change the AU that actually ran |
+| 2 · Wiki | [Start Session 2](session-02-wiki/WALKTHROUGH.md) | Use a decision model inside the promotion AU, then retrieve and question stored evidence |
+| 3 · EVE and AGNTCY | [Start Session 3](session-03-eve/WALKTHROUGH.md) | Author and accept an EVE agent, adopt it, discover AUs through AGNTCY and run the composition |
+| 4 · Compliance | [Start Session 4](session-04-compliance/WALKTHROUGH.md) | Check declarations, hold a result, recover it after restart, review it and audit the evidence |
 
-One folder per hands-on session. Each folder follows the same layout:
+All CV/JD examples are synthetic. The wiki and regulation seeds are dated,
+curated teaching corpora; they are not automatically refreshed when the course
+code changes. Inspect source dates and gaps before relying on an answer.
 
-- **`WALKTHROUGH.md`** — the learner instructions for the session. Start here.
-- **`README.md`** — describes the session's example data and how to feed it in.
-- Data subfolders (CVs, wiki seed notes, regulations seed, …) used by the
-  walkthrough.
-
-All CV/JD examples are synthetic; none of the people or companies are real.
-The wiki seed notes are curated course copies distilled from the main
-`aoa-knowledge` raw archive.
-
-| Session | Folder | What you do |
-| --- | --- | --- |
-| 1 — CV fit | [`session-01-cv-fit/`](session-01-cv-fit/WALKTHROUGH.md) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register. |
-| 2 — Wiki | [`session-02-wiki/`](session-02-wiki/WALKTHROUGH.md) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask. |
-| 3 — EVE | [`session-03-eve/`](session-03-eve/WALKTHROUGH.md) | Author an agent natively in EVE, accept it, then adopt it into the AOA registry, planner, and Studio. |
-| 4 — Compliance | [`session-04-compliance/`](session-04-compliance/WALKTHROUGH.md) | Agent card check, CV fit to a held result with human review, and flow audit against the EU AI Act corpus. |
-
-Start each session with its start script from the repo root
-(`./scripts/session1-up.sh` … `./scripts/session4-up.sh`, with `.bat`
-equivalents for Windows); the walkthroughs give the exact sequence.
+The [course overview](../COURSE.md) explains the learning outcomes. The
+[architecture guide](../ARCHITECTURE.md) shows the components and request paths.

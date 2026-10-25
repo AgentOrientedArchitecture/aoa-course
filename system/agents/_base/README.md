@@ -1,8 +1,10 @@
 # Shared agent scaffold
 
-`base.py` is the FastAPI scaffold every agent in this system extends.
+`base.py` is the FastAPI scaffold used by the Python agents in this system.
 
-It handles the five jobs every agent does the same way:
+EVE agents use their own runtime and the [adoption bridge](../../EVE.md).
+
+The Python scaffold handles five shared jobs:
 
 1. Discovers capability cards under `capabilities/<name>/`.
 2. Computes `skills_hash` for each by SHA-ing the matching `instructions.md`.

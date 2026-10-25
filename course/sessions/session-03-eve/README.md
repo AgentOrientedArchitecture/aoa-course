@@ -1,6 +1,12 @@
 # Session 3 — Authoring AUs with EVE
 
-Begin with [Adopting EVE with AGNTCY Directory](ADOPTION.md): the component boundaries, three descriptions, actual EVE call and evidence of adoption. Then use [native authoring](WALKTHROUGH.md) and [Directory discovery](DIRECTORY.md) as the practical sequence.
+Start with the [Session 3 walkthrough](WALKTHROUGH.md). It takes you from native
+EVE authoring through adoption, AGNTCY discovery, a CV/interview run and the
+Directory outage check. All required steps are on that page.
+
+Optional references: [architecture and adoption](ADOPTION.md),
+[manual Directory operations](DIRECTORY.md), [host-installed Directory](NATIVE-DIRECTORY.md).
+The default route runs both EVE and Directory in Docker on macOS, Linux and Windows.
 
 Session 3 uses [Vercel EVE](https://github.com/vercel/eve) to author and accept
 an agent natively before adopting it into the same registry, planner, and Studio
@@ -32,7 +38,7 @@ The learner starts with a blank authored surface under
 2. `session3-up` — run native EVE only; inside it, run `eve init .`, `eve info`,
    and `eve dev`.
 3. `session3-adopt` — create `capability-card.yaml` automatically when missing,
-   start AOA, and publish the accepted agent.
+   start AOA, publish all active AUs to AGNTCY and wait for discovery.
 
 Use `eve dev` to complete the native acceptance tests before adoption. The
 agent must return JSON only, exactly five bounded interview questions, and no

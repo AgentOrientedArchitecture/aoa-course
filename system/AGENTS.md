@@ -2,11 +2,11 @@
 
 Read [`ARCHITECTURE.md`](ARCHITECTURE.md) first for the system as a whole. This document zooms into one agent.
 
-The [October architecture guide](../course/ARCHITECTURE.md) shows how these parts connect in the revised profile, including specialist evaluator selection and persistent cases. The [EVE/AGNTCY guide](../course/sessions/session-03-eve/ADOPTION.md) explains adoption beyond this Python scaffold.
+The [course architecture guide](../course/ARCHITECTURE.md) shows how these parts connect, including specialist evaluator selection and persistent cases. The [EVE/AGNTCY guide](../course/sessions/session-03-eve/ADOPTION.md) explains adoption beyond this Python scaffold.
 
 ## The four parts
 
-Every Agentic Unit has four addressable parts:
+The Python scaffold uses four addressable parts. EVE uses a different authored layout, described below:
 
 ```
 agents/<name>/
@@ -33,7 +33,6 @@ example.
 ```yaml
 needs:
   - tool-document-text
-  - parser-cv
 ```
 
 The agent resolves these at boot through the registry and the resulting handles are passed into `agent.py`.
@@ -58,8 +57,8 @@ agents/evaluator/
   agent.py
   capabilities/
     cv/                 # evaluator-cv: CV-vs-JD fit
-    cv-data/            # revised: separate data evaluator runtime
-    cv-frontend/        # revised: separate frontend evaluator runtime
+    cv-data/            # separate data evaluator runtime
+    cv-frontend/        # separate frontend evaluator runtime
     promote/            # evaluator-promote: wiki promotion
     wiki-query/         # evaluator-wiki-query: retrieved wiki evidence
     plan-governance/    # evaluator-plan-governance: deterministic composition gate
@@ -111,10 +110,13 @@ before the learner reruns Agent card check.
 
 ## Invocation
 
-The planner gives the planner model compact registry context and asks for a
-task plan. The runtime validates that plan against capability cards, falling
-back to the deterministic course plan if needed, and binds each task to a
-concrete card. When plan governance is enabled, the planner records the
+In Sessions 1–2, the planner gives the generation model compact registry
+context and asks for a task plan. It validates the proposal and records any
+fallback to the fixed course plan. Sessions 3–4 use fixed task plans. All four
+sessions then filter AU contracts and use the decision service when several
+eligible candidates remain. Sessions 3–4 require current AGNTCY publications
+matched against the local adoption records before allocation. Whole-plan
+validation precedes accepted bindings. When plan governance is enabled, the planner records the
 resolved plan and digest and invokes the control-plane
 `evaluator-plan-governance` before any application-card lookup or invocation.
 An ineligible plan is rejected before application work. An eligible employment
@@ -330,8 +332,11 @@ compliance or certification, or proves effective human oversight.
 Both are course integrity mechanisms, not signatures or authorization
 credentials.
 
-In the original profile (`DURABLE_CASES=false`), held drafts live in planner
-memory; restart leaves trace JSONL but requires a new intent. The revised
-profile persists case snapshots and ordered events in SQLite, restores held
+The course persists case snapshots and ordered events in SQLite, restores held
 drafts and commits exact-result review transactionally. An interrupted external
-invocation is not automatically replayed. See the [restart exercise](../course/sessions/session-04-compliance/DURABLE-CASES.md).
+invocation is not automatically replayed. See the [Session 4 walkthrough](../course/sessions/session-04-compliance/WALKTHROUGH.md).
+
+The planner code also supports `DURABLE_CASES=false` for isolated development:
+held drafts then live in memory and cannot be reviewed after a restart. The
+course Compose definition enables persistence; learners do not select a
+separate course version.

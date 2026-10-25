@@ -1,4 +1,4 @@
-/* Additive inspection surfaces for the revised course. Existing Studio stays intact. */
+/* Plan, decision and saved-case inspection for the course. */
 (() => {
   const host = document.createElement("section");
   host.className = "lifecycle-section course-inspector";
@@ -54,8 +54,10 @@
     }
     let content=allocations.map(record=>{
       const decision=record.decision, candidates=record.candidates || [];
+      const eligibleCount = candidates.filter(candidate => candidate.eligible).length;
+      const noModelReason = eligibleCount === 0 ? 'No eligible capability; no decision-model call.' : eligibleCount === 1 ? 'Only one eligible capability; no decision-model call.' : 'No decision-model call recorded; inspect the allocation outcome.';
       return `<details class="course-decision" ${record.model_called?'open':''}><summary>${esc(record.task.replaceAll('-',' '))} · ${record.model_called?'model selection':'contract selection'}</summary>
-        <p>${record.model_called?`${esc(decision?.provider || 'provider not recorded')} / ${esc(decision?.model || 'model not recorded')} · ${Number.isFinite(decision?.latency_seconds) ? decision.latency_seconds.toFixed(2)+' s' : 'Latency not recorded'} · ${decision?.winner_probability==null?'No probability estimate':`Model probability ${(decision?.winner_probability*100).toFixed(1)}%`}`:'Only one eligible capability; no decision-model call.'}</p>
+        <p>${record.model_called?`${esc(decision?.provider || 'provider not recorded')} / ${esc(decision?.model || 'model not recorded')} · ${Number.isFinite(decision?.latency_seconds) ? decision.latency_seconds.toFixed(2)+' s' : 'Latency not recorded'} · ${decision?.winner_probability==null?'No probability estimate':`Model probability ${(decision?.winner_probability*100).toFixed(1)}%`}`:noModelReason}</p>
         <div class="course-table-scroll"><table><thead><tr><th>Eligible AU</th><th>Declared purpose</th><th>Model probability</th></tr></thead><tbody>${candidates.filter(c=>c.eligible).map(c=>`<tr><td>${esc(c.id)}</td><td>${esc(c.purpose)}</td><td>${decision?.probabilities?.[c.id]==null?'—':`${(decision.probabilities[c.id]*100).toFixed(1)}%`}</td></tr>`).join('')}</tbody></table></div>
         ${decision?.probabilities?.no_suitable_capability==null?'':`<p>No suitable capability: ${(decision.probabilities.no_suitable_capability*100).toFixed(1)}%. Model probability is not a guarantee of correctness.</p>`}
         <p>Returned choice: <strong>${esc(record.choice||'none')}</strong>. Accepted binding: <strong>${esc(accepted.get(record.task)||'none')}</strong>.</p>
@@ -76,7 +78,7 @@
     try {
       const response=await fetch('/api/saved-cases'); if(!response.ok)throw new Error('Saved cases are unavailable');
       const body=await response.json();
-      target.innerHTML=`<p>${body.durable?'Cases are persisted on disk and survive a planner restart.':'Original profile: cases are held in memory.'} Opening a case replays evidence without executing it.</p><ul>${body.runs.map(run=>`<li><button type="button" data-case="${esc(run.trace_id)}">${esc(run.workflow)} · ${esc(run.status)} · ${esc(run.trace_id)}</button></li>`).join('')||'<li>No cases yet.</li>'}</ul>`;
+      target.innerHTML=`<p>${body.durable?'Cases are persisted on disk and survive a planner restart.':'Persistence is disabled in this running service; cases are held in memory.'} Opening a case replays evidence without executing it.</p><ul>${body.runs.map(run=>`<li><button type="button" data-case="${esc(run.trace_id)}">${esc(run.workflow)} · ${esc(run.status)} · ${esc(run.trace_id)}</button></li>`).join('')||'<li>No cases yet.</li>'}</ul>`;
       for(const button of target.querySelectorAll('[data-case]'))button.addEventListener('click', async()=>{
         try {
           const response=await fetch('/api/course-traces/'+encodeURIComponent(button.dataset.case));

@@ -1,6 +1,6 @@
 # Architecture diagrams
 
-These SVGs describe the revised course implementation. They are ordinary repository files, viewable in a Markdown preview or browser, with accessible titles/descriptions. They do not require Mermaid or an external rendering service.
+These SVGs describe the course implementation. They are ordinary repository files, viewable in a Markdown preview or browser, with accessible titles/descriptions. They do not require Mermaid or an external rendering service.
 
 - `components.svg`: the running components and their responsibilities.
 - `cv-selection.svg`: proposal, eligibility, choice, validation and execution.

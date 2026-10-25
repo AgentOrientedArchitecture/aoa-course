@@ -46,7 +46,7 @@
 <text x="880" y="575" class="head" text-anchor="start">Case store</text>
 <text x="880" y="605" class="body" text-anchor="start">SQLite snapshots and events</text>
 <text x="880" y="631" class="body" text-anchor="start">JSONL audit projection</text>
-<text x="880" y="657" class="body" text-anchor="start">Revised profile</text>
+<text x="880" y="657" class="body" text-anchor="start">Saved cases</text>
 <path d="M600 220V270" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
 <text x="680" y="249" class="label" text-anchor="middle">intent / review</text>
 <path d="M450 335H340" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>

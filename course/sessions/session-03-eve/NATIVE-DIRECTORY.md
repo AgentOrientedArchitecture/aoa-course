@@ -4,7 +4,7 @@ This preserves the original host-installed route. The standard course now uses [
 
 Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. It explains why these are separate boundaries, what the course bridge implements, and what this integration does and does not establish.
 
-Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`, the authored instructions, native testing and the AOA boundary. Use these revised launchers so the selected model configuration is retained:
+Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`, the authored instructions, native testing and the AOA boundary. Use the standard launchers so the selected model configuration is retained:
 
 ```bash
 ./scripts/session3-up.sh
@@ -12,9 +12,9 @@ Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`
 ./scripts/session3-adopt.sh
 ```
 
-In Windows Command Prompt, use `scripts\session3-up.bat`, then `scripts\session3-adopt.bat`. These are the standard course launchers; they use `.env`. See the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop).
+In Windows Command Prompt, use `scripts\session3-up.bat`, then `scripts\session3-adopt.bat`. These are the standard course launchers; they use `.env`. See the [launcher table](../../pre-work/SETUP.md#start-and-stop).
 
-The pinned `eve init` may try to start its default agent before the provider-neutral configuration is added. If it reports a default-model metadata error, continue to the original walkthrough’s `agent.ts` configuration checkpoint, then run `eve dev` again. The revised launcher runs native authoring as the host user so Linux workshop files remain editable.
+The pinned `eve init` may try to start its default agent before the provider-neutral configuration is added. If it reports a default-model metadata error, continue to the walkthrough’s `agent.ts` configuration checkpoint, then run `eve dev` again. The launcher runs native authoring as the host user so Linux workshop files remain editable.
 
 The adopted EVE agent joins the existing CV/interview composition. It remains learner-authored; neither the adapter nor the Directory rewrites its behaviour.
 
@@ -51,7 +51,7 @@ To expose discovery **before** local adoption, export the checked-in template di
 .venv-course/bin/python scripts/directory-lab.py export interviewer-questions --card system/agents-eve/runtime/templates/interviewer-questions.yaml > .course-data/interviewer-before-adoption.oasf.json
 ```
 
-This optional path needs PyYAML from the [test environment](../../REVISED-VALIDATION.md#run-the-checks). Push and pull that record as above. Native EVE authoring stops the AOA services, so a comparison at this point may report a connection failure because the registry is not running. To inspect absence in a live registry, start only that service with `docker compose -f system/docker-compose.yml --profile session3 up --build -d registry`, then run `check`. A previous session may already have persisted the capability: inspect and explain that history rather than deleting it. Adoption then makes the runtime available; repeat the comparison and the full CV/interview run.
+This optional path needs PyYAML from the [test environment](../../VALIDATION.md#run-the-checks). Push and pull that record as above. Native EVE authoring stops the AOA services, so a comparison at this point may report a connection failure because the registry is not running. To inspect absence in a live registry, start only that service with `docker compose -f system/docker-compose.yml --profile session3 up --build -d registry`, then run `check`. A previous session may already have persisted the capability: inspect and explain that history rather than deleting it. Adoption then makes the runtime available; repeat the comparison and the full CV/interview run.
 
 ## Three distinct boundaries
 

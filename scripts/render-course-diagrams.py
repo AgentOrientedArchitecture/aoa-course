@@ -49,7 +49,7 @@ d.box(450, 270, 300, 180, 'Planner service · 7200', ['Propose and validate a pl
 d.box(860, 290, 300, 145, 'Decision API · 7250', ['A bounded named choice', 'TypeSafe or local Ollama', 'No authority to invoke an AU'], 'model')
 d.box(450, 540, 300, 135, 'Agentic Units', ['Python runtimes or EVE', 'Each fulfils its public contract', 'Models and tools live inside'], 'au')
 d.box(40, 540, 300, 135, 'Tool bridges', ['Document text, files, wiki', 'Registered as kind: tool', 'HTTP bridge → MCP server'], 'au')
-d.box(860, 540, 300, 135, 'Case store', ['SQLite snapshots and events', 'JSONL audit projection', 'Revised profile'], 'store')
+d.box(860, 540, 300, 135, 'Case store', ['SQLite snapshots and events', 'JSONL audit projection', 'Saved cases'], 'store')
 d.arrow('M600 220V270', 'intent / review', (680, 249))
 d.arrow('M450 335H340', 'read cards', (395, 322))
 d.arrow('M750 335H860', 'ask for choice', (805, 322))

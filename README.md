@@ -1,8 +1,8 @@
 # aoa-course
 
-**Start here:** [Course setup](course/pre-work/01-revised-model-access.md). Use `main`, copy `.env.example` to `.env`, add the two hosted-provider keys or choose the local option in that same file, then use the session scripts. One Compose file defines the current course.
+**Start here:** [Course setup](course/pre-work/SETUP.md). Use `main`, copy `.env.example` to `.env`, add the two hosted-provider keys or choose the local option in that same file, then use the session scripts. One Compose file defines the current course.
 
-**Course:** [Four connected live demos](course/REVISED-COURSE.md) · [Architecture and diagrams](course/ARCHITECTURE.md) · [EVE and AGNTCY adoption](course/sessions/session-03-eve/ADOPTION.md).
+**Course:** [Four connected live demos](course/COURSE.md) · [Architecture and diagrams](course/ARCHITECTURE.md) · [EVE and AGNTCY adoption](course/sessions/session-03-eve/ADOPTION.md).
 
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
 The system is a reference implementation for learning the architecture shape,
@@ -24,9 +24,10 @@ agent runtimes - and then checks its own governance evidence against a real regu
 > [Sessions](#sessions) shows which course session uses which profile.
 
 In **Session 1** you build a system that evaluates a CV against a job
-description. By the end of the session you have three governed agent runtimes
-— CV parser, evaluator, reporter — co-operating through a small browser studio
-to produce a structured fit verdict.
+description. Three responsibilities—parsing, assessment and reporting—are
+fulfilled by AUs selected from five running capabilities, including general, data
+and frontend evaluators. Inspect the task plan, bounded selection and actual result
+in the browser Studio.
 
 In **Session 2** you open the same repo and discover the pattern is general. A
 new wiki parser container runs the same parser code, model, and document-text
@@ -46,8 +47,10 @@ config — but no capability card, registry, or governed identity. A small
 `aoa-eve` adapter supplies exactly those, so an EVE-authored interviewer agent
 (TypeScript, on Node) registers and is orchestrated by the same registry,
 planner, and studio as the Python agents. The workflow becomes
-`parse-cv → evaluate-cv-fit → interviewer-questions`, and the planner cannot tell
-that the last step runs on a different runtime. See
+`parse-cv → evaluate-cv-fit → interviewer-questions`. AGNTCY Directory publishes
+and discovers all running AUs, while the local registry retains their adopted
+contracts and lifecycle. The planner invokes the EVE AU through its public contract;
+framework details remain inside the bridge. See
 [`system/EVE.md`](system/EVE.md).
 
 The reference adapters currently emit the A2A v0.3 JSON-RPC card/message shape.
@@ -85,7 +88,7 @@ cp .env.example .env
 ./scripts/session1-up.sh
 ```
 
-On Windows use Command Prompt, `copy .env.example .env`, and the matching `.bat` commands. The [setup guide](course/pre-work/01-revised-model-access.md) covers hosted models, the local Ollama option, and existing checkouts.
+On Windows use Command Prompt, `copy .env.example .env`, and the matching `.bat` commands. The [setup guide](course/pre-work/SETUP.md) covers hosted models, the local Ollama option, and existing checkouts.
 
 ```bash
 ./scripts/session1-up.sh
@@ -101,7 +104,7 @@ On Windows use Command Prompt, `copy .env.example .env`, and the matching `.bat`
 
 Open [Studio](http://localhost:8080) after starting an AOA session. Native EVE authoring is deliberately separate; follow its [walkthrough](course/sessions/session-03-eve/WALKTHROUGH.md). AGNTCY's [catalogue](http://localhost:8891) becomes available with Session 3 adoption and continues in Session 4.
 
-`system/docker-compose.yml` is the sole current Compose definition. The scripts choose session profiles and settings; students do not assemble overlays or select a course version. Existing private `.env.revised` files remain readable during migration, but fresh setups use only `.env`. Earlier configurations and the previous setup instructions are [preserved in the archive](archive/configuration-before-consolidation/README.md).
+`system/docker-compose.yml` is the sole current Compose definition. The scripts choose session profiles and settings; students do not assemble overlays or select a course version. Fresh setups use only `.env`. If updating an older installation, read the [migration note](archive/course-content-before-review/INDEX.md#updating-an-older-installation). Earlier configurations and instructions are preserved in `archive/`.
 
 ## Repo layout
 
@@ -131,7 +134,7 @@ example data.
 
 | Repo profile | What you do | Walkthrough | Used by course session |
 |---|---|---|---|
-| `session1` (CV fit) | Build and inspect the three-AU CV-fit workflow, then modify a live agent and watch it re-register | [`course/sessions/session-01-cv-fit/WALKTHROUGH.md`](course/sessions/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
+| `session1` (CV fit) | Build and inspect the three-task CV-fit workflow, then modify a live agent and watch it re-register | [`course/sessions/session-01-cv-fit/WALKTHROUGH.md`](course/sessions/session-01-cv-fit/WALKTHROUGH.md) | Course Sessions 1–2 — "See" (demo) and "Name" (lab: modify your agent) |
 | `session2` (wiki) | The same shape becomes a knowledge-management workflow: ingest, promote, graph, ask | [`course/sessions/session-02-wiki/WALKTHROUGH.md`](course/sessions/session-02-wiki/WALKTHROUGH.md) | Self-study / optional deep dive — the same pipeline holds Session 4's regulations corpus |
 | `session3` (EVE) | Run an EVE-authored agent natively, then expose the same behaviour through an AOA card, identity, registry and trace | [`course/sessions/session-03-eve/WALKTHROUGH.md`](course/sessions/session-03-eve/WALKTHROUGH.md) | Course Session 3 — "Recognise the shape" (lab: framework inside, contract outside) |
 | `session4` (card evidence + result review + flow audit) | Improve declared Agent card evidence, run eligible CV fit to a held draft, review its exact result digest, then audit release or quarantine evidence | [`course/sessions/session-04-compliance/WALKTHROUGH.md`](course/sessions/session-04-compliance/WALKTHROUGH.md) | Course Session 4 — "Apply the shape" (lab: separate declarations, deterministic eligibility, result review, execution evidence, and legal claims) |

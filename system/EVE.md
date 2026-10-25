@@ -1,6 +1,6 @@
 # Session 3 — Authoring Agentic Units with Vercel EVE
 
-The learner-facing [EVE and AGNTCY adoption guide](../course/sessions/session-03-eve/ADOPTION.md) explains the external components, actual EVE invocation, portable discovery record, local contract and evidence at each boundary. This page retains the runtime and filesystem detail.
+Follow the [Session 3 walkthrough](../course/sessions/session-03-eve/WALKTHROUGH.md) from native authoring through adoption, Directory discovery and the composed run. The [EVE and AGNTCY architecture reference](../course/sessions/session-03-eve/ADOPTION.md) explains the external components, actual EVE invocation, portable discovery record, local contract and evidence at each boundary. This page gives the runtime and filesystem detail.
 
 > Protocol scope: the course bridge currently emits the A2A v0.3 JSON-RPC
 > card/message shape. It demonstrates the outward boundary and registry
@@ -48,7 +48,9 @@ second agent for the learner to copy or compare against.
 
 ## The canonical build-then-adopt flow
 
-There are only three public course commands for Session 3:
+Three commands organise the core Session 3 sequence. Use the `.sh` variants on
+macOS/Linux and `.bat` variants in Windows Command Prompt from the repository
+root; the walkthrough supplies the exact commands:
 
 1. `session3-build` pre-builds the complete Session 3 image set, including
    `aoa-course/eve-workshop:0.17.1`. It starts nothing and authors nothing.
@@ -56,7 +58,9 @@ There are only three public course commands for Session 3:
    registry, planner, studio, or bridge.
 3. `session3-adopt` creates `workshop/capability-card.yaml` automatically when
    needed, starts AOA, starts the generic bridge, and publishes the learner's
-   accepted agent.
+   accepted agent. It also starts AGNTCY Directory and waits for publication
+   of the running AUs. The `directory` helper supports inspection and the
+   discovery outage exercise later in the same walkthrough.
 
 Inside the native workshop, the learner runs the EVE commands directly:
 
@@ -102,9 +106,16 @@ and model provenance. The generic bridge stamps runtime identity and
 `skills_hash`, registers the card, exposes the A2A surface, and emits trace
 events.
 
-The planner therefore treats the final step like any other AU. It discovers a
-capability contract and invokes an A2A endpoint; it does not import EVE or depend
-on EVE's session model.
+The planner therefore treats the final step like any other AU. It retrieves
+its OASF record through AGNTCY, checks the current local approved contract and
+runtime binding, and invokes the A2A endpoint. It does not import EVE or depend
+on EVE's session model. The course opens an EVE session per invocation; this
+exercise does not demonstrate interview memory across separate requests.
+
+The generic bridge checks JSON shape and required output fields. The native
+and adopted acceptance checks must still inspect question count, word limits,
+grounding and hiring-decision boundaries. Published constraints alone do not
+prove that an answer meets them.
 
 ## Change lifecycle
 

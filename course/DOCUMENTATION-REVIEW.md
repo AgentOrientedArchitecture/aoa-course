@@ -1,36 +1,92 @@
-# Documentation review — 25 October 2026
+# Course content review
 
-Reviewed the October course implementation against the current Compose overlays, launchers, registry, planner/allocation, decision adapters, case store, EVE bridge and Directory helper. This was an implementation/documentation review, not a fresh provider-backed rehearsal or a legal review of the curated corpus. Current setup and delivery use `main`.
+Reviewed on 25 October 2026 for a fresh checkout of `main`. The review covered
+setup, all four session walkthroughs and their supporting exercises, architecture
+and service/tool references, Studio navigation and instructions, fixtures, seed
+corpora and the relevant launcher/runtime behaviour. Private keys and learner
+runtime data were not used as review material.
 
-## Findings addressed
+## Learner route
 
-| Gap | Change |
+Start with [setup](pre-work/SETUP.md), then use one `WALKTHROUGH.md` per session:
+
+| Session | Complete path |
 |---|---|
-| No clear first explanation of the revised running system | Added `ARCHITECTURE.md` with component responsibilities, session differences, source pointers and six SVG diagrams |
-| Older references said held results were lost on restart without identifying the profile | Marked the original in-memory path and explained the revised SQLite path in the planner, system and compliance documentation |
-| Registry documentation implied the planner always uses `/discover` | Described the revised `/list` → local eligibility → bounded decision path |
-| Planning and orchestration looked like separate deployed components | Explained their separate responsibilities inside the single planner service; fixed plans in Sessions 3–4 do not disable decision allocation |
-| CV hot-reload instructions always edited the general evaluator | Added a selected-capability-to-file map and the need to compare the same runtime before/after |
-| EVE and AGNTCY could read as vendor mentions rather than a demonstrated integration | Added a substantial adoption guide covering actual EVE calls, the course adapter, local vs portable contracts, responsibility boundaries and inspectable evidence |
-| Directory comparison before adoption could fail because native EVE mode stops the registry | Explained the connection failure, optional registry-only start and persisted-card caveat |
-| A successful comparison command could be mistaken for execution approval | Documented its informational result, limited hash scope and explicit false authorisation/identity fields |
-| Setup links and examples were split between shell-only additions and cross-platform launchers | Linked the shared command table and added Windows commands at revised session entry points |
-| Studio could display Markdown but not embedded diagrams or heading anchors | Added scoped SVG serving under the course diagrams folder, responsive images and heading IDs; retained disabled raw HTML and the filesystem boundary |
+| [1 · CV](sessions/session-01-cv-fit/WALKTHROUGH.md) | Run → inspect task proposal and AU selection → compare evaluators → edit the selected AU → review |
+| [2 · Wiki](sessions/session-02-wiki/WALKTHROUGH.md) | Ingest → inspect promotion/rejection/review → inspect graph → ask with retrieved evidence → review |
+| [3 · EVE and AGNTCY](sessions/session-03-eve/WALKTHROUGH.md) | Author → accept natively → adopt → inspect OASF discovery → compose CV/interview → stop Directory and test failure → recover → review |
+| [4 · Compliance](sessions/session-04-compliance/WALKTHROUGH.md) | Check card evidence → add declaration to the selected evaluator → hold result → restart → review exact result → audit |
 
-Existing walkthroughs, examples and launcher functionality are retained. No presentation changes or learner/runtime-data resets were made.
+`DECISIONS.md`, `ADOPTION.md`, `DIRECTORY.md` and `DURABLE-CASES.md` are optional
+explanations or deeper exercises. None is a second required walkthrough.
+The setup, overview, instructor runbook and validation record now have neutral
+filenames. The unused root provider preset is archived, leaving one current
+`.env.example`. Edition labels were removed from the current learner route, diagrams
+and visible Studio instructions. Earlier Studio bookmarks redirect to the current
+pages. Repository source and fixture links open GitHub when read in Studio;
+the documentation server still exposes only course Markdown and scoped diagrams.
+
+## Accuracy and usability corrections
+
+- The CV workflow has three responsibilities and five available AUs. Selection
+  uses task purpose and assessment emphasis; the selected evaluator subsequently
+  reads the documents. A model choice becomes an accepted binding only after
+  composition validation.
+- Hot-reload and governance exercises follow the evaluator that actually ran,
+  including specialist runtimes. The healthcare-payments job's historical
+  `fintech` filename is explained without changing the source fixture.
+- Wiki `review` and `reject` both prevent publication. There is no editorial
+  approval queue. Preserving the parser's quotes is not proof that the parser
+  copied the source accurately.
+- Session 3 includes AGNTCY inspection and the outage check before finishing.
+  EVE's terminal UI, host/container file paths, initial scaffold model error,
+  required copy-and-paste files and adoption steps are described in order.
+- The Mac/Linux native launcher now prints the machine and full workshop path,
+  as Windows already did, so a remote shell is distinguishable from a local one.
+- Sessions 3–4 require AGNTCY AU discovery. Local adoption, lifecycle and tool
+  lookup remain in the registry. No silent local-discovery fallback is taught.
+- Persistence descriptions match the SQLite case store. A held result survives
+  restart; interrupted invocation is not blindly replayed. Review binds to the
+  same digest, and an identical retry does not release twice.
+- Troubleshooting uses current launchers and preserves data. The retained legacy
+  reset script is explicitly unsuitable for resetting current durable cases.
+- Studio distinguishes zero eligible AUs from a single directly bound AU; both
+  can legitimately involve no decision-model call.
+
+Original documents are preserved byte-for-byte under
+[`archive/course-content-before-review/`](../archive/course-content-before-review/INDEX.md).
+Examples, learner exercises, optional host-installed Directory instructions and
+existing runtime functionality remain available. No learner checkout, workshop,
+keys or saved cases were removed.
 
 ## Validation
 
-- All **41 tests pass**, including the existing revised-course tests and new document-route checks for diagrams, heading links, disabled raw HTML and file access boundaries.
-- All **136 local links** in the changed Markdown resolve to existing files.
-- The six generated SVGs were rendered and visually checked for readable labels, connections and cropping.
-- A temporary local Studio documentation view loaded every image in both new guides without horizontal overflow; the invocation section link scrolled to its heading. The check ran with service subscriptions disabled.
-- `git diff --check` passes. No live model calls or course services were needed for this documentation check.
+- **64 Python tests pass**, including document redirects, navigation, filesystem
+  boundaries, persistence, allocation, discovery and 16 actual launcher tests.
+- **12 Node inspection tests pass**.
+- All current local Markdown links and heading targets resolve; shell and
+  JavaScript syntax checks pass; `git diff --check` passes.
+- The real EVE container starts as a non-root learner using the exact TypeScript
+  example from the Session 3 walkthrough. The isolated check uses offline
+  dependencies and no provider calls. Package cache and mounted workshop state
+  are writable; no learner files are replaced.
 
-## Still needs the walkthrough
+The [validation record](VALIDATION.md) preserves earlier provider-backed integration
+observations and explains how to repeat the automated checks.
 
-- Fresh Mac and Windows installation, provider access, full EVE native acceptance and Directory round trip in the learner environments.
-- A timed teaching pass: inspect whether the diagrams and evidence checkpoints make the distinction between discovery, adoption and execution clear.
-- Quality review of actual CV assessments, interview questions and wiki promotion judgements. Shape checks and model probabilities are not quality validation.
-- Review questions and demonstration pacing in the presentation after the practical walkthrough, as already agreed.
-- If adopting an externally owned agent, complete the identity, contract, access, evaluation and operating decisions listed in `sessions/session-03-eve/ADOPTION.md`; the local lab does not establish those.
+## Remaining teaching checks
+
+A complete learner-led Mac and Windows rehearsal is still required. Automated
+checks cannot establish that the instructions are clear in use, that local
+hardware is fast enough, or that a particular model response is good.
+
+The wiki seeds are selected April research snapshots. They do not contain every
+later course topic, and their gaps should remain visible when querying them.
+The regulation corpus is also dated teaching evidence. A timetable spot-check
+matched [European Commission guidance](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai); this was not a full legal review.
+No source seed was silently updated to make the demo appear more current.
+
+Question quality, semantic decision calibration, externally owned agent adoption,
+production durability and a full enterprise AGNTCY deployment remain beyond the
+claims demonstrated by this local course. Presentation demo alignment and final
+review-question pacing can follow the practical walkthrough.

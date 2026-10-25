@@ -1,6 +1,6 @@
-# Session 3 walkthrough — build natively in EVE, then adopt into AOA
+# Session 3 — EVE and AGNTCY
 
-For the revised course, use the [connected extension](DIRECTORY.md) for its launch command and additional checkpoints. The original walkthrough remains below.
+This is the complete session: build and test an EVE interviewer, adopt it into AOA, inspect its AGNTCY record, run the composed workflow and test the discovery boundary. Stay on this page for the required steps. The [adoption explanation](ADOPTION.md) and [Directory reference](DIRECTORY.md) provide optional detail.
 
 Session 3 starts with a blank authored workspace. You first create and accept an
 agent with EVE's own CLI. Only after the native agent works do you adopt it into
@@ -15,7 +15,7 @@ The learner path has three public course commands:
 
 Node, npm, EVE, and package dependencies stay inside the pinned
 `aoa-course/eve-workshop:0.17.1` image. Your laptop needs Docker, a text editor,
-and the course `.env`; it does not need Node.
+and the course `.env`; it does not need Node. Complete the [setup](../../pre-work/SETUP.md) and generation smoke test first. All host commands below run from the root of the same checkout.
 
 ## Before the session — build the image
 
@@ -55,6 +55,8 @@ studio, or AOA bridge. The container opens at `/workshop`, bind-mounted from:
 system/agents-eve/workshop/
 ```
 
+The launcher prints the machine name and the full **host workshop folder** before opening the shell. Check that it is the checkout you opened in your editor. `/workshop` is the container path; a shell connected to Spark writes to Spark, not this laptop.
+
 The checked-in workspace is a pinned package shell with no authored agent. At
 the `eve-workshop>` prompt, initialise it yourself:
 
@@ -62,8 +64,10 @@ the `eve-workshop>` prompt, initialise it yourself:
 eve init .
 ```
 
-If EVE enters its development UI automatically, press `Ctrl+C` so that you can
-edit first. The authored files now appear on the host:
+If EVE enters its terminal development UI automatically, press `Ctrl+C` so that you can
+edit first. The scaffold may also report a default-model metadata error. If the
+files below were created, continue to Checkpoint 2 and configure the course model
+before starting `eve dev` again. Do not rerun `eve init` over authored files. The authored files now appear on the host:
 
 ```text
 system/agents-eve/workshop/
@@ -267,7 +271,7 @@ eve info
 ```
 
 Confirm that EVE reports the agent and channel from the learner workspace. Then
-start the native development UI yourself:
+start the native development UI in this terminal:
 
 ```sh
 eve dev
@@ -297,8 +301,9 @@ return exactly five grounded questions without inventing candidate details.
 Iterate on `instructions.md` and repeat these native acceptance tests until the
 standalone EVE agent passes. Press `Ctrl+C`, then `exit`, when ready.
 
-At this point there is no AOA capability, registry entry, or Agent ID. You have
-accepted a native EVE agent, not yet an Agentic Unit.
+On a fresh checkout there is not yet an AOA capability, registry entry or Agent ID
+for this interviewer. You have accepted a native EVE agent. If reusing a checkout,
+earlier registry records may persist; they do not accept your new behaviour for you.
 
 ## Checkpoint 5 — adopt the accepted agent
 
@@ -319,8 +324,9 @@ On macOS or Linux:
 1. validates that the learner-authored EVE files exist;
 2. creates `system/agents-eve/workshop/capability-card.yaml` automatically if it
    is missing;
-3. starts the Session 3 AOA services and generic EVE bridge; and
-4. registers the agent as the `interviewer-questions` capability.
+3. starts the Session 3 AOA services, the EVE bridge and AGNTCY Directory;
+4. registers the agent as the `interviewer-questions` capability; and
+5. publishes all active AUs to Directory and waits for their records to be searchable.
 
 The generated card is the public contract; `agent/instructions.md` remains the
 implementation's private behavioural guidance. Inspect the adopted result at:
@@ -334,36 +340,142 @@ revalidates and republishes the card. If you return to native EVE and change the
 agent after acceptance, repeat the native tests and rerun `session3-adopt`
 before testing through AOA.
 
-## Checkpoint 6 — run the composed workflow
+## Checkpoint 6 — inspect the discovered capabilities
 
-Open Studio at `http://localhost:8080`, choose **CV fit + interview**, and submit
-a CV and job description from [`../session-01-cv-fit/`](../session-01-cv-fit/).
+Open [Studio](http://localhost:8080). In **Capability cards**, find
+`interviewer-questions`. Switch between its summary and JSON. Inspect its Agent
+ID, inputs, outputs and instructions hash. This is the locally adopted contract.
 
-The intent runs:
+Now open [AGNTCY's catalogue](http://localhost:8891), search for `aoa-course`,
+and select the interviewer. A fresh Session 3 publishes six AUs: the parser,
+three CV evaluators, reporter and EVE interviewer. Deterministic tools retain
+local registrations. Older Directory records may remain in a reused checkout;
+publication history is not the list of currently eligible AUs.
+
+Inspect the declared skill, endpoint and catalogue JSON. The automatic records
+include each runtime's actual A2A Agent Card, which makes them visible in the
+catalogue. Copy the interviewer's content ID and retrieve the **full OASF record**:
+
+| Action | macOS/Linux | Windows Command Prompt |
+|---|---|---|
+| Ensure publication is ready | `./scripts/directory.sh sync --wait 120` | `scripts\directory.bat sync --wait 120` |
+| Retrieve the record | `./scripts/directory.sh pull YOUR_CONTENT_ID --out interviewer-discovered.json` | `scripts\directory.bat pull YOUR_CONTENT_ID --out interviewer-discovered.json` |
+| Compare it with local adoption | `./scripts/directory.sh check interviewer-discovered.json` | `scripts\directory.bat check interviewer-discovered.json` |
+
+Replace `YOUR_CONTENT_ID` with the real value; do not type angle brackets around
+it. Open `.course-data/interviewer-discovered.json` in your editor. The catalogue
+JSON is a projection; this file is the complete retrieved description.
+
+For a matching, approved card, expect `matching_local_contract`,
+`local_lifecycle_approved` and `locally_eligible` to be true. Expect
+`execution_authorised` and `identity_verified_by_directory_record` to be false.
+Read the fields: a successful `check` command can still report a mismatch.
+
+You have now inspected three different descriptions:
+
+| Description | What it supplies |
+|---|---|
+| Local AOA capability card | Accepted contract, Agent ID and lifecycle |
+| OASF record in AGNTCY | Portable description, declared skills and discovery evidence |
+| Runtime A2A Agent Card | Endpoint and invocation surface |
+
+None of these alone proves the agent's behaviour or grants permission to run it.
+
+## Checkpoint 7 — run the composed workflow
+
+Return to Studio's **Studio · all controls** view and choose **CV fit + interview**.
+Drop or paste these synthetic fixtures into the CV and job-description fields:
+
+- [`jordan-okafor.txt`](../session-01-cv-fit/cv-examples/jordan-okafor.txt)
+- [`senior-data-engineer-fintech.txt`](../session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt)
+
+The job file's retained filename says fintech; its content is **Senior Data
+Engineer — Healthcare Payments**. Use the actual content when judging the result.
+For **Assessment emphasis**, try `Assess production data pipelines and data reliability`.
+This brief guides AU selection; the selected evaluator subsequently reads the documents.
+
+Submit once. This session uses a fixed task sequence:
 
 ```text
-parse-cv → evaluate-cv-fit → interviewer-questions
+parse-cv → evaluate-cv-fit → generate-interview-questions
 ```
 
-The first two steps are existing Python AUs. The final step is the EVE agent you
-created and accepted natively. The planner invokes it through the same registry
-contract and A2A surface without importing EVE or understanding EVE sessions.
+The planner retrieves candidates from AGNTCY, checks them against current local
+adoption and contracts, then selects compatible AUs. Multiple eligible evaluators
+use the configured decision model. The first two tasks use Python AUs. The final
+task binds to `interviewer-questions` and invokes your real EVE agent through
+its adopted A2A endpoint. EVE details stay
+inside the course-owned bridge.
 
-Use the responsibility walk to verify the adopted Agent ID, capability, trace
-boundary, and five returned questions.
+In **AU selection**, inspect **Published records and local adoption checks**:
 
-## Debrief
+1. Find the interviewer's Directory content ID and its accepted local binding.
+2. Inspect the evaluator candidates and accepted choice. A declaration or high
+   model probability does not prove that this is the best assessment.
+3. Follow the invocation to the EVE interviewer. Confirm it received the
+   assessment, then inspect the returned five questions in **Run review**.
+4. Reapply the native acceptance criteria from Checkpoint 4. Generic bridge
+   signals check fields; they do not establish every word limit or question quality.
 
-| EVE remains responsible for | AOA adds at adoption |
+Keep the trace ID and record content ID with your observations. The proof is the
+completed composition and its evidence, not merely a catalogue card appearing.
+
+## Checkpoint 8 — test the discovery boundary
+
+After a successful run, stop **only Directory**:
+
+| Action | macOS/Linux | Windows Command Prompt |
+|---|---|---|
+| Stop Directory, retaining its records | `./scripts/directory.sh stop` | `scripts\directory.bat stop` |
+| Restart it after the check | `./scripts/directory.sh up` | `scripts\directory.bat up` |
+| Wait for publication before retrying | `./scripts/directory.sh sync --wait 120` | `scripts\directory.bat sync --wait 120` |
+
+While Directory is stopped, submit a **new** CV/interview intent. Expect a
+visible discovery error. Inspect the trace for `directory-unavailable` and
+**zero AU invocations**. There is no silent fallback to the local registry list.
+Opening a saved result can still work: reviewing stored evidence is different
+from discovering AUs for a new run.
+
+Restart Directory, wait for sync and submit again. The local registry still owns
+adoption, lifecycle and tool lookup. From this session onwards, AGNTCY supplies
+the AU discovery records that the planner must also validate. Session 4 continues
+with this arrangement.
+
+## Review questions
+
+- What did EVE supply, what did the adoption bridge add, and what did AGNTCY add?
+- Where did the fixed task sequence end and the decision about which AU to use begin?
+- Why can a discoverable record still be ineligible for this task?
+- What evidence showed that the adopted interviewer actually ran?
+- Why did a new intent fail when Directory stopped while a saved result remained readable?
+- Before using an externally owned agent, what identity, access, quality and operating checks would still be needed?
+
+## Finish
+
+Stop the course from the host terminal:
+
+| macOS/Linux | Windows Command Prompt |
 |---|---|
-| learner-authored `agent.ts` and `instructions.md` | generated capability card and stable Agent ID |
-| native CLI, runtime, sessions, and development UI | registry discovery and lifecycle |
-| native acceptance before composition | outward A2A surface and estate trace boundary |
+| `./scripts/down.sh` | `scripts\down.bat` |
 
-The ownership boundary is visible on disk: reusable course infrastructure lives
-under `system/agents-eve/runtime/`; the agent you authored and its generated
-contract live under `system/agents-eve/workshop/`.
+This preserves your authored EVE files, cards, Directory records and saved runs.
+Keep them for [Session 4](../session-04-compliance/WALKTHROUGH.md). For optional
+manual publishing, contract-mismatch checks and the OASF taxonomy, use the
+[Directory reference](DIRECTORY.md). These are not extra required setup steps.
 
-## Revised course: discover the adopted AU through AGNTCY
+## If a checkpoint fails
 
-With the current course setup, adoption also starts AGNTCY and publishes the running AU estate with actual A2A Agent Cards. Follow [the Directory walkthrough](DIRECTORY.md#use-agntcy-for-the-running-estate) before the CV/interview run. In Studio, inspect the `directory-discovery` event and the interviewer's content ID before its accepted binding and invocation. The local registry retains adoption/lifecycle authority; it is no longer the sole AU discovery source. Session 4 continues on this path.
+| Symptom | Check before continuing |
+|---|---|
+| Generated files appear only in the container | Compare the launcher's machine and host path with the checkout open in your editor; inspect `system/agents-eve/workshop/agent/` on that machine |
+| `eve init` reports a model metadata error | If the files exist, complete Checkpoints 2–3, then run `eve info` and `eve dev` |
+| `eve dev` cannot create `/app/node_modules/eve/.eve` | Exit the shell, update `main`, run `session3-build`, then `session3-up`; the current image provides the non-root cache directory. Keep authored files |
+| Adoption reports missing files | Finish native authoring and acceptance in this checkout; do not copy unrelated runtime files over the workshop |
+| Publication is not ready | Run `directory sync --wait 120` with the platform launcher above; inspect `scripts/logs.sh directory-bridge` or `scripts\logs.bat directory-bridge` |
+| A card changed but discovery fails | Re-adopt after editing the EVE card, then sync. Historical records are retained; the planner requires the current binding |
+| Model call fails | Check the private `.env`, generation smoke test, provider quota and decision service logs; errors are not replaced silently |
+
+The course uses real third-party framework and Directory components, a learner-owned
+agent and course-owned integration. It does not deploy AGNTCY federation, verified
+enterprise identity, SLIM or a full observability platform. See the optional
+[adoption explanation](ADOPTION.md) for those boundaries.

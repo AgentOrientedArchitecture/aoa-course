@@ -1,48 +1,57 @@
-# CV fit: choosing the AU
+# CV allocation reference
 
-Start with `./scripts/session1-up.sh`, or `scripts\session1-up.bat` in Windows Command Prompt, after creating `.env` through the [setup guide](../../pre-work/01-revised-model-access.md). Follow the original [CV walkthrough](WALKTHROUGH.md) for synthetic inputs, contract inspection and hot reload, using the differences below. The revised Studio adds **Plan and decisions** and an **Assessment emphasis** field.
+Optional background for [Session 1](WALKTHROUGH.md). The walkthrough includes
+all the practical steps, provider comparison and review questions.
 
-Read the [component and selection diagrams](../../ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au). Expect **five AU cards and one tool**: parser, general/data/frontend evaluators, reporter and document-text. The decision service is control-plane infrastructure, not another registered AU card.
+## Two different model responsibilities
 
-## Predict the allocation
+The planner's generation model proposes a bounded task plan. The course
+already defines its required responsibilities and reference contracts; failed
+or invalid proposals use a recorded fallback. This service is real executable
+planning and orchestration code, but is not itself a registered Planner AU.
 
-Use the supplied data-engineer CV/job pair. Before running, predict which evaluator should be chosen and why. The registry contains three separate governed runtimes: the original general evaluator, a data-engineering evaluator and a frontend evaluator. They share an output contract but have different declared purposes and assessment instructions.
+Allocation then asks **which eligible AU should perform this task?** The
+general, data-engineering and frontend evaluators are separate runtimes. They
+have compatible contracts and different declared purposes and instructions.
+The decision model selects among those declarations plus
+`no_suitable_capability`. Its input is task purpose, assessment emphasis and
+use context, not the CV and job contents. The selected AU performs the actual
+document assessment afterwards.
 
-Run with emphasis “Assess production data pipelines, SQL, reliability and governance.” Inspect:
+![Task proposal, eligibility, choice and composition validation](../../diagrams/cv-selection.svg)
 
-1. The task breakdown and whether it came from the LLM or the explicit workflow fallback.
-2. Contract eligibility: required inputs, output types and lifecycle status.
-3. The model's returned choice among eligible evaluators plus “no suitable capability”.
-4. The accepted binding, which appears only after the whole plan passes validation.
-5. The selected AU's actual output and evidence. Its declared speciality is not a measured quality score.
+## What code guarantees here
 
-The LLM can propose the task decomposition; decision selection binds eligible AUs. The bounded course validator preserves each required responsibility and its evidence dependencies. A schema-valid plan that sends the report the wrong upstream evidence must not execute.
+| Boundary | Implemented check | What it does not establish |
+|---|---|---|
+| Contract eligibility | Approved AU lifecycle, compatible inputs and outputs, no extra required input. | Whether declared specialisation is useful on this case. |
+| Choice acceptance | An eligible returned option and the configured probability policy. | Semantic correctness or measured output quality. |
+| Composition validation | Required responsibilities and evidence dependencies, input types and references. | Correctness of every claim inside an AU's output. |
+| Recorded binding | Selection is accepted only after composition validation. | That future runs must choose the same AU. |
 
-## Change the task
+With one eligible capability the code binds it without a model call. No fit,
+insufficient probability, a provider failure or an invalid response prevents
+allocation from proceeding to application execution. **AU selection** separates
+the returned choice, composition check and accepted binding.
 
-Use the frontend job and corresponding CV. Change emphasis to “Assess accessibility, design systems, UI testing and browser performance.” Compare the selected runtime, rationale, latency and output. Keep the generation model fixed.
+## Probability and evaluation
 
-Try an out-of-scope request. A model can still confidently select an unsuitable option: inspect this as a failure, rather than treating a typed answer as proof. Raise the probability threshold on the hosted route to observe abstention; the local baseline has no such probability gate.
+`DECISION_MIN_PROBABILITY` is an illustrative course policy, not a threshold
+calibrated against measured accuracy. The local Ollama baseline uses constrained
+JSON and returns no probability; `DECISION_ALLOW_UNSCORED=true` explicitly
+permits it. It is not equivalent to the hosted TypeSafe decision model.
 
-## Edit the AU that actually ran
+Compare candidate results on the same examples before changing providers.
+Keep the selected AU, its `skills_hash`, model, input, output and observed
+signals together. If allocation changes when rerunning an instruction edit,
+that is no longer a controlled comparison of one AU's behaviour. Editing an
+unselected evaluator can change its card without changing the result.
 
-The original walkthrough edits the general evaluator. With decision allocation, first inspect the accepted binding and edit the corresponding file:
+A production selector would need evidence about failures, relative quality,
+cost and abstentions on representative held-out tasks. The course records
+observations; it does not automatically train a selector or maintain a
+measured-quality marketplace. Faster inference alone does not remove a human
+review or downstream capacity constraint.
 
-| Selected capability | Instructions to edit |
-|---|---|
-| `evaluator-cv` | `system/agents/evaluator/capabilities/cv/instructions.md` |
-| `evaluator-cv-data` | `system/agents/evaluator/capabilities/cv-data/instructions.md` |
-| `evaluator-cv-frontend` | `system/agents/evaluator/capabilities/cv-frontend/instructions.md` |
-
-Record that card's `skills_hash`, change one instruction, wait for its registration update and rerun the same input. Check the newly accepted binding too: if allocation chooses a different AU, this is no longer a controlled comparison of the same implementation. Editing an unselected evaluator can update its card without changing the observed result.
-
-For the optional provider swap, change `.env.revised` (or the exported setting that takes precedence), not only `.env`. Keep a copy of the observed input/output evidence. A visible hash change provides provenance; it does not itself establish that the new behaviour is correct.
-
-## Review questions
-
-- All three evaluators accept the same inputs. What establishes eligibility, and what remains a judgement?
-- A selected AU returns the correct JSON shape but a poor assessment. Which evidence should affect future selection?
-- The model proposes a new edge that bypasses the evaluation. Why is checking each AU separately insufficient?
-- If the bottleneck is the human review queue, what would faster inference change about overall throughput?
-
-Record results on the same examples before changing models. The lesson is sufficient utility from a stable model, with replaceable components and observed quality.
+The [course architecture guide](../../ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au)
+provides the wider component view.

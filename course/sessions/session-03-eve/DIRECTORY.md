@@ -1,39 +1,11 @@
-# EVE: build, discover and adopt
+# AGNTCY Directory reference
 
-Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. EVE runs the interviewer, AGNTCY Directory publishes a portable description, and the local AOA registry and planner handle adoption and composition.
+The complete learner sequence is in the [Session 3 walkthrough](WALKTHROUGH.md).
+Use this page for optional manual publication, record inspection, taxonomy and
+troubleshooting. Session 3 adoption and Session 4 startup already start Directory
+and publish the active AUs; you do not need a second setup.
 
-## Use AGNTCY for the running estate
-
-In the revised course, **Session 3 adoption and Session 4 startup enable AGNTCY discovery for every running AU**. Sessions 1–2 retain the simple local discovery path. The original profile and manual exercises below remain available.
-
-`session3-adopt.sh/.bat` starts Directory and a small course-owned publication adapter alongside AOA. The adapter reads the active local AU contracts and each runtime's actual A2A Agent Card, publishes OASF records, and checks for changes every five seconds. Startup waits for the expected AUs to be published. Deterministic tools keep their local registrations; they are not labelled as AUs.
-
-To republish/check readiness explicitly:
-
-```bash
-./scripts/directory.sh sync --wait 120
-```
-
-Windows: `scripts\directory.bat sync --wait 120`. This populates the active estate, including the EVE interviewer. It does not invent agents from inactive templates or delete earlier published records.
-
-Open [AGNTCY's catalogue](http://localhost:8891), search for `aoa-course`, and select the interviewer. These runtime publications contain an **A2A module**, so they appear in the catalogue. Inspect the declared purpose, skills, endpoint and catalogue JSON. Use the returned content ID with `directory.sh pull <cid> --out discovered.json` (or `.bat`) to inspect the complete OASF record in your editor.
-
-Now run **CV fit + interview** in Studio:
-
-1. The planner searches AGNTCY and retrieves the published OASF records through the course adapter. The adapter uses the real upstream `dirctl`; it does not return the local registry list as a substitute.
-2. The planner matches those records against locally adopted, approved contracts and runtime bindings. Missing/stale publications or an unavailable Directory stop the run before any AU invocation.
-3. Contract eligibility and the bounded decision model select the AUs. The EVE interviewer receives the assessment through its adopted A2A endpoint and generates the questions.
-4. In **AU selection**, inspect **Published records and local adoption checks**. Find the EVE content ID, accepted binding and invocation. **Run review** retains the same discovery evidence with the output.
-
-For the architectural test, stop Directory after a successful run and submit a **new** intent. It must fail discovery without invoking an AU or falling back to the old registry search. Restart Directory and retry. Already-held results can still be reviewed: that is case-state recovery, not a new discovery request.
-
-Session 4 uses the same discovery path, including its governance/evidence AUs. After changing a card, wait for the publisher or run `sync` again before rerunning it. Historical records remain visible, but a stale binding or suspended local AU cannot become a candidate.
-
-## Prepare the EVE capability
-
-Keep the [EVE walkthrough](WALKTHROUGH.md): native `eve init`, authored instructions, native acceptance and then AOA adoption. With `.env` configured, use `session3-up.sh/.bat`, complete the native exercise and exit its shell, then run `session3-adopt.sh/.bat`. The [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop) covers both platforms. A healthy adopted `interviewer-questions` card must be in the local registry for the main export/comparison sequence below.
-
-The pinned `eve init` may report a default-model metadata error before the provider-neutral `agent.ts` is added. Complete that configuration checkpoint in the native walkthrough and run `eve dev` again. The agent remains learner-authored; neither the adapter nor Directory rewrites its behaviour.
+For the responsibility boundaries, see [EVE and AGNTCY adoption](ADOPTION.md).
 
 ## Start Directory in Docker
 
@@ -52,7 +24,7 @@ The container uses the official `dir-ctl` image's binary, pinned by version and 
 
 Directory's database and record store persist in **`.course-data/directory`**. Exports and retrieved JSON files are also written under `.course-data`, where you can open them in your editor. Neither `directory stop` nor the normal course `down.sh/.bat` removes that data. The course `logs` and `down` commands include Directory.
 
-The CLI connection is insecure within this local teaching setup; container packaging does not add publisher verification or enterprise approval. The [original host-installed route](NATIVE-DIRECTORY.md) is retained. If you used it previously, stop its daemon with Ctrl+C before using the container: never run two daemons against the same data directory.
+The CLI connection is insecure within this local teaching setup; container packaging does not add publisher verification or enterprise approval. The [optional host-installed route](NATIVE-DIRECTORY.md) is retained. If you used it previously, stop its daemon with Ctrl+C before using the container: never run two daemons against the same data directory.
 
 ## Manual publish, find and retrieve exercise
 
@@ -122,7 +94,7 @@ Native EVE authoring stops AOA services. A comparison then needs the registry ru
 
 Save a copy of `.course-data/discovered.json` as `.course-data/mismatch.json`, change its contract digest in your editor and run `directory.sh check mismatch.json` or `directory.bat check mismatch.json`. Discovery still succeeded; local eligibility must be false. No Directory result is automatically executable.
 
-Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE capability, its invocation and five questions grounded in the selected evaluator's output. Directory publication alone is not the final success condition. Keep the portable record, accepted local card and run evidence together.
+Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE capability, its invocation and five questions grounded in the selected evaluator's output. Directory publication alone is not the final success condition. Keep the portable record, accepted local card and run evidence together. The main walkthrough already includes this composition; this reference does not require a second run.
 
 ## Troubleshooting
 

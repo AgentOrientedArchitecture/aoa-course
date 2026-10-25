@@ -4,7 +4,7 @@ setlocal EnableExtensions
 cd /d "%~dp0.."
 
 if not exist ".env" if not exist ".env.revised" (
-  echo error=.env or .env.revised is required in the repository root 1>&2
+  echo error=.env is required in the repository root; copy .env.example first 1>&2
   exit /b 1
 )
 
