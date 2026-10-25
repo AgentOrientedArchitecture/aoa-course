@@ -37,7 +37,7 @@ For stable-model utility, judge each output against explicit task criteria befor
 
 ## Remote use
 
-Spark remains available for remote builds and execution; a local laptop checkout can run the same course independently. From an authorised computer, forward port 8080 to view Spark's Studio; no public exposure is required. Docker services and a Directory process in a persistent terminal can outlive the Mac connection. Use `main` and confirm the same reviewed commit when continuing from another client. Private provider keys and persisted runtime data do not travel with Git. Final presentation rendering can remain on the Mac.
+Spark remains available for remote builds and execution; a local laptop checkout can run the same course independently. From an authorised computer, forward port 8080 to view Spark's Studio; no public exposure is required. The Docker services, including AGNTCY Directory, can outlive the Mac connection. Use `main` and confirm the same reviewed commit when continuing from another client. Private provider keys and persisted runtime data do not travel with Git. Final presentation rendering can remain on the Mac.
 
 ## Scope still open for a later course iteration
 

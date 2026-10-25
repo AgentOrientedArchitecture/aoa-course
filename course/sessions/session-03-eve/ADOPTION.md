@@ -13,7 +13,7 @@ Read the [system map](../../ARCHITECTURE.md) first. Follow the [native walkthrou
 | EVE framework | Real `eve` package, pinned to **0.17.1**, running its CLI, development runtime and client API in Docker | We can author and run an agent independently of the AOA scaffold |
 | Interviewer agent | Learner-authored `agent.ts`, `instructions.md` and channel files | A separately implemented capability can fulfil the same outward contracts as the Python AUs |
 | Adoption bridge | Course-owned JavaScript under `system/agents-eve/runtime/adapter/` | The integration work required to expose EVE as an AU is visible and inspectable |
-| AGNTCY Directory | Real **v1.8.0** `dirctl` local daemon and client | A description can be stored, indexed, searched and retrieved through external discovery infrastructure |
+| AGNTCY Directory | Real **v1.8.0** `dirctl` daemon and client in Docker, using the pinned upstream binary | A description can be stored, indexed, searched and retrieved through external discovery infrastructure |
 | OASF record | **1.0.0** record exported by the course helper with a skill classification and contract digest | A portable declaration can be related to the local capability contract |
 | Runtime registry | Course HTTP service with persisted cards and seeded lifecycle actors | Local discovery and runtime composition work; enterprise publisher identity/approval is simplified |
 
@@ -89,7 +89,7 @@ Directory's content ID identifies the published record. It is distinct from the 
 
 In the revised course, a specialist evaluator may be selected before the EVE step. Inspect that accepted binding. The Session 3 task plan is fixed to keep attention on the adoption boundary; AU allocation still uses the revised contract/decision path.
 
-For the Directory exercise on Windows, use a WSL2 checkout with Docker integration and run the Session 3 commands there. The native Windows batch route remains available for EVE authoring/adoption without Directory. Avoid splitting the same exercise between Windows and WSL checkouts: their workshop paths and loopback addresses may differ.
+EVE and Directory both run through Docker on Windows. Use the same Windows checkout and Command Prompt for `session3-adopt.bat` and `directory.bat`; no separate WSL checkout or host Python is needed. The shell launcher provides the same Directory operations on macOS/Linux. Directory records and exported files remain in `.course-data`, and the course stop/log scripts include the Directory container. The [original native-host route](NATIVE-DIRECTORY.md) remains available as an alternative.
 
 ## Adopting an externally owned agent
 
@@ -119,7 +119,9 @@ Repository links below work in GitHub or an editor; Studio only serves the learn
 | Real EVE process and client/session calls | [`eve.mjs`](../../../system/agents-eve/runtime/adapter/eve.mjs) |
 | Card stamping and registry publication | [`card.mjs`](../../../system/agents-eve/runtime/adapter/card.mjs), [`registry.mjs`](../../../system/agents-eve/runtime/adapter/registry.mjs) |
 | Interviewer contract | [`interviewer-questions.yaml`](../../../system/agents-eve/runtime/templates/interviewer-questions.yaml) |
-| Pinned Directory installation | [`directory-install.sh`](../../../scripts/directory-install.sh) |
+| Pinned Directory container and persistent data | [`Dockerfile`](../../../system/services/directory/Dockerfile), [`docker-compose.directory.yml`](../../../system/docker-compose.directory.yml) |
+| Cross-platform Directory commands | [`directory.sh`](../../../scripts/directory.sh), [`directory.bat`](../../../scripts/directory.bat) |
+| Optional native-host Directory installation | [`directory-install.sh`](../../../scripts/directory-install.sh) |
 | OASF export, CLI calls and local comparison | [`directory-lab.py`](../../../scripts/directory-lab.py) |
 
 ## What has been verified?

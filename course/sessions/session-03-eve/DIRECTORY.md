@@ -1,76 +1,106 @@
 # EVE: build, discover and adopt
 
-Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. It explains why these are separate boundaries, what the course bridge implements, and what this integration does and does not establish.
+Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. EVE runs the interviewer, AGNTCY Directory publishes a portable description, and the local AOA registry and planner handle adoption and composition.
 
-Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`, the authored instructions, native testing and the AOA boundary. Use these revised launchers so the selected model configuration is retained:
+## Prepare the EVE capability
 
-```bash
-./scripts/revised-eve.sh native
-# Complete the original native authoring and acceptance checkpoints, then exit.
-./scripts/revised-eve.sh adopt
-```
+Keep the [EVE walkthrough](WALKTHROUGH.md): native `eve init`, authored instructions, native acceptance and then AOA adoption. With `.env.revised` configured, use `session3-up.sh/.bat`, complete the native exercise and exit its shell, then run `session3-adopt.sh/.bat`. The [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop) covers both platforms. A healthy adopted `interviewer-questions` card must be in the local registry for the main export/comparison sequence below.
 
-In Windows Command Prompt, use `scripts\revised-eve.bat native`, then `scripts\revised-eve.bat adopt`. The standard `session3-up` and `session3-adopt` launchers also select this revised path when `.env.revised` is present. See the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop).
+The pinned `eve init` may report a default-model metadata error before the provider-neutral `agent.ts` is added. Complete that configuration checkpoint in the native walkthrough and run `eve dev` again. The agent remains learner-authored; neither the adapter nor Directory rewrites its behaviour.
 
-The pinned `eve init` may try to start its default agent before the provider-neutral configuration is added. If it reports a default-model metadata error, continue to the original walkthrough’s `agent.ts` configuration checkpoint, then run `eve dev` again. The revised launcher runs native authoring as the host user so Linux workshop files remain editable.
+## Start Directory in Docker
 
-The adopted EVE agent joins the existing CV/interview composition. It remains learner-authored; neither the adapter nor the Directory rewrites its behaviour.
+Use the same checkout on `main` as the EVE lab. Docker runs the real AGNTCY **v1.8.0** daemon, its CLI and the course's Python helper. No host `dirctl`, Python installation or separate WSL checkout is needed. On Windows, use Docker Desktop with Linux containers, as for EVE.
 
-## Publish to a real local Directory
+From the repository root:
 
-This part uses macOS/Linux shell commands. On Windows, run the whole Session 3 Directory exercise from a WSL2 checkout with Docker integration; the installer does not provide a native Windows binary. This keeps the workshop, registry connection and Directory files in one environment. The native Windows EVE-only route remains available.
+| Action | macOS/Linux | Windows Command Prompt |
+|---|---|---|
+| Build and start; wait for readiness | `./scripts/directory.sh up` | `scripts\directory.bat up` |
+| Inspect the installed version | `./scripts/directory.sh cli version` | `scripts\directory.bat cli version` |
+| Follow Directory logs | `./scripts/directory.sh logs` | `scripts\directory.bat logs` |
+| Stop Directory, keeping records | `./scripts/directory.sh stop` | `scripts\directory.bat stop` |
 
-```bash
-./scripts/directory-install.sh
-python3 scripts/directory-lab.py start
-```
+The container uses the official `dir-ctl` image's binary, pinned by version and multi-platform digest, with the course helper and PyYAML alongside it. It runs in the background and publishes host loopback port 8890. Its helper reaches the local AOA registry through `registry:7100` on the course Docker network. Start Directory and AOA from the same checkout and Compose project.
 
-Leave that terminal open, or run the service under a persistent remote terminal on Spark. It listens on loopback port 8890 and keeps its state under `.course-data/directory`. This is AGNTCY Directory v1.8.0, not an imitation registry. Stop it with Ctrl+C in that terminal; the course's `down` script stops Compose services and does not stop this separate host process.
+Directory's database and record store persist in **`.course-data/directory`**. Exports and retrieved JSON files are also written under `.course-data`, where you can open them in your editor. Neither `directory stop` nor the normal course `down.sh/.bat` removes that data. The course `logs` and `down` commands include Directory.
 
-The helper uses an insecure local connection. The installer records the downloaded binary's hash; it does not verify a publisher signature. Neither is a production trust configuration.
+The CLI connection is insecure within this local teaching setup; container packaging does not add publisher verification or enterprise approval. The [original host-installed route](NATIVE-DIRECTORY.md) is retained. If you used it previously, stop its daemon with Ctrl+C before using the container: never run two daemons against the same data directory.
 
-In a second terminal:
+## Publish, find and retrieve
 
-```bash
-python3 scripts/directory-lab.py export interviewer-questions > .course-data/interviewer.oasf.json
-python3 scripts/directory-lab.py push .course-data/interviewer.oasf.json > .course-data/interviewer.cid
-python3 scripts/directory-lab.py search "aoa-course/*"
-python3 scripts/directory-lab.py pull "$(cat .course-data/interviewer.cid)" > .course-data/discovered.json
-python3 scripts/directory-lab.py check .course-data/discovered.json
-```
-
-Allow a few seconds for indexing before searching. Inspect the actual record, its content-addressed identifier and the matching contract digest. The interviewer maps to OASF question generation (10205); parser exports map to fact extraction (10301), verified against the pinned v1.0.0 taxonomy. Mapping another capability requires reviewing a suitable taxonomy item. A declared skill does not establish measured ability.
-
-The final command reports `matching_local_contract`, `local_lifecycle_approved`, `locally_eligible`, `execution_authorised` and `identity_verified_by_directory_record`. In the matching adopted case, the first three should be true and the last two false. Read the fields: this comparison command is informational and can exit successfully while reporting a mismatch. It is not an automated admission controller.
-
-To expose discovery **before** local adoption, export the checked-in template directly:
+On **macOS/Linux**:
 
 ```bash
-.venv-course/bin/python scripts/directory-lab.py export interviewer-questions --card system/agents-eve/runtime/templates/interviewer-questions.yaml > .course-data/interviewer-before-adoption.oasf.json
+./scripts/directory.sh export interviewer-questions --out interviewer.oasf.json
+./scripts/directory.sh push interviewer.oasf.json --out interviewer.cid
+./scripts/directory.sh search "aoa-course/*"
+./scripts/directory.sh pull --cid-file interviewer.cid --out discovered.json
+./scripts/directory.sh check discovered.json
 ```
 
-This optional path needs PyYAML from the [test environment](../../REVISED-VALIDATION.md#run-the-checks). Push and pull that record as above. Native EVE authoring stops the AOA services, so a comparison at this point may report a connection failure because the registry is not running. To inspect absence in a live registry, start only that service with `docker compose -f system/docker-compose.yml --profile session3 up --build -d registry`, then run `check`. A previous session may already have persisted the capability: inspect and explain that history rather than deleting it. Adoption then makes the runtime available; repeat the comparison and the full CV/interview run.
+On **Windows Command Prompt**:
+
+```bat
+scripts\directory.bat export interviewer-questions --out interviewer.oasf.json
+scripts\directory.bat push interviewer.oasf.json --out interviewer.cid
+scripts\directory.bat search "aoa-course/*"
+scripts\directory.bat pull --cid-file interviewer.cid --out discovered.json
+scripts\directory.bat check discovered.json
+```
+
+The helper writes UTF-8 files inside the mounted `.course-data` folder. `--cid-file` reads the returned identifier directly, so no shell substitution or redirection is needed. The original helper's stdout/redirection interface remains supported for native users.
+
+Allow a few seconds for indexing before searching. Inspect `.course-data/interviewer.oasf.json`, the actual content ID in `interviewer.cid`, and the retrieved record in `discovered.json`. The interviewer maps to OASF question generation (10205); parser exports map to fact extraction (10301), checked against the pinned v1.0.0 taxonomy. Mapping another capability requires reviewing a suitable taxonomy entry. A declared skill does not establish measured ability.
+
+The final command reports:
+
+| Field | Expected for the matching adopted card | Meaning |
+|---|---|---|
+| `matching_local_contract` | `true` | The selected contract fields match the record's digest |
+| `local_lifecycle_approved` | `true` | The local card's lifecycle is approved |
+| `locally_eligible` | `true` | Both comparison conditions hold; task eligibility still follows |
+| `execution_authorised` | `false` | Discovery/comparison does not grant execution permission |
+| `identity_verified_by_directory_record` | `false` | These annotations do not verify the publisher |
+
+Read the fields: `check` is informational and can exit successfully while reporting a mismatch. It is not an automated admission controller. The [adoption guide](ADOPTION.md#three-descriptions-of-the-same-capability) lists the exact hash scope and distinguishes the OASF record, AOA card and A2A Agent Card.
+
+## Discover before adoption
+
+The container also mounts the checked-in contract template read-only. You can publish its description before an interviewer has been adopted:
+
+```bash
+./scripts/directory.sh export interviewer-questions --card /course-templates/interviewer-questions.yaml --out interviewer-before-adoption.oasf.json
+```
+
+On Windows, use `scripts\directory.bat` with the same arguments. Push and retrieve this record as above. A learner-authored card is also accessible at `/workshop/capability-card.yaml` after it exists.
+
+Native EVE authoring stops AOA services. A comparison then needs the registry running; to inspect an unadopted record, start just the registry with `docker compose -f system/docker-compose.yml --profile session3 up --build -d registry`. A previous session may already have persisted the card: inspect that history rather than deleting it. Complete adoption, then repeat the comparison and CV/interview run.
 
 ## Three distinct boundaries
 
 - **Directory** stores and discovers a portable declaration. A name or annotation is not verified identity.
-- **Local registry** holds the adopted AU's contract and lifecycle. `check` compares the declaration with the current local contract; it never imports or approves an external agent.
-- **Planner and governance** decide whether this AU is eligible for this task and whether the complete plan may run in this use context.
+- **Local registry** holds the adopted AU's contract and lifecycle. `check` compares declarations; it never imports or approves an external agent.
+- **Planner and governance** decide whether the adopted AU fits this task and whether the complete plan may run in this use context.
 
-Change a copy of the discovered declaration's contract digest and rerun `check`. Discovery still succeeded; local eligibility must fail. No result from the Directory is automatically executable.
+Save a copy of `.course-data/discovered.json` as `.course-data/mismatch.json`, change its contract digest in your editor and run `directory.sh check mismatch.json` or `directory.bat check mismatch.json`. Discovery still succeeded; local eligibility must be false. No Directory result is automatically executable.
 
-Finish the demonstration in **CV fit + interview**. The planner should call the locally adopted EVE capability and return five questions grounded in the selected evaluator's output. Directory publication alone is not the final success condition. Inspect the [invocation boundary](ADOPTION.md#follow-one-invocation) and keep the record, accepted card and run evidence together.
+Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE capability, its invocation and five questions grounded in the selected evaluator's output. Directory publication alone is not the final success condition. Keep the portable record, accepted local card and run evidence together.
 
-## Troubleshooting the boundary
+## Troubleshooting
 
 | Observation | Check |
 |---|---|
-| Connection refused on port 8890 | Keep the Directory daemon running in its own terminal; use the same machine/environment as the helper |
-| Search returns nothing immediately after push | Wait briefly for indexing; pull using the actual content ID returned by push |
-| Registry connection fails during comparison | Native EVE mode stops AOA; adopt or start the registry before comparing |
-| Contract mismatch | Inspect the specific contract fields and whether the exported record predates a card edit; publish a newly reviewed record rather than changing a hash to hide the difference |
-| Matching record but no working result | Check runtime health, model access, local selection and the actual EVE reply; metadata comparison does not test execution |
-| EVE's initial scaffold reports unknown model metadata | Complete the provider-neutral `agent.ts` checkpoint in the native walkthrough, then rerun `eve dev` |
+| Docker cannot start | Start Docker Desktop/Engine; on Windows select Linux containers |
+| `agntcy-directory` is not running | Run `directory.sh up` or `directory.bat up`; inspect `logs` if readiness fails |
+| Host port 8890 is already in use | Stop the old host Directory daemon or identify the existing container; do not run two daemons on the same data |
+| Search is initially empty | Allow indexing to finish; retrieve using the returned content ID |
+| Registry connection fails | Run the adopted AOA session or the registry-only command above, in the same checkout/project |
+| A file cannot be found | Helper paths are relative to `.course-data`; use the filename, not a Windows host path |
+| A contract comparison fails | Inspect the fields and whether the record predates a card edit; publish a newly reviewed record rather than changing the digest to hide the difference |
+| Matching record but no working result | Check runtime health, model access, local selection and the actual EVE reply |
+
+The raw CLI remains available through `directory.sh cli ...` and `directory.bat cli ...`. Keep record paths relative to `.course-data`. The helper maps only parser and interviewer capabilities; it does not expose every AGNTCY feature.
 
 ## Review questions
 
@@ -78,4 +108,4 @@ Finish the demonstration in **CV fit + interview**. The planner should call the 
 - Which checks would be needed before adopting an agent published by another organisation?
 - Does a matching contract hash prove the runtime behaves as declared?
 
-This lab covers local publish/discover and local acceptance checks. Federation, identity verification, SLIM transport and AGNTCY observability are later course extensions. Primary references: [Directory local deployment](https://dir.agntcy.org/latest/dir/dir-deployment-local/) and [Directory usage scenarios](https://dir.agntcy.org/latest/dir/dir-features-scenarios/).
+This lab covers a real local publish/discover round trip and local comparison. Federation, verified identity, SLIM and AGNTCY observability remain later course extensions. Primary references: [Directory local deployment](https://dir.agntcy.org/latest/dir/dir-deployment-local/) and [container CLI quickstart](https://dir.agntcy.org/latest/dir/dir-quickstart/).

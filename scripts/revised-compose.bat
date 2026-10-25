@@ -8,7 +8,7 @@ if exist ".env.revised" set "ENV_ARGS=%ENV_ARGS% --env-file .env.revised"
 set "LOCAL_ARGS="
 if /I "%AOA_LOCAL%"=="1" set "LOCAL_ARGS=--profile local"
 if /I "%AOA_LOCAL%"=="true" set "LOCAL_ARGS=--profile local"
-set "FILES=-f system/docker-compose.yml"
+set "FILES=-f system/docker-compose.yml -f system/docker-compose.directory.yml"
 if "%SESSION%"=="1" goto session1
 if "%SESSION%"=="2" goto session2
 if "%SESSION%"=="3" goto session3

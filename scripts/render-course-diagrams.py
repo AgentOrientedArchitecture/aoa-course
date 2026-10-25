@@ -95,7 +95,7 @@ d = Diagram('eve-adoption', 'Build, discover and adopt', 'Session 3 · EVE runs 
 d.box(40, 145, 300, 150, 'Native EVE', ['Author and test the interviewer', 'agent.ts + instructions.md', 'No AOA registration yet'], 'au')
 d.box(450, 145, 300, 150, 'Course adoption bridge', ['Reuse the authored files', 'Add card, Agent ID and trace', 'Expose the A2A boundary'])
 d.box(860, 145, 300, 150, 'Local AOA registry', ['Live capability and endpoint', 'Contract + lifecycle metadata', 'Used by this course planner'])
-d.box(40, 470, 300, 155, 'AGNTCY Directory', ['Real local dirctl daemon', 'OASF record: publish / find / pull', 'Metadata; does not run EVE'], 'store')
+d.box(40, 470, 300, 155, 'AGNTCY Directory', ['Real dirctl daemon in Docker', 'OASF record: publish / find / pull', 'Metadata; does not run EVE'], 'store')
 d.box(450, 470, 300, 155, 'Compare the record', ['Course check compares hashes', 'And local lifecycle status', 'Does not import or invoke'])
 d.box(860, 470, 300, 155, 'Compose and execute', ['Select local capabilities', 'Validate the complete plan', 'Invoke the adopted interviewer'], 'au')
 d.arrow('M340 220H450', 'adopt', (395, 205)); d.arrow('M750 220H860', 'register', (805, 205))

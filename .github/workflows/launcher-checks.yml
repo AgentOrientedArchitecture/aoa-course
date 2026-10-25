@@ -2,9 +2,9 @@ name: Course launchers
 on:
   push:
     branches: [main]
-    paths: ['scripts/**', 'tests/test_launchers.py', '.github/workflows/launcher-checks.yml']
+    paths: ['scripts/**', 'system/docker-compose.directory.yml', 'system/services/directory/**', 'tests/test_launchers.py', 'tests/check_directory_container.py', '.github/workflows/launcher-checks.yml']
   pull_request:
-    paths: ['scripts/**', 'tests/test_launchers.py', '.github/workflows/launcher-checks.yml']
+    paths: ['scripts/**', 'system/docker-compose.directory.yml', 'system/services/directory/**', 'tests/test_launchers.py', 'tests/check_directory_container.py', '.github/workflows/launcher-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,3 +23,13 @@ jobs:
           python-version: '3.12'
       - name: Check actual launchers without Docker or provider calls
         run: python -m unittest discover -s tests -p test_launchers.py -v
+  directory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Real Directory publish, retrieve and restart
+        run: python tests/check_directory_container.py

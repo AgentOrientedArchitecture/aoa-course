@@ -26,7 +26,7 @@
 <rect x="40" y="470" width="300" height="155" rx="12" fill="#f0ecfa" stroke="#715391" stroke-width="1.5"/>
 <rect x="40" y="485" width="5" height="125" rx="2" fill="#715391"/>
 <text x="60" y="505" class="head" text-anchor="start">AGNTCY Directory</text>
-<text x="60" y="535" class="body" text-anchor="start">Real local dirctl daemon</text>
+<text x="60" y="535" class="body" text-anchor="start">Real dirctl daemon in Docker</text>
 <text x="60" y="561" class="body" text-anchor="start">OASF record: publish / find / pull</text>
 <text x="60" y="587" class="body" text-anchor="start">Metadata; does not run EVE</text>
 <rect x="450" y="470" width="300" height="155" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>

@@ -15,12 +15,14 @@ docker compose %ENV_ARGS% ^
   -f system/docker-compose.session4.yml ^
   -f system/docker-compose.revised.yml ^
   -f system/docker-compose.revised-eve.yml ^
+  -f system/docker-compose.directory.yml ^
   --profile session1 ^
   --profile session2 ^
   --profile session3 ^
   --profile session3-lab-native ^
   --profile session3-lab-wrapped ^
   --profile session4 ^
+  --profile directory ^
   --profile local ^
   logs -f --tail=100 %*
 

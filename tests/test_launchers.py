@@ -144,6 +144,8 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
                 for profile in ('session1','session2','session3','session4','session3-lab-native','session3-lab-wrapped','local'):
                     self.assertIn(profile, row['argv'])
                 self.assertIn('system/docker-compose.revised-eve.yml', row['argv'])
+                self.assertIn('system/docker-compose.directory.yml', row['argv'])
+                self.assertIn('directory', row['argv'])
                 self.assertNotIn('-v', row['argv'])
                 self.assertNotIn('--volumes', row['argv'])
                 self.assertEqual(sentinel.read_bytes(), b'preserve this saved case')
@@ -207,6 +209,38 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertIn('system/docker-compose.revised.yml', row['argv'])
         self.assertIn('.env.revised', row['argv'])
         self.assertIn('_base.provider_test', row['argv'])
+
+    def test_directory_is_container_only_and_preserves_records(self):
+        data = self.root / '.course-data'
+        data.mkdir()
+        record = data / 'interviewer.oasf.json'
+        record.write_text('existing record')
+        row = self.invoke('directory', 'up')[0]
+        self.assertIn('system/docker-compose.directory.yml', row['argv'])
+        self.assertIn('--wait', row['argv'])
+        self.assertEqual(row['argv'][-1], 'agntcy-directory')
+        self.assertNotIn('--remove-orphans', row['argv'])
+        self.clean_log()
+        row = self.invoke('directory', 'pull', '--cid-file', 'record with spaces.cid', '--out', 'retrieved record.json')[0]
+        self.assertEqual(row['argv'][-7:], ['python', '/app/directory-lab.py', 'pull', '--cid-file', 'record with spaces.cid', '--out', 'retrieved record.json'])
+        self.assertIn('-T', row['argv'])
+        self.clean_log()
+        row = self.invoke('directory', 'cli', 'version')[0]
+        self.assertEqual(row['argv'][-1], 'version')
+        self.assertIn('dirctl', row['argv'])
+        self.clean_log()
+        row = self.invoke('directory', 'stop')[0]
+        self.assertIn('stop', row['argv'])
+        self.assertNotIn('down', row['argv'])
+        self.assertEqual(record.read_text(), 'existing record')
+
+    def test_directory_errors_propagate_and_invalid_commands_do_not_run(self):
+        self.assertEqual(self.invoke('directory', 'unknown', expect=2), [])
+        self.env['MOCK_FAIL_COMMAND'] = 'up'
+        self.invoke('directory', 'up', expect=17)
+        self.clean_log()
+        self.env['MOCK_FAIL_COMMAND'] = 'exec'
+        self.invoke('directory', 'check', 'missing.json', expect=17)
 
 
 if __name__ == '__main__':

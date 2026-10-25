@@ -1,0 +1,25 @@
+# Same Compose project/network as the course, but explicitly started for the lab.
+services:
+  agntcy-directory:
+    profiles: ["directory"]
+    build:
+      context: ..
+      dockerfile: system/services/directory/Dockerfile
+    image: aoa-course/directory:1.8.0
+    user: "${DIRECTORY_UID:-1000}:${DIRECTORY_GID:-1000}"
+    ports:
+      - "127.0.0.1:${COURSE_DIRECTORY_PORT:-8890}:8890"
+    volumes:
+      - ${COURSE_DIRECTORY_DATA_ROOT:-../.course-data}:/course-data
+      - ./agents-eve/runtime/templates:/course-templates:ro
+      - ./agents-eve/workshop:/workshop:ro
+    environment:
+      DIRECTORY_DAEMON_SERVER_LISTEN_ADDRESS: "0.0.0.0:8890"
+      COURSE_DIRECTORY_ADDR: "127.0.0.1:8890"
+      COURSE_REGISTRY_URL: "http://registry:7100"
+    healthcheck:
+      test: ["CMD", "dirctl", "--server-addr", "127.0.0.1:8890", "--auth-mode", "insecure", "search", "--name", "__aoa_healthcheck__", "--output", "json"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s

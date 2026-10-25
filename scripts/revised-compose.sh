@@ -6,7 +6,7 @@ compose=(docker compose)
 [[ ! -f .env ]] || compose+=(--env-file .env)
 [[ ! -f .env.revised ]] || compose+=(--env-file .env.revised)
 [[ "${AOA_LOCAL:-false}" != "true" && "${AOA_LOCAL:-0}" != "1" ]] || compose+=(--profile local)
-files=(-f system/docker-compose.yml)
+files=(-f system/docker-compose.yml -f system/docker-compose.directory.yml)
 case "$session" in
   1) files+=(-f system/docker-compose.session1.yml);;
   2) ;;

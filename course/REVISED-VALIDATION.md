@@ -59,7 +59,7 @@ The standard session, EVE build/adoption and provider-check launchers now select
 - Real Docker Compose configuration validation passes for all four revised sessions with both example model routes, and for the combined stop/log service configuration. These checks do not start or stop containers.
 - The `Course launchers` GitHub Actions workflow passed all 11 tests on Linux, macOS and native Windows at commit `a029f79`: [cross-platform results](https://github.com/AgentOrientedArchitecture/aoa-course/actions/runs/40096715858). The first Windows run caught an EVE helper-path error after argument processing; the corrected scripts passed the complete rerun.
 
-These checks validate launcher behaviour. They do not replace the fresh Mac/Windows walkthroughs with Docker and live providers, which remain pending. AGNTCY Directory is a separate foreground process, and the current Windows Directory instructions use WSL2.
+These checks validate launcher behaviour. They do not replace the fresh Mac/Windows walkthroughs with Docker and live providers, which remain pending. At this checkpoint, AGNTCY Directory used a separate host process and the Windows instructions used WSL2. The current [Directory lab](sessions/session-03-eve/DIRECTORY.md) runs the daemon and tools in Docker with shell and native Windows batch launchers.
 
 To repeat just the launcher checks without Docker or provider keys:
 
@@ -72,3 +72,14 @@ Use `python3` if that is the Python command on your machine.
 ## Documentation checks, 25 October 2026
 
 The [documentation review](DOCUMENTATION-REVIEW.md) adds a system map and an EVE/AGNTCY adoption guide grounded in the implementation. All 41 tests pass, including new coverage for document rendering, heading anchors, SVG serving and file access boundaries. All 136 local links in the changed Markdown resolve, and all six diagrams were rendered and visually inspected. A browser check confirmed image loading and section navigation in the existing Studio documentation route. This pass made no live provider calls and did not repeat the 21 October integration rehearsal.
+
+## Directory container checks, 25 October 2026
+
+Directory now runs through Docker on all course platforms, including Windows Command Prompt. The daemon, upstream CLI and Python helper are contained together; the original native route is retained in `sessions/session-03-eve/NATIVE-DIRECTORY.md`.
+
+- The official v1.8.0 multi-platform image is pinned by digest. A real Apple Silicon Docker test published, indexed, searched and retrieved an OASF record, then compared it with an isolated real course registry.
+- The same test confirmed a contract mismatch remains ineligible, discovery never authorises execution, a failed retrieval preserves an existing output file, and a record survives Directory stop/start.
+- All 43 Python tests pass, including 13 launcher checks covering the new Directory commands, paths with spaces, exit codes and preserved files.
+- CI runs those launchers on Linux, macOS and native Windows, and the real container round trip on Linux amd64.
+
+The container test uses synthetic registry metadata, temporary data and a separate Docker project. It does not call a generation/decision provider or alter learner data. Native Windows Docker Desktop rehearsal remains a separate delivery check; the Windows CI job checks actual batch command handling with a Docker stand-in.

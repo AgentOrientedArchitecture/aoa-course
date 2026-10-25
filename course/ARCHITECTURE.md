@@ -18,9 +18,9 @@ The course builds one estate across four examples: assess a CV, curate a wiki, a
 | **EVE AU** | The learner's TypeScript agent running in the real EVE runtime, behind a course-owned adoption bridge. | Native EVE at `http://localhost:7310`; adopted card at `http://localhost:7311/.well-known/agent-card.json` |
 | **Tool bridges** | Deterministic capabilities for files, document extraction and wiki storage. Registered HTTP bridges call the local MCP implementations. | `kind: tool`; tool invocations within the AU trace |
 | **Case store** | SQLite snapshots and ordered events, used to restore runs and commit exact-result review. | Saved case, status, result digest and review; `system/services/planner/traces/cases.sqlite3` |
-| **AGNTCY Directory** | A separately started, real local Directory daemon storing and finding portable OASF records. It is outside the request execution path. | Published record, content ID, search/pull result and comparison with a local card |
+| **AGNTCY Directory** | A real Directory daemon, CLI and course helper in one container, started for the discovery lab. It stores and finds portable OASF records, outside the request execution path. | Published record, content ID, search/pull result and comparison with a local card |
 
-These URLs refer to the machine running the course. On Spark use your configured connection or forwarding; `localhost` on a different laptop is a different machine. The Directory daemon listens on loopback port 8890 and is used through its CLI, not Studio's runtime-registry pane.
+These URLs refer to the machine running the course. On Spark use your configured connection or forwarding; `localhost` on a different laptop is a different machine. Directory exposes loopback port 8890 on the host; its CLI and helper run inside the container through `directory.sh/.bat`. The helper reaches `registry:7100` on the course Docker network. Directory records are separate from Studio's runtime-registry pane and persist under `.course-data/directory`.
 
 The registry is deliberately small: lifecycle actors are seeded and registration defaults to approved. This makes the mechanics visible; it does not implement independent publisher verification or an enterprise approval workflow. Likewise the planner is real executable planning/orchestration code, but is not itself a separately registered Planner AU.
 

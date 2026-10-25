@@ -1,6 +1,6 @@
 # Revised model access
 
-Use Docker and the existing course repository. macOS/Linux use `.sh` launchers; Windows Command Prompt uses the matching `.bat` launchers with Docker Desktop running Linux containers. WSL2 remains an alternative for Windows and is required for the optional AGNTCY Directory lab's current installer.
+Use Docker and the existing course repository. macOS/Linux use `.sh` launchers; Windows Command Prompt uses the matching `.bat` launchers with Docker Desktop running Linux containers. EVE and the AGNTCY Directory tools run in containers. No separate WSL checkout, host Python or host `dirctl` installation is needed for the Directory lab; WSL2 remains an optional way to run the shell launchers.
 
 ## Get the October course
 
@@ -77,6 +77,8 @@ Run from the repository root after creating `.env.revised`:
 | Session 3: pre-build images | `./scripts/session3-build.sh` | `scripts\session3-build.bat` |
 | Session 3: native EVE authoring | `./scripts/session3-up.sh` | `scripts\session3-up.bat` |
 | Session 3: adopt the tested agent | `./scripts/session3-adopt.sh` | `scripts\session3-adopt.bat` |
+| Session 3: start AGNTCY Directory | `./scripts/directory.sh up` | `scripts\directory.bat up` |
+| Stop only AGNTCY Directory | `./scripts/directory.sh stop` | `scripts\directory.bat stop` |
 | Session 4: compliance | `./scripts/session4-up.sh` | `scripts\session4-up.bat` |
 | Seed Session 4 evidence after startup | `./scripts/session4-seed.sh` | `scripts\session4-seed.bat` |
 | Follow service logs | `./scripts/logs.sh` | `scripts\logs.bat` |
@@ -84,7 +86,7 @@ Run from the repository root after creating `.env.revised`:
 
 Session 3's native authoring step stops the running AOA services so learners can inspect EVE on its own. After authoring and native testing, exit that shell and use the adoption launcher. Adoption builds the image before installing dependencies, retains existing learner files/cards, and checks both agent health and registry presence before reporting success.
 
-`down` includes every original and revised Compose service, including the decision service, specialist CV evaluators, EVE and container Ollama. It retains volumes, saved cases, wiki state and authored workshop files by default. `logs` covers the same service set; add a service name to narrow it. Stop a separately started AGNTCY Directory with Ctrl+C in its own terminal. Host-installed Ollama is also independent of Compose.
+`down` includes every original and revised Compose service, including the decision service, specialist CV evaluators, EVE, AGNTCY Directory and container Ollama. It retains volumes, saved cases, Directory records, wiki state and authored workshop files by default. `logs` covers the same service set; add a service name to narrow it. A Directory started through the optional native-host route still needs Ctrl+C in its terminal. Host-installed Ollama is also independent of Compose.
 
 The explicit revised entry points remain available on both platforms: `revised-up.sh/.bat 1`, `2` or `4`, and `revised-eve.sh/.bat build`, `native` or `adopt`. They always choose the revised configuration. The ordinary session launchers instead honour `AOA_REVISED`: `1`/`true` forces revised, `0`/`false` forces original, and unset/`auto` selects by the presence of `.env.revised`. On macOS/Linux, for example, `AOA_REVISED=0 ./scripts/session1-up.sh` runs the original course. In Windows Command Prompt, run `set AOA_REVISED=0` first; `set AOA_REVISED=` restores automatic selection.
 

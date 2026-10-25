@@ -11,7 +11,7 @@ import urllib.error
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
-CLI = ROOT / '.course-tools/dirctl-1.8.0'
+CLI = Path(os.getenv('COURSE_DIRECTORY_CLI', str(ROOT / '.course-tools/dirctl-1.8.0')))
 CONTRACT_FIELDS = ('id', 'version', 'kind', 'purpose', 'inputs', 'outputs', 'constraints')
 
 
@@ -57,16 +57,34 @@ def compare(record, local):
             'identity_verified_by_directory_record': False}
 
 
+def emit(text, output=None):
+    if output:
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text.rstrip() + '\n', encoding='utf-8')
+    else:
+        print(text.rstrip())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     ex = sub.add_parser('export'); ex.add_argument('capability'); ex.add_argument('--card', help='Unadopted workshop YAML card, using PyYAML')
     sub.add_parser('start')
     push = sub.add_parser('push'); push.add_argument('record')
-    pull = sub.add_parser('pull'); pull.add_argument('cid')
+    pull = sub.add_parser('pull'); pull.add_argument('cid', nargs='?'); pull.add_argument('--cid-file')
     search = sub.add_parser('search'); search.add_argument('name', nargs='?', default='aoa-course/*')
     check = sub.add_parser('check'); check.add_argument('record')
+    for command in (ex, push, pull, search, check):
+        command.add_argument('--out', help='Write output as UTF-8; paths are inside .course-data when using Docker')
     args = parser.parse_args()
+    if args.command == 'pull':
+        if bool(args.cid) == bool(args.cid_file):
+            parser.error('Provide a CID or --cid-file, but not both')
+        if args.cid_file:
+            args.cid = Path(args.cid_file).read_text(encoding='utf-8-sig').strip()
+        if not args.cid:
+            parser.error('CID file is empty')
     if args.command == 'export':
         if args.card:
             import yaml
@@ -75,7 +93,7 @@ def main():
                 parser.error('Card ID differs from requested capability')
         else:
             card = registry_card(args.capability)
-        print(json.dumps(export_record(card), indent=2)); return
+        emit(json.dumps(export_record(card), indent=2), args.out); return
     if args.command == 'check':
         record = json.loads(Path(args.record).read_text())
         try:
@@ -83,8 +101,8 @@ def main():
         except urllib.error.HTTPError as exc:
             if exc.code != 404:
                 raise
-            print(json.dumps({'locally_eligible': False, 'reason': 'Not adopted into the local AOA registry', 'execution_authorised': False}, indent=2)); return
-        print(json.dumps(compare(record, local), indent=2)); return
+            emit(json.dumps({'locally_eligible': False, 'reason': 'Not adopted into the local AOA registry', 'execution_authorised': False}, indent=2), args.out); return
+        emit(json.dumps(compare(record, local), indent=2), args.out); return
     if not CLI.exists():
         parser.error('Run scripts/directory-install.sh first')
     if args.command == 'start':
@@ -93,7 +111,12 @@ def main():
     extra = {'push': ['push', getattr(args, 'record', ''), '--output', 'raw'],
              'pull': ['pull', getattr(args, 'cid', '')],
              'search': ['search', '--name', getattr(args, 'name', ''), '--output', 'json']}[args.command]
-    subprocess.run([str(CLI), '--server-addr', '127.0.0.1:8890', '--auth-mode', 'insecure', *extra], check=True)
+    command = [str(CLI), '--server-addr', os.getenv('COURSE_DIRECTORY_ADDR', '127.0.0.1:8890'), '--auth-mode', 'insecure', *extra]
+    if args.out:
+        result = subprocess.run(command, stdout=subprocess.PIPE, text=True, check=True)
+        emit(result.stdout, args.out)
+    else:
+        subprocess.run(command, check=True)
 
 
 if __name__ == '__main__':
