@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 670" role="img" aria-labelledby="title desc">
+<title id="title">A decision model inside an AU</title><desc id="desc">Session 2 · the judgement changes; the parser, reporter and wiki contracts remain usable.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#516775"/></marker></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#203847}.title{font-size:30px;font-weight:700}.sub{font-size:18px;fill:#536875}.head{font-size:23px;font-weight:700}.body{font-size:18px}.label{font-size:16px;fill:#405866;paint-order:stroke;stroke:#fafbf9;stroke-width:7px;stroke-linejoin:round}</style>
+<rect width="1200" height="670" fill="#fafbf9"/>
+<text x="40" y="48" class="title">A decision model inside an AU</text>
+<text x="40" y="82" class="sub">Session 2 · the judgement changes; the parser, reporter and wiki contracts remain usable.</text>
+<rect x="40" y="145" width="300" height="155" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="40" y="160" width="5" height="125" rx="2" fill="#23775b"/>
+<text x="60" y="180" class="head" text-anchor="start">Parse the note</text>
+<text x="60" y="210" class="body" text-anchor="start">parser-notes</text>
+<text x="60" y="236" class="body" text-anchor="start">Generation model extracts fields</text>
+<text x="60" y="262" class="body" text-anchor="start">Inspect the extracted passages</text>
+<rect x="450" y="145" width="300" height="155" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="450" y="160" width="5" height="125" rx="2" fill="#23775b"/>
+<text x="470" y="180" class="head" text-anchor="start">Assess promotion</text>
+<text x="470" y="210" class="body" text-anchor="start">evaluator-promote</text>
+<text x="470" y="236" class="body" text-anchor="start">Code gates the returned choice</text>
+<text x="470" y="262" class="body" text-anchor="start">Retains the parsed quotes</text>
+<rect x="860" y="145" width="300" height="155" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="860" y="160" width="5" height="125" rx="2" fill="#23775b"/>
+<text x="880" y="180" class="head" text-anchor="start">Report / publish</text>
+<text x="880" y="210" class="body" text-anchor="start">reporter-ingest-summary</text>
+<text x="880" y="236" class="body" text-anchor="start">Writes only if promote is true</text>
+<text x="880" y="262" class="body" text-anchor="start">Reject / review: withhold</text>
+<rect x="450" y="405" width="300" height="140" rx="12" fill="#fff3dc" stroke="#94621c" stroke-width="1.5"/>
+<rect x="450" y="420" width="5" height="110" rx="2" fill="#94621c"/>
+<text x="470" y="440" class="head" text-anchor="start">Decision API</text>
+<text x="470" y="470" class="body" text-anchor="start">promote · reject · review</text>
+<text x="470" y="496" class="body" text-anchor="start">Choice + available probability</text>
+<text x="470" y="522" class="body" text-anchor="start">Provider, model and latency</text>
+<rect x="860" y="405" width="300" height="140" rx="12" fill="#f0ecfa" stroke="#715391" stroke-width="1.5"/>
+<rect x="860" y="420" width="5" height="110" rx="2" fill="#715391"/>
+<text x="880" y="440" class="head" text-anchor="start">Wiki store</text>
+<text x="880" y="470" class="body" text-anchor="start">Registered tool and MCP server</text>
+<text x="880" y="496" class="body" text-anchor="start">Promoted evidence and index</text>
+<text x="880" y="522" class="body" text-anchor="start">Supports later grounded queries</text>
+<path d="M340 220H450" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="395" y="205" class="label" text-anchor="middle">parsed evidence</text>
+<path d="M750 220H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="805" y="205" class="label" text-anchor="middle">promotion</text>
+<path d="M560 300V405" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="510" y="355" class="label" text-anchor="middle">request</text>
+<path d="M640 405V300" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="685" y="355" class="label" text-anchor="middle">choice</text>
+<path d="M1010 300V405" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1080" y="355" class="label" text-anchor="middle">promote only</text>
+<text x="40" y="595" class="sub" text-anchor="start">AU code sends uncertain choices and promotions with no usable passages to review.</text>
+<text x="40" y="630" class="sub" text-anchor="start">Review is recorded and withheld. There is no separate human promotion queue.</text>
+</svg>

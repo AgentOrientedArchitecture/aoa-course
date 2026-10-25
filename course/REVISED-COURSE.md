@@ -4,6 +4,13 @@ The course still builds the same estate: **CV assessment → knowledge wiki → 
 
 Use this page as the entry point for the revised branch. All original walkthroughs, examples and launchers remain available. The expense prototype in `aoa-course-v2` is a separate companion; it is not a prerequisite or a replacement.
 
+## Reading order
+
+1. [Set up model access and launchers](pre-work/01-revised-model-access.md).
+2. [Understand the components and request flow](ARCHITECTURE.md): six diagrams covering the system, AU selection, wiki decisions, adoption, EVE invocation and persistent cases.
+3. Use the session guide below alongside its existing walkthrough. Each guide names the checkpoints that differ in the revised profile.
+4. Before Session 3, read [Adopting EVE with AGNTCY Directory](sessions/session-03-eve/ADOPTION.md). It connects real framework execution and discovery infrastructure to the AOA boundary, with the evidence to inspect at each step.
+
 ## What learners should be able to explain and demonstrate
 
 1. Separate an intent, a task decomposition, an eligible capability and an accepted executable plan.

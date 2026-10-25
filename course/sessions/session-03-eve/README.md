@@ -1,5 +1,7 @@
 # Session 3 — Authoring AUs with EVE
 
+Begin with [Adopting EVE with AGNTCY Directory](ADOPTION.md): the component boundaries, three descriptions, actual EVE call and evidence of adoption. Then use [native authoring](WALKTHROUGH.md) and [Directory discovery](DIRECTORY.md) as the practical sequence.
+
 Session 3 uses [Vercel EVE](https://github.com/vercel/eve) to author and accept
 an agent natively before adopting it into the same registry, planner, and Studio
 used by the Python agents. The complete guided lab is in

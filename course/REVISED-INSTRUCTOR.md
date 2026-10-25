@@ -3,6 +3,7 @@
 ## Before the class
 
 - Start on the reviewed revision of `codex/october-course-rebuild` in `aoa-course`, on Spark or the teaching laptop. Use the [launcher table](pre-work/01-revised-model-access.md#start-and-stop) for macOS/Linux and Windows commands.
+- Use the [architecture diagrams](ARCHITECTURE.md) to locate each component before running its example. Read the [EVE/AGNTCY adoption explanation](sessions/session-03-eve/ADOPTION.md) before Session 3; the practical integration is a main course argument, not an optional product overview.
 - Use the [provider setup](pre-work/01-revised-model-access.md). Verify actual Cerebras and TypeSafe calls, account quota and access from the teaching environment. Keep the local route ready and label it when used.
 - Build all images before the session. EVE retains its pinned native workspace and framework version; do not replace learner files to make a demo pass.
 - Run `.venv-course/bin/python -m pytest -q tests` after installing `tests/requirements.txt` into that isolated environment. These are adapter/policy/storage checks, not model-quality certification.
@@ -19,6 +20,14 @@ Introduce each existing story before its new mechanism. Let learners predict the
 4. Compliance: red card, declared review, exact held result, restart, review, duplicate request, audit.
 
 The existing slide placeholders can still lead into these live examples. The repository's hands-on session numbers are not a proposal to renumber the deck.
+
+## Session 3 evidence to show
+
+Show the same learner agent working in native EVE, then the registered AOA contract, then a CV/interview run calling it across the bridge. Explain the course-owned adapter and inspect the actual `eve/client` session call if asked how real the integration is. Generic bridge signals check field presence; inspect five-question quality and limits explicitly.
+
+Publish and retrieve an OASF record through the real local Directory. Compare its content ID, contract digest and local Agent ID; they identify different things. Show the comparison returning `execution_authorised: false` even when the declaration matches. Finish with the executed local composition so discovery is connected to useful work.
+
+Keep the scope explicit: real third-party framework and discovery infrastructure, learner-owned agent, course-owned adapter, local seeded approval. An externally owned agent would still need identity, permission, contract, quality and operational acceptance. The [adoption guide](sessions/session-03-eve/ADOPTION.md#adopting-an-externally-owned-agent) supplies that discussion without claiming it has already been implemented.
 
 ## Record the comparison
 

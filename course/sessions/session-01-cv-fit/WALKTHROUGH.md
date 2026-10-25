@@ -19,6 +19,8 @@ read the **Registry pane**: three `kind: au` capabilities and one
 Nothing here is a description of the system — it *is* the system's public
 surface.
 
+**Revised profile:** the registry has five AU cards because data and frontend evaluators are also available. Follow [Edit the AU that actually ran](DECISIONS.md#edit-the-au-that-actually-ran) when reaching the hot-reload exercise below.
+
 ## 2. Run the workflow
 
 In the **CV fit** tab, drop or paste a CV and a job description:
@@ -32,7 +34,7 @@ over A2A, calls its declared tools, and returns outputs plus **signals**.
 
 Things worth pointing at in the trace:
 
-- The planner selected capabilities by **card**, not by name in code.
+- Inspect how the planner selected capabilities from registered **cards**. The course still has named reference contracts and required task definitions; a trace may show an LLM proposal, a fixed plan or a fallback. The revised allocation path adds explicit contract filtering and bounded choice.
 - `parser-cv` reached for `tool-document-text` — a declared, traced boundary.
 - Every step carries the same `trace_id`: the whole run is reconstructable.
 - The signals block on each response (schema validity, latency) is the
@@ -81,7 +83,7 @@ that is "replacement is registration" at the model layer.
 
 - The **card** is the public promise; `instructions.md` is governed behaviour;
   tools are declared dependencies; the model is an implementation detail.
-- Change behind the boundary is safe **because** the public surfaces
-  (`skills_hash`, `provenance.model`, signals) show it moving.
+- Public surfaces (`skills_hash`, `provenance.model`, signals) make change
+  inspectable. Test the resulting behaviour; visibility alone does not make a change safe.
 - The question this sets up: the registry accepted your change without asking
   anyone. Should it have? (Session 4's Agent card check has an opinion.)

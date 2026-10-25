@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" role="img" aria-labelledby="title desc">
+<title id="title">From an intent to an executable plan</title><desc id="desc">Session 1 · separate a proposed task, a model choice and an accepted binding.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#516775"/></marker></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#203847}.title{font-size:30px;font-weight:700}.sub{font-size:18px;fill:#536875}.head{font-size:23px;font-weight:700}.body{font-size:18px}.label{font-size:16px;fill:#405866;paint-order:stroke;stroke:#fafbf9;stroke-width:7px;stroke-linejoin:round}</style>
+<rect width="1200" height="820" fill="#fafbf9"/>
+<text x="40" y="48" class="title">From an intent to an executable plan</text>
+<text x="40" y="82" class="sub">Session 1 · separate a proposed task, a model choice and an accepted binding.</text>
+<rect x="40" y="140" width="330" height="155" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="40" y="155" width="5" height="125" rx="2" fill="#32649a"/>
+<text x="60" y="175" class="head" text-anchor="start">1  Propose tasks</text>
+<text x="60" y="205" class="body" text-anchor="start">CV + job + assessment emphasis</text>
+<text x="60" y="231" class="body" text-anchor="start">LLM proposal or recorded fallback</text>
+<text x="60" y="257" class="body" text-anchor="start">Required course tasks stay fixed</text>
+<rect x="435" y="140" width="330" height="155" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="435" y="155" width="5" height="125" rx="2" fill="#32649a"/>
+<text x="455" y="175" class="head" text-anchor="start">2  Filter contracts</text>
+<text x="455" y="205" class="body" text-anchor="start">Approved AU lifecycle</text>
+<text x="455" y="231" class="body" text-anchor="start">Compatible inputs and outputs</text>
+<text x="455" y="257" class="body" text-anchor="start">Code checks eligibility</text>
+<rect x="830" y="140" width="330" height="155" rx="12" fill="#fff3dc" stroke="#94621c" stroke-width="1.5"/>
+<rect x="830" y="155" width="5" height="125" rx="2" fill="#94621c"/>
+<text x="850" y="175" class="head" text-anchor="start">3  Choose a fit</text>
+<text x="850" y="205" class="body" text-anchor="start">Decision model if several eligible</text>
+<text x="850" y="231" class="body" text-anchor="start">One eligible: bind without a model</text>
+<text x="850" y="257" class="body" text-anchor="start">No fit / low probability: stop</text>
+<rect x="435" y="405" width="330" height="130" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="435" y="420" width="5" height="100" rx="2" fill="#32649a"/>
+<text x="455" y="440" class="head" text-anchor="start">4  Validate composition</text>
+<text x="455" y="470" class="body" text-anchor="start">All required responsibilities</text>
+<text x="455" y="496" class="body" text-anchor="start">Correct evidence dependencies</text>
+<text x="455" y="522" class="body" text-anchor="start">Only then accept the bindings</text>
+<rect x="40" y="405" width="330" height="130" rx="12" fill="#fbeeed" stroke="#a94d44" stroke-width="1.5"/>
+<rect x="40" y="420" width="5" height="100" rx="2" fill="#a94d44"/>
+<text x="60" y="440" class="head" text-anchor="start">Stop before execution</text>
+<text x="60" y="470" class="body" text-anchor="start">Invalid composition or no choice</text>
+<text x="60" y="496" class="body" text-anchor="start">Inspect the reason and clarify</text>
+<rect x="830" y="405" width="330" height="130" rx="12" fill="#ffffff" stroke="#5b6c78" stroke-width="1.5"/>
+<rect x="830" y="420" width="5" height="100" rx="2" fill="#5b6c78"/>
+<text x="850" y="440" class="head" text-anchor="start">CV evaluator candidates</text>
+<text x="850" y="470" class="body" text-anchor="start">General · data · frontend</text>
+<text x="850" y="496" class="body" text-anchor="start">Separate runtimes and Agent IDs</text>
+<text x="850" y="522" class="body" text-anchor="start">Same input/output contract</text>
+<rect x="40" y="650" width="300" height="110" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="40" y="665" width="5" height="80" rx="2" fill="#23775b"/>
+<text x="60" y="685" class="head" text-anchor="start">Parse CV</text>
+<text x="60" y="715" class="body" text-anchor="start">parser-cv</text>
+<text x="60" y="741" class="body" text-anchor="start">Structured CV evidence</text>
+<rect x="450" y="650" width="300" height="110" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="450" y="665" width="5" height="80" rx="2" fill="#23775b"/>
+<text x="470" y="685" class="head" text-anchor="start">Assess fit</text>
+<text x="470" y="715" class="body" text-anchor="start">The selected evaluator</text>
+<text x="470" y="741" class="body" text-anchor="start">Scores, gaps and rationale</text>
+<rect x="860" y="650" width="300" height="110" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="860" y="665" width="5" height="80" rx="2" fill="#23775b"/>
+<text x="880" y="685" class="head" text-anchor="start">Report</text>
+<text x="880" y="715" class="body" text-anchor="start">reporter-cv-fit</text>
+<text x="880" y="741" class="body" text-anchor="start">The returned assessment</text>
+<path d="M370 215H435" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M765 215H830" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M995 295V350H600V405" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="770" y="340" class="label" text-anchor="middle">proposed bindings</text>
+<path d="M435 470H370" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="400" y="457" class="label" text-anchor="middle">invalid</text>
+<path d="M600 535V595H190V650" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="400" y="582" class="label" text-anchor="middle">valid plan → run the application AUs</text>
+<path d="M340 705H450" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M750 705H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="40" y="795" class="sub" text-anchor="start">A valid contract and a high model probability do not establish assessment quality.</text>
+</svg>

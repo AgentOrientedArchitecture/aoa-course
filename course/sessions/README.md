@@ -2,6 +2,8 @@
 
 **Revised course:** [Cerebras, TypeSafe and the four connected live demos](../REVISED-COURSE.md). The original material below is retained.
 
+Start the October walkthrough with the [architecture guide](../ARCHITECTURE.md), then the session's revised guide: [CV allocation](session-01-cv-fit/DECISIONS.md), [wiki decisions](session-02-wiki/DECISIONS.md), [EVE/AGNTCY adoption](session-03-eve/ADOPTION.md), or [durable cases](session-04-compliance/DURABLE-CASES.md). These explain how to use the original walkthroughs with the revised profile.
+
 One folder per hands-on session. Each folder follows the same layout:
 
 - **`WALKTHROUGH.md`** — the learner instructions for the session. Start here.

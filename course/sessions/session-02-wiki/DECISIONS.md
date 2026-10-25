@@ -1,6 +1,6 @@
 # Wiki: a decision inside the AU
 
-Start `./scripts/revised-up.sh 2`. Retain the original [wiki walkthrough](WALKTHROUGH.md), including ingest, graph, retrieval and citations.
+Start `./scripts/session2-up.sh`, or `scripts\session2-up.bat`, with `.env.revised` configured. The explicit `revised-up.sh/.bat 2` path also works. Retain the original [wiki walkthrough](WALKTHROUGH.md), including ingest, graph, retrieval and citations. The [wiki architecture diagram](../../ARCHITECTURE.md#session-2-the-decision-is-the-aus-main-model-output) shows which component supplies the judgement and which one writes the result.
 
 The parser still uses the generation model to extract the note. The promotion AU now asks a bounded question: **promote, reject, or review**. The decision model supplies the judgement; code assembles the existing promotion contract from parsed fields and preserves each retained quote. The reporter writes to the wiki only when `promote` is true.
 

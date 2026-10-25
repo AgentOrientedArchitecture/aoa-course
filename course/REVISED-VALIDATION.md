@@ -64,3 +64,7 @@ python -m unittest discover -s tests -p test_launchers.py -v
 ```
 
 Use `python3` if that is the Python command on your machine.
+
+## Documentation checks, 25 October 2026
+
+The [documentation review](DOCUMENTATION-REVIEW.md) adds a system map and an EVE/AGNTCY adoption guide grounded in the implementation. All 41 tests pass, including new coverage for document rendering, heading anchors, SVG serving and file access boundaries. All 136 local links in the changed Markdown resolve, and all six diagrams were rendered and visually inspected. A browser check confirmed image loading and section navigation in the existing Studio documentation route. This pass made no live provider calls and did not repeat the 21 October integration rehearsal.

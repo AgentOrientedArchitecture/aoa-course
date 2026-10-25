@@ -6,8 +6,25 @@ and controls release of the completed result. It owns the correlated JSONL
 trace.
 
 The base system uses hybrid model planning with deterministic validation and
-fallback. Session 4 sets `PLANNER_STRATEGY=deterministic`, so every enabled
-workflow uses its fixed course plan.
+fallback. Sessions 3 and 4 set `PLANNER_STRATEGY=deterministic`, so their enabled
+workflows use fixed course plans. This service also implements orchestration
+and result review; it is not a separately registered Planner AU.
+
+## Revised allocation
+
+With `ALLOCATION_MODE=decision`, the service obtains the registry's `/list`,
+filters cards against a task's reference contract and calls the decision
+service only when multiple eligible AUs remain. A single eligible AU requires
+no model choice. No fit, low probability or a provider error stops allocation
+before application execution. `validate_composition` checks required tasks,
+input/output compatibility and evidence dependencies before accepted bindings
+are recorded. See the [selection diagram](../../../course/ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au).
+
+Task planning and AU allocation are separate settings: fixed Session 3/4 plans
+can still receive decision-model allocation. The workflow catalogue and
+reference contracts bound what the model can propose. Execution is sequential.
+The workflow diagrams below use the original general CV evaluator; the revised
+allocator may select `evaluator-cv-data` or `evaluator-cv-frontend` for that task.
 
 ## Workflows
 
@@ -40,7 +57,7 @@ For each Session 4 intent, the planner:
    plans use `human-review-before-release`.
 3. Invokes `evaluator-plan-governance` before any application AU `lookup` or
    `invoke`. Its deterministic policy checks employment context, the selected
-   `evaluator-cv` review-before-use declaration, and the result-release control.
+   evaluator's review-before-use declaration, and the result-release control.
    `tool-wiki-store` supplies inspectable Annex III and Article 14 rationale.
 4. Fails closed with `reject` if the employment declaration, release control,
    Annex III passage, or Article 14 passage is missing. Rejected plans run no
@@ -93,20 +110,28 @@ or authorization credentials.
 ## Held-run state
 
 Trace files persist under `/data/traces/`, bind-mounted to
-`system/services/planner/traces/`. Active `PreparedRun` objects, immutable draft
-payloads, and per-run locks live in planner memory. Restarting the planner leaves
-trace evidence on disk but loses the active draft required for review. Submit a
-new intent after a restart.
+`system/services/planner/traces/`. The persistence mode matters:
 
-This implementation does not provide production workflow persistence, crash
-recovery, replay protection, or crash-idempotent review.
+- Original profile, `DURABLE_CASES=false`: active runs, drafts and locks live in
+  memory. Restart leaves JSONL evidence but requires a new intent for review.
+- Revised profile, `DURABLE_CASES=true`: `case_store.py` persists snapshots and
+  ordered events in SQLite at `CASE_DB_PATH`. Held drafts restore after restart.
+  Draft/hold and review/release-or-quarantine transactions are atomic. Identical
+  review retries return the stored outcome; conflicts receive HTTP 409. JSONL
+  is a projection regenerated for existing audit consumers.
+
+On startup, previously running/preparing cases become `interrupted` and are not
+automatically rerun. Request locks are still in-process, and the course runs one
+planner process. This is not a distributed workflow service or an exactly-once
+guarantee for external effects. See the [case diagram and exercise](../../../course/sessions/session-04-compliance/DURABLE-CASES.md).
 
 ## Endpoints
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `POST` | `/intent` | `{ "kind": "...", "use_context": {...}, "inputs": {...} }` | trace ID, workflow, status, and outputs or held draft metadata |
-| `GET` | `/runs/{trace_id}` | — | active in-memory run, draft, digest, review, and released outputs |
+| `GET` | `/runs` | — | available run snapshots and whether durable cases are enabled |
+| `GET` | `/runs/{trace_id}` | — | run, draft, digest, review and released outputs; includes restored cases in durable mode |
 | `POST` | `/runs/{trace_id}/review` | `decision`, exact `result_digest`, required `review_notes` | released or quarantined run snapshot |
 | `POST` | `/runs/{trace_id}/approval` | compatibility alias for `/review` using the same result-review body | released or quarantined run snapshot |
 | `POST` | `/trace-events` | AU/tool trace record | `{ "ok": true }` |
@@ -155,8 +180,8 @@ The planner runs on port `7200` and expects
 `PLANNER_STRATEGY` controls plan construction:
 
 - `hybrid` — ask the model, validate, and fall back if needed.
-- `deterministic` — skip the model and use the built-in course plan. Session 4
-  uses this strategy.
+- `deterministic` — skip the planning model and use the built-in course plan. Sessions 3 and 4
+  use this strategy.
 - `llm` — require a valid model-generated plan; fail if validation fails.
 
 `PLAN_GOVERNANCE_CAPABILITY` enables the pre-execution eligibility check. The

@@ -1,5 +1,7 @@
 # Session 3 — Authoring Agentic Units with Vercel EVE
 
+The learner-facing [EVE and AGNTCY adoption guide](../course/sessions/session-03-eve/ADOPTION.md) explains the external components, actual EVE invocation, portable discovery record, local contract and evidence at each boundary. This page retains the runtime and filesystem detail.
+
 > Protocol scope: the course bridge currently emits the A2A v0.3 JSON-RPC
 > card/message shape. It demonstrates the outward boundary and registry
 > integration; it is not an A2A v1 conformance implementation.
@@ -83,7 +85,7 @@ it derives Ollama's OpenAI-compatible `/v1` endpoint from `OLLAMA_HOST`.
 `MODEL_CONTEXT_WINDOW_TOKENS` supplies metadata EVE cannot infer for local or
 unlisted model IDs.
 
-This keeps provider selection in the course `.env`: the authored agent does not
+This keeps provider selection in the course environment (`.env`, then `.env.revised` for the revised profile): the authored agent does not
 import a provider-specific SDK or hard-code a hosted service.
 
 ## Adoption into the CV workflow

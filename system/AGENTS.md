@@ -2,6 +2,8 @@
 
 Read [`ARCHITECTURE.md`](ARCHITECTURE.md) first for the system as a whole. This document zooms into one agent.
 
+The [October architecture guide](../course/ARCHITECTURE.md) shows how these parts connect in the revised profile, including specialist evaluator selection and persistent cases. The [EVE/AGNTCY guide](../course/sessions/session-03-eve/ADOPTION.md) explains adoption beyond this Python scaffold.
+
 ## The four parts
 
 Every Agentic Unit has four addressable parts:
@@ -56,6 +58,8 @@ agents/evaluator/
   agent.py
   capabilities/
     cv/                 # evaluator-cv: CV-vs-JD fit
+    cv-data/            # revised: separate data evaluator runtime
+    cv-frontend/        # revised: separate frontend evaluator runtime
     promote/            # evaluator-promote: wiki promotion
     wiki-query/         # evaluator-wiki-query: retrieved wiki evidence
     plan-governance/    # evaluator-plan-governance: deterministic composition gate
@@ -326,7 +330,8 @@ compliance or certification, or proves effective human oversight.
 Both are course integrity mechanisms, not signatures or authorization
 credentials.
 
-Held draft objects live in planner memory. A planner restart leaves trace JSONL
-evidence on disk but loses the active draft required for result review; submit a
-new intent. This is not production persistence or crash-idempotent
-orchestration.
+In the original profile (`DURABLE_CASES=false`), held drafts live in planner
+memory; restart leaves trace JSONL but requires a new intent. The revised
+profile persists case snapshots and ordered events in SQLite, restores held
+drafts and commits exact-result review transactionally. An interrupted external
+invocation is not automatically replayed. See the [restart exercise](../course/sessions/session-04-compliance/DURABLE-CASES.md).

@@ -1,9 +1,11 @@
 # Architecture
 
+For the October implementation, start with [How the course system works](../course/ARCHITECTURE.md), including component and request-flow diagrams. This reference retains the base-course detail; revised-profile differences are identified below and in the final section. [EVE and AGNTCY adoption](../course/sessions/session-03-eve/ADOPTION.md) provides the external-integration walkthrough.
+
 A small, container-shaped, readable AOA system. This is a reference
 implementation for learning the shape of AOA, not a deployment platform. It
 keeps the moving parts explicit: Sessions 1 and 2 establish three workflows,
-three agent codebases, nine AU capabilities, three deterministic tools, and
+three agent codebases, nine AU capabilities in the base profiles, three deterministic tools, and
 three plumbing services. The parser codebase is deployed as separate governed
 parser runtimes so Session 2 can show that new Agent IDs plus new capability
 contracts and `instructions.md` files create materially different agents
@@ -150,7 +152,8 @@ Each is something you can see on screen as you build:
 ## The agent set
 
 Three Python agent codebases, deployed as five distinct governed runtimes by
-Session 4:
+Session 4 in the base profiles. The revised overlay also starts separate
+`cv-data-evaluator` and `cv-frontend-evaluator` runtimes:
 
 | Runtime | Codebase | Capabilities |
 |---|---|---|
@@ -427,15 +430,21 @@ bind-mounted for inspection: `system/inbox/` holds submitted inputs,
 `system/services/planner/traces/` holds JSONL traces, and
 `system/services/registry/data/cards.json` holds live registry state.
 
-Held drafts are different: their active `PreparedRun` objects, frozen outputs,
-and locks live only in planner memory. Restarting planner leaves trace files but
-loses the draft needed for result review. This course implementation is not
-production workflow persistence, crash recovery, or crash-idempotent review.
+In the original profile (`DURABLE_CASES=false`), active `PreparedRun` objects,
+frozen outputs and locks live only in planner memory. Restarting leaves trace
+files but loses the draft needed for result review. In the revised profile,
+SQLite restores the held case and supports transactional, idempotent review;
+see the [case lifecycle](../course/ARCHITECTURE.md#session-4-a-result-that-survives-the-process).
+Neither mode supplies general recovery for external side effects.
 
 ## Running locally
 
 Use Docker Compose profiles to start the part of the system needed for the
 session.
+
+The direct commands below illustrate the base profiles. For October, use the
+[current shell/Windows launchers](../course/pre-work/01-revised-model-access.md#start-and-stop)
+with `.env.revised` present.
 
 Session 1 starts only the CV-fit path:
 
@@ -500,7 +509,9 @@ planner all stay still.
 
 ## Revised course profile (October 2026)
 
-`scripts/revised-up.sh` opts into contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. Original launchers retain the original planner allocation and promotion paths. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
+The standard session scripts select the revised profile when `.env.revised` exists; `AOA_REVISED=0` explicitly retains the original path. The explicit `revised-up.sh/.bat` and `revised-eve.sh/.bat` entry points remain available. The revised profile adds contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
+
+Sessions 1–2 default to hybrid task planning; Sessions 3–4 use fixed course plans. Revised AU allocation still runs in all four sessions. Planning, allocation, orchestration and result review share the planner service; the course does not register a separate Planner AU. It executes the accepted tasks sequentially. The models operate within a fixed course workflow catalogue, with code checking required responsibilities and evidence dependencies.
 
 Cerebras generation and TypeSafe decisions have distinct adapters and configuration. Ollama can supply either generation or an explicitly unscored decision baseline. The decision service does not grant authority or invoke an AU.
 

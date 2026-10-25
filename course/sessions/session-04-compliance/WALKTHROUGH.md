@@ -112,7 +112,6 @@ grounded knowledge-query workflow, ask about the EU AI Act, and inspect passage
 citations and tool retrieval. These utilities support evidence exploration; they
 are not governance stages.
 
-Trace JSONL persists on disk, while active held drafts and locks live in planner
-memory. If the planner restarts, submit a new CV-fit intent and review its new
-draft. This course control is not production persistence or proof of effective
-human oversight.
+**Original profile (`DURABLE_CASES=false`):** trace JSONL persists on disk, while active held drafts and locks live in planner memory. If the planner restarts, submit a new CV-fit intent and review its new draft.
+
+**Revised profile:** held drafts and ordered events are saved in SQLite. Follow [the restart exercise](DURABLE-CASES.md) to reopen and review the same result. Neither profile establishes production workflow guarantees or effective human oversight merely by recording a review.

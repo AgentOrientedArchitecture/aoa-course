@@ -21,7 +21,7 @@ from typing import Any, AsyncIterator
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -551,12 +551,28 @@ async def events() -> StreamingResponse:
 async def course_document(document: str):
     root = Path(os.getenv("COURSE_DOCS_DIR", "/data/course")).resolve()
     path = (root / document).resolve()
-    if not path.is_relative_to(root) or path.suffix != ".md" or not path.is_file():
+    if not path.is_relative_to(root) or not path.is_file():
         raise HTTPException(404, "Course document not found")
-    rendered = MarkdownIt("commonmark", {"html": False}).enable("table").render(path.read_text())
+    if path.suffix == ".svg" and path.is_relative_to(root / "diagrams"):
+        return FileResponse(path, media_type="image/svg+xml", headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+        })
+    if path.suffix != ".md":
+        raise HTTPException(404, "Course document not found")
+    md = MarkdownIt("commonmark", {"html": False}).enable("table")
+    tokens = md.parse(path.read_text())
+    heading_ids: dict[str, int] = {}
+    for index, token in enumerate(tokens):
+        if token.type == "heading_open" and index + 1 < len(tokens):
+            slug = re.sub(r"[^\w\s-]", "", tokens[index + 1].content.lower()).strip().replace(" ", "-")
+            count = heading_ids.get(slug, 0)
+            heading_ids[slug] = count + 1
+            token.attrSet("id", f"{slug}-{count}" if count else slug)
+    rendered = md.renderer.render(tokens, md.options, {})
     return HTMLResponse("<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-        + "<title>AOA course</title><style>body{font:17px/1.65 system-ui;max-width:1000px;margin:40px auto;padding:0 24px;color:#21352e;background:#fafbf9}a{color:#245e89}pre{overflow:auto;background:#edf1ed;padding:18px;border-radius:8px}code{font-size:.86em}table{border-collapse:collapse;width:100%;font-size:.9em}td,th{border:1px solid #d0d9d3;padding:10px;text-align:left;vertical-align:top}h1,h2,h3{line-height:1.2}nav{padding-bottom:20px;border-bottom:1px solid #ccd7d0}</style>"
-        + "<nav><a href='/'>Studio</a> · <a href='/course/REVISED-COURSE.md'>Course guide</a> · <a href='/course/REVISED-INSTRUCTOR.md'>Instructor runbook</a> · <a href='/course/REVISED-VALIDATION.md'>Validation</a></nav><main>" + rendered + "</main></html>")
+        + "<title>AOA course</title><style>body{font:17px/1.65 system-ui;max-width:1000px;margin:40px auto;padding:0 24px;color:#21352e;background:#fafbf9}a{color:#245e89}img{display:block;max-width:100%;height:auto;margin:24px 0}pre{overflow:auto;background:#edf1ed;padding:18px;border-radius:8px}code{font-size:.86em}table{border-collapse:collapse;width:100%;font-size:.9em}td,th{border:1px solid #d0d9d3;padding:10px;text-align:left;vertical-align:top}h1,h2,h3{line-height:1.2;scroll-margin-top:20px}nav{padding-bottom:20px;border-bottom:1px solid #ccd7d0}</style>"
+        + "<nav><a href='/'>Studio</a> · <a href='/course/REVISED-COURSE.md'>Course guide</a> · <a href='/course/ARCHITECTURE.md'>Architecture</a> · <a href='/course/sessions/session-03-eve/ADOPTION.md'>EVE and AGNTCY</a> · <a href='/course/REVISED-INSTRUCTOR.md'>Instructor runbook</a> · <a href='/course/REVISED-VALIDATION.md'>Validation</a></nav><main>" + rendered + "</main></html>")
 
 
 if __name__ == "__main__":

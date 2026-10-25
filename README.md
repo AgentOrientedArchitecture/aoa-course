@@ -2,6 +2,8 @@
 
 **Revised course:** [Cerebras, TypeSafe and the four connected live demos](course/REVISED-COURSE.md). The original material below is retained.
 
+**Understand the system:** [Architecture and component diagrams](course/ARCHITECTURE.md) · [Adopting EVE with AGNTCY Directory](course/sessions/session-03-eve/ADOPTION.md).
+
 **October laptop walkthrough:** use branch `codex/october-course-rebuild` and follow [the revised setup guide](course/pre-work/01-revised-model-access.md) first. It covers macOS/Linux shell scripts and native Windows batch files. The `session*-up`, EVE build/adoption and provider-check scripts select the revised course when `.env.revised` exists. The direct Docker commands below retain the original configuration; use the scripts for October.
 
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.

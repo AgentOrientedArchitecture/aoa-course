@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+<title id="title">One call across the EVE boundary</title><desc id="desc">The planner speaks the AU contract. The bridge translates it into a real EVE session.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#516775"/></marker></defs>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#203847}.title{font-size:30px;font-weight:700}.sub{font-size:18px;fill:#536875}.head{font-size:23px;font-weight:700}.body{font-size:18px}.label{font-size:16px;fill:#405866;paint-order:stroke;stroke:#fafbf9;stroke-width:7px;stroke-linejoin:round}</style>
+<rect width="1200" height="610" fill="#fafbf9"/>
+<text x="40" y="48" class="title">One call across the EVE boundary</text>
+<text x="40" y="82" class="sub">The planner speaks the AU contract. The bridge translates it into a real EVE session.</text>
+<rect x="40" y="145" width="300" height="165" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="40" y="160" width="5" height="135" rx="2" fill="#32649a"/>
+<text x="60" y="180" class="head" text-anchor="start">AOA planner service</text>
+<text x="60" y="210" class="body" text-anchor="start">After CV parsing and evaluation</text>
+<text x="60" y="236" class="body" text-anchor="start">Inputs: evaluation + optional CV</text>
+<text x="60" y="262" class="body" text-anchor="start">Selected interviewer contract</text>
+<rect x="450" y="145" width="300" height="165" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
+<rect x="450" y="160" width="5" height="135" rx="2" fill="#32649a"/>
+<text x="470" y="180" class="head" text-anchor="start">Course bridge · 7311</text>
+<text x="470" y="210" class="body" text-anchor="start">A2A message/send → inputs</text>
+<text x="470" y="236" class="body" text-anchor="start">Contract-derived JSON prompt</text>
+<text x="470" y="262" class="body" text-anchor="start">Parse reply; report signals</text>
+<rect x="860" y="145" width="300" height="165" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
+<rect x="860" y="160" width="5" height="135" rx="2" fill="#23775b"/>
+<text x="880" y="180" class="head" text-anchor="start">EVE runtime</text>
+<text x="880" y="210" class="body" text-anchor="start">eve dev --no-ui</text>
+<text x="880" y="236" class="body" text-anchor="start">eve/client creates a session</text>
+<text x="880" y="262" class="body" text-anchor="start">Learner agent calls its model</text>
+<rect x="450" y="435" width="300" height="110" rx="12" fill="#ffffff" stroke="#5b6c78" stroke-width="1.5"/>
+<rect x="450" y="450" width="5" height="80" rx="2" fill="#5b6c78"/>
+<text x="470" y="470" class="head" text-anchor="start">AOA result envelope</text>
+<text x="470" y="500" class="body" text-anchor="start">questions + report_markdown</text>
+<text x="470" y="526" class="body" text-anchor="start">Presence checks and latency</text>
+<path d="M340 225H450" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="395" y="210" class="label" text-anchor="middle">A2A v0.3 shape</text>
+<path d="M750 225H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="805" y="210" class="label" text-anchor="middle">EVE client</text>
+<path d="M1010 310V365H700V310" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="855" y="353" class="label" text-anchor="middle">final assistant text</text>
+<path d="M600 310V435" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="600" y="395" class="label" text-anchor="middle">parsed JSON</text>
+<path d="M450 490H190V310" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="190" y="395" class="label" text-anchor="middle">result + trace ID</text>
+<text x="40" y="585" class="sub" text-anchor="start">Generic signals check shape and field presence. Native acceptance still checks question quality and limits.</text>
+</svg>

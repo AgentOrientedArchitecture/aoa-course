@@ -3,9 +3,15 @@
 A small HTTP service that holds the set of registered capabilities.
 
 Agents and tools `POST /register` on boot. The studio subscribes to `/stream`
-to keep its registry pane live. The planner calls `POST /discover` to rank
-capabilities for a task, then uses the selected card to orchestrate work.
+to keep its registry pane live. The registry supports `POST /discover` for
+deterministic ranking. In the revised course the planner reads `GET /list`,
+then performs contract eligibility and bounded decision allocation in its own
+service before invoking the selected card.
 `GET /find?id=<id>` remains available for direct lookup and inspection.
+
+This is the runtime registry used by execution. The separately started AGNTCY
+Directory stores OASF discovery records and does not automatically register or
+authorise a local AU. See the [adoption diagram](../../../course/sessions/session-03-eve/ADOPTION.md#three-boundaries-to-demonstrate).
 
 On registration the registry also stamps a lightweight governance lifecycle
 onto the card. The course uses seeded actor identities such as
