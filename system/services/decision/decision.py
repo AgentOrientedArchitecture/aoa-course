@@ -21,10 +21,11 @@ app = FastAPI()
 
 def configuration() -> dict:
     provider = os.getenv("DECISION_PROVIDER", "typesafe")
+    default_model = {"typesafe": "jev-1.13.0", "systemone": "clef-flash"}.get(provider, "gpt-oss:20b")
     return {
         "provider": provider,
-        "model": os.getenv("DECISION_MODEL", "jev-1.13.0" if provider == "typesafe" else "gpt-oss:20b"),
-        "probability_semantics": "provider_reported" if provider in {"typesafe", "kev"} else "unavailable",
+        "model": os.getenv("DECISION_MODEL", default_model),
+        "probability_semantics": "provider_reported" if provider in {"typesafe", "kev", "systemone"} else "unavailable",
     }
 
 
@@ -72,8 +73,14 @@ async def decide(body: dict, client: httpx.AsyncClient) -> dict:
     provider, model = config["provider"], config["model"]
     question = {"type": "choice", "instructions": body["instructions"], "criteria": body["criteria"]}
     started = time.perf_counter()
-    if provider in {"typesafe", "kev"}:
-        base = os.getenv("DECISION_BASE_URL", "https://api.typesafe.ai" if provider == "typesafe" else "http://host.docker.internal:8090").rstrip("/")
+    if provider in {"typesafe", "kev", "systemone"}:
+        default_base = {
+            "typesafe": "https://api.typesafe.ai",
+            "kev": "http://host.docker.internal:8090",
+            "systemone": "http://host.docker.internal:11434",
+        }[provider]
+        base = os.getenv("DECISION_BASE_URL", default_base).rstrip("/")
+        # Local System One servers must never inherit the hosted TypeSafe key.
         key = os.getenv("TYPESAFE_API_KEY", "") if provider == "typesafe" else os.getenv("DECISION_API_KEY", "")
         if provider == "typesafe" and not key:
             raise ValueError("TYPESAFE_API_KEY is not configured; select the local option or configure a key")
@@ -98,7 +105,7 @@ async def decide(body: dict, client: httpx.AsyncClient) -> dict:
         usage = {"input_tokens": raw.get("prompt_eval_count"), "output_tokens": raw.get("eval_count")}
         model = raw.get("model", model)
     else:
-        raise ValueError("DECISION_PROVIDER must be typesafe, ollama or kev")
+        raise ValueError("DECISION_PROVIDER must be typesafe, systemone, ollama or kev")
     canonical = json.dumps(body, sort_keys=True, separators=(",", ":"))
     return {
         **answer, **config, "model": model,

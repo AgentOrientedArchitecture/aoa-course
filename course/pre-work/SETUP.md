@@ -45,6 +45,65 @@ The local decision baseline uses constrained JSON and reports no calibrated prob
 
 Optional container Ollama is retained: start with `AOA_LOCAL=1` in the shell, set `OLLAMA_HOST` and `DECISION_BASE_URL` to `http://ollama:11434`, set `OPENAI_BASE_URL=http://ollama:11434/v1`, and pull the model into that container. On Windows run `set AOA_LOCAL=1` before the launcher.
 
+### Native local decisions with Clef
+
+Clef-Flash is a decision model with a native System One API. It can supply the
+course's AU selection and wiki-promotion decisions, retaining model probabilities
+and the caller's acceptance gate. It is a separate option from the unscored
+chat baseline above; the hosted Cerebras/TypeSafe defaults remain unchanged.
+
+For [Ollama 0.35.1 or later](https://ollama.com/library/clef-flash), download
+`clef-flash` with `ollama pull clef-flash`. Change these existing `.env` settings:
+
+```dotenv
+DECISION_PROVIDER=systemone
+DECISION_MODEL=clef-flash
+DECISION_BASE_URL=http://host.docker.internal:11434
+DECISION_ALLOW_UNSCORED=false
+```
+
+`DECISION_BASE_URL` is the server root; the adapter adds `/v1/systemone`.
+The same protocol works with compatible `llama.cpp` servers and
+[oMLX 0.7.2](https://github.com/jundot/omlx/releases/tag/v0.7.2). For oMLX,
+use a decision checkpoint such as
+[`Jundot/clef-flash-oQ4e`](https://huggingface.co/Jundot/clef-flash-oQ4e),
+including its joint decision head. Set the exact model ID returned by that
+server's `/v1/models`, its port, and `DECISION_API_KEY` only if that server
+requires authentication. The System One route never uses the hosted TypeSafe key.
+
+Keep `DECISION_ALLOW_UNSCORED=false`. Probabilities are model outputs, not a
+calibrated chance of correctness; re-evaluate the 0.65 teaching gate with your
+inputs. Ollama's Clef choice interface supports 2–26 options, which covers the
+current course candidate sets. A request or server failure remains visible;
+the adapter does not substitute a hosted decision.
+
+Changing only the decision settings leaves generation on its configured provider.
+For fully local inference, generation must also use Ollama or an OpenAI-compatible
+local server such as oMLX. For example, if oMLX serves `Qwen3.8-27B-4bit` on port
+8000, edit the existing generation settings:
+
+```dotenv
+PROVIDER=openai
+CEREBRAS_API_KEY=
+AOA_OPENAI_API_KEY=local-no-auth
+OPENAI_BASE_URL=http://host.docker.internal:8000/v1
+MODEL=Qwen3.8-27B-4bit
+```
+
+`local-no-auth` is a placeholder for an **unauthenticated local server only**:
+the course client and smoke test require a non-empty key. If authentication is
+enabled, use that server's own key instead. Use the actual port and model ID
+reported by your server; never send a hosted key to the local endpoint.
+Docker must be able to reach the host server at `host.docker.internal`;
+success from a host terminal alone does not verify container access. Check the
+server's listen-address settings and run the course's model-provider smoke test.
+The optional Clef trial below exercises the decision interface separately.
+
+Start with a model that fits alongside Docker and Clef, then measure the course
+examples before trying a larger one.
+[Local trial observations](../validation/2026-10-25-local-models/README.md)
+record what has actually been checked.
+
 ## Start and stop
 
 Run these from the repository root:

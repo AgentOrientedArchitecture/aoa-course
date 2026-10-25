@@ -220,7 +220,7 @@ require rerunning `session3-adopt`.
 | **registry** | Loads capability cards on startup. Watches `cards.json` for changes. Stamps demo governance lifecycle actors (`published_by`, `approved_by`, reviewer/deprecation fields). Exposes direct lookup, listing, and deterministic capability discovery over HTTP. |
 | **planner** | Receives intents from Studio. Builds and validates a plan, resolves concrete cards, runs deterministic eligibility before application lookup, sequences eligible AU work with A2A `message/send`, freezes the final draft, and releases or quarantines it after exact-result review. Records all control and application events to `traces/<event-id>.jsonl`. |
 | **studio** | Browser surface at `localhost:8080`. Shows registry, resolved work, eligibility and wiki evidence, responsibility trace, held draft, result digest, reviewer notes, and release/quarantine outcome; submits exact-result review and subscribes to registry/trace SSE. |
-| **decision** | Calls TypeSafe or the local constrained-choice baseline. Returns a choice and provider evidence; it does not invoke AUs or grant execution authority. |
+| **decision** | Calls TypeSafe, a local System One decision endpoint, or the local constrained-chat baseline. Returns a choice and provider evidence; it does not invoke AUs or grant execution authority. |
 | **agntcy-directory** | Actual upstream Directory daemon and catalogue storing and retrieving OASF descriptions in Sessions 3–4. |
 | **directory-bridge** | Course adapter that publishes running AUs and retrieves Directory records for comparison with current local bindings. |
 
@@ -506,8 +506,12 @@ Models operate within a fixed workflow catalogue, with code checking required
 responsibilities and evidence dependencies.
 
 Cerebras generation and TypeSafe decisions have distinct adapters and
-configuration. Ollama can supply generation or an explicitly unscored decision
-baseline. The decision service does not grant authority or invoke an AU.
+configuration. `DECISION_PROVIDER=systemone` calls a local native
+`/v1/systemone` endpoint and validates the returned candidate probabilities,
+using only optional `DECISION_API_KEY` authentication. Clef can run through
+Ollama, compatible llama.cpp builds or oMLX. `DECISION_PROVIDER=ollama` retains
+the explicitly unscored `/api/chat` baseline. The decision service does not grant
+authority or invoke an AU.
 A valid output shape and a high model probability do not establish semantic
 correctness; the configured acceptance threshold is an uncalibrated teaching
 policy.

@@ -1,0 +1,65 @@
+{
+  "model": "Qwen3.8-27B-4bit",
+  "elapsed_seconds": 19.822174708009697,
+  "usage": {
+    "prompt_tokens": 90,
+    "completion_tokens": 35,
+    "total_tokens": 125,
+    "input_tokens": 90,
+    "output_tokens": 35,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "model_load_duration": 16.8,
+    "time_to_first_token": 1.74,
+    "total_time": 3.0,
+    "prompt_eval_duration": 1.74,
+    "generation_duration": 1.26,
+    "prompt_tokens_per_second": 51.67,
+    "generation_tokens_per_second": 27.78
+  },
+  "output": {
+    "tasks": [
+      "parse-cv",
+      "evaluate-cv-fit",
+      "report-cv-fit"
+    ]
+  },
+  "expected": {
+    "tasks": [
+      "parse-cv",
+      "evaluate-cv-fit",
+      "report-cv-fit"
+    ]
+  },
+  "scope": "One synthetic local OpenAI-compatible generation and JSON-shape check; not a CV or EVE quality evaluation.",
+  "matches_expectation": true,
+  "request": {
+    "model": "Qwen3.8-27B-4bit",
+    "temperature": 0,
+    "max_tokens": 256,
+    "enable_thinking": false,
+    "response_format": {
+      "type": "json_object"
+    },
+    "messages": [
+      {
+        "role": "system",
+        "content": "Return only a JSON object with a tasks array. Use the supplied task IDs exactly."
+      },
+      {
+        "role": "user",
+        "content": "A synthetic CV assessment needs these three responsibilities in order: parse-cv, evaluate-cv-fit, report-cv-fit. Return {\"tasks\":[...]} with those IDs."
+      }
+    ]
+  },
+  "runtime": "oMLX 0.7.2, isolated runtime on the Mac",
+  "limits": [
+    "The task IDs were supplied in the request; this did not test planning or intent decomposition.",
+    "The server warned that grammar-constrained decoding was unavailable; JSON was not schema-enforced.",
+    "Qwen and Clef were tested sequentially, not concurrently."
+  ]
+}
