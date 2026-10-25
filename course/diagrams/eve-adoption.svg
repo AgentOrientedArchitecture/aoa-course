@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
-<title id="title">Build, discover and adopt</title><desc id="desc">Session 3 · EVE runs the agent; Directory stores its description; AOA composes the capability.</desc>
+<title id="title">Build, discover and adopt</title><desc id="desc">Session 3 · EVE runs the agent; Directory discovers AUs; AOA checks adoption and composes the work.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#516775"/></marker></defs>
 <style>text{font-family:Arial,Helvetica,sans-serif;fill:#203847}.title{font-size:30px;font-weight:700}.sub{font-size:18px;fill:#536875}.head{font-size:23px;font-weight:700}.body{font-size:18px}.label{font-size:16px;fill:#405866;paint-order:stroke;stroke:#fafbf9;stroke-width:7px;stroke-linejoin:round}</style>
 <rect width="1200" height="800" fill="#fafbf9"/>
 <text x="40" y="48" class="title">Build, discover and adopt</text>
-<text x="40" y="82" class="sub">Session 3 · EVE runs the agent; Directory stores its description; AOA composes the capability.</text>
+<text x="40" y="82" class="sub">Session 3 · EVE runs the agent; Directory discovers AUs; AOA checks adoption and composes the work.</text>
 <rect x="40" y="145" width="300" height="150" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
 <rect x="40" y="160" width="5" height="120" rx="2" fill="#23775b"/>
 <text x="60" y="180" class="head" text-anchor="start">Native EVE</text>
@@ -22,7 +22,7 @@
 <text x="880" y="180" class="head" text-anchor="start">Local AOA registry</text>
 <text x="880" y="210" class="body" text-anchor="start">Live capability and endpoint</text>
 <text x="880" y="236" class="body" text-anchor="start">Contract + lifecycle metadata</text>
-<text x="880" y="262" class="body" text-anchor="start">Used by this course planner</text>
+<text x="880" y="262" class="body" text-anchor="start">Adoption authority, not discovery</text>
 <rect x="40" y="470" width="300" height="155" rx="12" fill="#f0ecfa" stroke="#715391" stroke-width="1.5"/>
 <rect x="40" y="485" width="5" height="125" rx="2" fill="#715391"/>
 <text x="60" y="505" class="head" text-anchor="start">AGNTCY Directory</text>
@@ -31,29 +31,29 @@
 <text x="60" y="587" class="body" text-anchor="start">Metadata; does not run EVE</text>
 <rect x="450" y="470" width="300" height="155" rx="12" fill="#eaf1fb" stroke="#32649a" stroke-width="1.5"/>
 <rect x="450" y="485" width="5" height="125" rx="2" fill="#32649a"/>
-<text x="470" y="505" class="head" text-anchor="start">Compare the record</text>
-<text x="470" y="535" class="body" text-anchor="start">Course check compares hashes</text>
+<text x="470" y="505" class="head" text-anchor="start">Check adopted bindings</text>
+<text x="470" y="535" class="body" text-anchor="start">Match contract and runtime hash</text>
 <text x="470" y="561" class="body" text-anchor="start">And local lifecycle status</text>
-<text x="470" y="587" class="body" text-anchor="start">Does not import or invoke</text>
+<text x="470" y="587" class="body" text-anchor="start">Keep content IDs in the trace</text>
 <rect x="860" y="470" width="300" height="155" rx="12" fill="#e7f4ee" stroke="#23775b" stroke-width="1.5"/>
 <rect x="860" y="485" width="5" height="125" rx="2" fill="#23775b"/>
 <text x="880" y="505" class="head" text-anchor="start">Compose and execute</text>
-<text x="880" y="535" class="body" text-anchor="start">Select local capabilities</text>
+<text x="880" y="535" class="body" text-anchor="start">Allocate discovered AUs</text>
 <text x="880" y="561" class="body" text-anchor="start">Validate the complete plan</text>
 <text x="880" y="587" class="body" text-anchor="start">Invoke the adopted interviewer</text>
 <path d="M340 220H450" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
 <text x="395" y="205" class="label" text-anchor="middle">adopt</text>
 <path d="M750 220H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
 <text x="805" y="205" class="label" text-anchor="middle">register</text>
-<path d="M190 295V470" fill="none" stroke="#516775" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
-<text x="190" y="390" class="label" text-anchor="middle">export contract template</text>
+<path d="M910 295V330H190V470" fill="none" stroke="#516775" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="550" y="318" class="label" text-anchor="middle">publish all running AUs + actual A2A cards</text>
 <path d="M340 545H450" fill="none" stroke="#516775" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
 <text x="395" y="530" class="label" text-anchor="middle">pulled record</text>
 <path d="M960 295V365H600V470" fill="none" stroke="#516775" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
 <text x="760" y="353" class="label" text-anchor="middle">local contract</text>
-<path d="M1090 295V470" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="1090" y="405" class="label" text-anchor="middle">runtime discovery</text>
+<path d="M750 545H860" fill="none" stroke="#516775" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="805" y="530" class="label" text-anchor="middle">eligible AUs</text>
 <text x="40" y="680" class="sub" text-anchor="start">Dashed arrows carry descriptions. Publication in Directory never grants local execution permission.</text>
-<text x="40" y="715" class="sub" text-anchor="start">The exported card can be the unadopted template or the registered card. Both paths are in the lab.</text>
+<text x="40" y="715" class="sub" text-anchor="start">Sessions 3–4 require AGNTCY for every new plan. Missing or stale records stop discovery.</text>
 <text x="40" y="750" class="sub" text-anchor="start">The same learner-authored EVE agent runs before and after adoption.</text>
 </svg>

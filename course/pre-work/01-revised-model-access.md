@@ -93,3 +93,7 @@ The explicit revised entry points remain available on both platforms: `revised-u
 Open `http://localhost:8080`. Check `http://localhost:7250/healthz` from the host: it names the decision provider/model and says whether configuration is present. It does **not** claim a successful provider call. Run the first CV example to verify actual access.
 
 Keep the model choice stable during the four sessions. Record model, prompts/skills hashes, candidate cards, task quality, failure/abstention rate, latency, usage and cost before considering a replacement. Do not compare a hosted price with local zero: local compute and operator time still have a cost.
+
+### AGNTCY from Session 3 onwards
+
+The revised `session3-adopt` and `session4-up` launchers start AGNTCY plus the course publication adapter and wait for all expected active AUs to be published. Allow time for the first Directory image build. Its catalogue is at `http://localhost:8891`. Both shell and batch launchers retain the same workflow. No host Python or separate WSL checkout is needed. `directory.sh sync --wait 120` / `directory.bat sync --wait 120` republishes or checks readiness explicitly. Global stop/log scripts include both containers and preserve data.

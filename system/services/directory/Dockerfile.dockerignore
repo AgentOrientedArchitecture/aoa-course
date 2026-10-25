@@ -6,3 +6,6 @@
 !system/services/directory/
 !system/services/directory/Dockerfile
 !system/services/directory/requirements.txt
+!system/services/directory/bridge.py
+!system/services/planner/
+!system/services/planner/directory_contract.py

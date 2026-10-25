@@ -27,12 +27,15 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from allocation import allocate, validate_composition
 from case_store import CaseStore, CaseConflict
+from directory_contract import bind_records
 
 logger = logging.getLogger("planner")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 REGISTRY_URL = os.environ.get("REGISTRY_URL", "http://registry:7100").rstrip("/")
+DISCOVERY_BACKEND = os.environ.get("DISCOVERY_BACKEND", "local")
+DIRECTORY_BRIDGE_URL = os.environ.get("DIRECTORY_BRIDGE_URL", "http://directory-bridge:8892").rstrip("/")
 TRACES_DIR = Path(os.environ.get("PLANNER_TRACES_DIR", "/data/traces"))
 PORT = int(os.environ.get("PLANNER_PORT", "7200"))
 INVOKE_TIMEOUT = float(os.environ.get("PLANNER_INVOKE_TIMEOUT", "300"))
@@ -537,6 +540,7 @@ def _candidate_trace(candidate: dict[str, Any]) -> dict[str, Any]:
         "agent_card_url": card.get("agent_card_url"),
         "a2a_endpoint": card.get("a2a_endpoint"),
         "endpoint": card.get("endpoint"),
+        "discovery_evidence": card.get("discovery_evidence"),
     }
 
 
@@ -942,6 +946,10 @@ async def _registry_list(client: httpx.AsyncClient) -> list[dict[str, Any]]:
 
 
 async def _registry_discover(client: httpx.AsyncClient, query: dict[str, Any]) -> dict[str, Any]:
+    if DISCOVERY_BACKEND == "agntcy":
+        # Revised flows bind through the bounded allocator. Never silently use
+        # the old registry search when AGNTCY is the selected source.
+        raise HTTPException(409, "AGNTCY discovery requires a bounded task contract")
     r = await client.post(f"{REGISTRY_URL}/discover", json=query)
     r.raise_for_status()
     return r.json()
@@ -1435,6 +1443,21 @@ async def _run_workflow(
     resolved_steps: list[ResolvedStep] = []
     async with httpx.AsyncClient() as client:
         all_capability_cards = await _registry_list(client)
+        if DISCOVERY_BACKEND == "agntcy":
+            try:
+                response = await client.get(DIRECTORY_BRIDGE_URL + '/records', timeout=90)
+                response.raise_for_status()
+                all_capability_cards, discovery_evidence = bind_records(response.json()['records'], all_capability_cards)
+            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+                await _record({'trace_id': trace_id, 'step': 'directory-unavailable', 'source': 'agntcy-directory',
+                               'reason': 'Directory search/pull failed; no AU invoked', 'error_type': type(exc).__name__})
+                raise HTTPException(503, "AGNTCY discovery unavailable; no AU invoked. Check Directory and retry.") from exc
+            await _record({'trace_id': trace_id, 'step': 'directory-discovery', **discovery_evidence})
+            if discovery_evidence['missing_current_publication']:
+                raise HTTPException(503, {'message': 'Current AU publications are missing or stale; wait for publication or run directory sync. No AU invoked.',
+                                          'capabilities': discovery_evidence['missing_current_publication']})
+        elif DISCOVERY_BACKEND != 'local':
+            raise HTTPException(503, 'Unknown discovery backend; no AU invoked')
         configured_governance_card = next(
             (
                 card for card in all_capability_cards
@@ -1554,6 +1577,7 @@ async def _run_workflow(
                 "task": task.id,
                 "query": query,
                 "candidates": [_candidate_trace(candidate) for candidate in candidates],
+                "source": "agntcy-directory" if DISCOVERY_BACKEND == "agntcy" else "local-registry",
             })
             if not candidates:
                 message = f"no capability discovered for task {task.id}"

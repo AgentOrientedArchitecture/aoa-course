@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
-COPY planner.py allocation.py case_store.py /app/
+COPY planner.py allocation.py case_store.py directory_contract.py /app/
 
 EXPOSE 7200
 CMD ["python", "-u", "/app/planner.py"]

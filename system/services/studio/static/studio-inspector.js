@@ -92,6 +92,13 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
   }
 
   function paintSelection() {
+    const discovery = records.find(r => r.step === 'directory-discovery');
+    const unavailable = records.find(r => r.step === 'directory-unavailable');
+    const discoveryHtml = discovery ? `<p class="inspection-notice">AU discovery: AGNTCY Directory. ${discovery.accepted.length} current, locally adopted AUs matched retrieved OASF records.</p>
+      <details><summary>Published records and local adoption checks</summary>${discovery.accepted.map(row=>`<p><strong>${esc(row.capability)}</strong><br>Content ID: <code>${esc(row.cid)}</code></p>`).join('')}${detail('Complete discovery evidence', discovery)}</details>`
+      : unavailable ? '<p class="inspection-warning">AGNTCY Directory is unavailable. This run did not fall back to local AU discovery.</p>'
+      : records.length ? '<p class="inspection-muted">This trace does not record AGNTCY discovery; earlier sessions use the local registry.</p>' : '';
+    updatePanel($("inspection-discovery-evidence"), discoveryHtml);
     const ids = taskIds(records);
     if (!taskPinned || !ids.includes(taskId)) taskId = records.find(r=>r.step==='allocation' && r.model_called)?.task || ids[0] || "";
     const view = allocationEvidence(records, taskId);
@@ -102,7 +109,7 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
     updatePanel($("inspection-candidates"), `<h3>Eligible candidates</h3>${eligible.map(c=>`<button type="button" class="inspection-candidate" data-inspect-candidate="${esc(c.id)}" data-focus-key="candidate-${esc(c.id)}" aria-pressed="${c.id===candidateId}"><strong>${esc(c.id)}</strong><span>${c.id===view.allocation?.choice?'Returned choice':'Eligible alternative'}</span></button>`).join("") || '<p class="inspection-muted">No eligible-candidate list recorded.</p>'}`);
     for (const b of $("inspection-stages").querySelectorAll("[data-inspect-stage]")) b.setAttribute("aria-pressed",String(b.dataset.inspectStage===stage));
     updatePanel($("inspection-stage-body"),stageBody(view));
-    const holds = records.filter(r=>['allocation-held','plan-rejected'].includes(r.step) || r.step==='composition-validation' && r.valid===false);
+    const holds = records.filter(r=>['allocation-held','plan-rejected','directory-unavailable'].includes(r.step) || r.step==='directory-discovery' && r.missing_current_publication?.length || r.step==='composition-validation' && r.valid===false);
     $("inspection-plan-notice").textContent = holds.length ? "This trace contains a hold or rejection. Inspect the recorded check; a model choice alone does not authorise execution." : "Recorded order: proposed task → eligibility → choice → composition validation → accepted binding → execution.";
     $("inspection-plan-notice").classList.toggle("inspection-warning",holds.length>0);
   }
@@ -115,6 +122,8 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
   });
 
   function paintOutput() {
+    const discovered = records.find(r => r.step === 'directory-discovery');
+    updatePanel($("inspection-run-discovery"), discovered ? `<details><summary>AU discovery provenance: AGNTCY Directory</summary>${detail('Retrieved content IDs and adoption checks', discovered)}</details>` : '');
     const outputs=runOutputs(records);
     if(!outputPinned || !outputs.some(r=>(r.task||r.capability)===outputId))outputId=outputs.at(-1)?.task||outputs.at(-1)?.capability||"";
     const selected=outputs.find(r=>(r.task||r.capability)===outputId);

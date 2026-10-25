@@ -7,7 +7,7 @@
 - Use the [provider setup](pre-work/01-revised-model-access.md). Verify actual Cerebras and TypeSafe calls, account quota and access from the teaching environment. Keep the local route ready and label it when used.
 - Build all images before the session. EVE retains its pinned native workspace and framework version; do not replace learner files to make a demo pass.
 - Run `.venv-course/bin/python -m pytest -q tests` after installing `tests/requirements.txt` into that isolated environment. These are adapter/policy/storage checks, not model-quality certification.
-- Start the local AGNTCY Directory, verify publish/pull/search and check its record against the local card.
+- After Session 3 adoption, check automatic AU publication, AGNTCY catalogue cards and the Directory content IDs in the executed plan. Session 4 continues through AGNTCY.
 - Preserve the original material. Do not clear existing wiki, traces, workshop files or cards to manufacture a clean run. Use labelled synthetic inputs and explain persisted history.
 
 ## Delivery sequence
@@ -16,7 +16,7 @@ Introduce each existing story before its new mechanism. Let learners predict the
 
 1. CV: one complete run, inspect the plan, switch assessment speciality, compare the output with the same generation model.
 2. Wiki: relevant note, irrelevant note, uncertain note. Separate extraction fidelity, semantic judgement and publication.
-3. EVE: native authoring and acceptance first, local Directory discovery and AOA adoption next. Inspect the added boundary rather than presenting an external record as permission.
+3. EVE: native authoring and acceptance, adoption, automatic publication of the AU estate, then an AGNTCY-discovered CV/interview run. Inspect the local approval check and the EVE content ID before its A2A invocation.
 4. Compliance: red card, declared review, exact held result, restart, review, duplicate request, audit.
 
 The existing slide placeholders can still lead into these live examples. The repository's hands-on session numbers are not a proposal to renumber the deck.
@@ -25,7 +25,7 @@ The existing slide placeholders can still lead into these live examples. The rep
 
 Show the same learner agent working in native EVE, then the registered AOA contract, then a CV/interview run calling it across the bridge. Explain the course-owned adapter and inspect the actual `eve/client` session call if asked how real the integration is. Generic bridge signals check field presence; inspect five-question quality and limits explicitly.
 
-Publish and retrieve an OASF record through the real local Directory. Compare its content ID, contract digest and local Agent ID; they identify different things. Show the comparison returning `execution_authorised: false` even when the declaration matches. Finish with the executed local composition so discovery is connected to useful work.
+Inspect automatic publication and retrieve an OASF record through the real local Directory. Compare its content ID, contract digest and local Agent ID; they identify different things. Show the comparison returning `execution_authorised: false` even when the declaration matches. Finish with the executed composition and its `directory-discovery` evidence. Stop Directory and submit a new intent: it must fail before any AU invocation. Restart it before continuing. Explain that the local registry retains adoption and tool lookup while AGNTCY supplies AU discovery.
 
 Keep the scope explicit: real third-party framework and discovery infrastructure, learner-owned agent, course-owned adapter, local seeded approval. An externally owned agent would still need identity, permission, contract, quality and operational acceptance. The [adoption guide](sessions/session-03-eve/ADOPTION.md#adopting-an-externally-owned-agent) supplies that discussion without claiming it has already been implemented.
 

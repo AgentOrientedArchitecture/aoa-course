@@ -27,3 +27,23 @@ services:
       timeout: 5s
       retries: 24
       start_period: 10s
+
+  directory-bridge:
+    profiles: ["directory"]
+    build:
+      context: ..
+      dockerfile: system/services/directory/Dockerfile
+    image: aoa-course/directory:1.8.0
+    command: ["python", "/app/bridge.py"]
+    environment:
+      COURSE_DIRECTORY_ADDR: "agntcy-directory:8890"
+      COURSE_REGISTRY_URL: "http://registry:7100"
+      COURSE_DIRECTORY_EXPECTED_AUS: ${COURSE_DIRECTORY_EXPECTED_AUS:-}
+    depends_on:
+      agntcy-directory:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8892/healthz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 24

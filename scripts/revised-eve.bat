@@ -33,6 +33,7 @@ if defined LOCAL_ARGS (
 %COMPOSE% run --rm --no-deps --service-ports -e HOME=/tmp %EXTRA_ARGS% eve-workshop-native
 exit /b %ERRORLEVEL%
 :adopt
+if not exist ".course-data" mkdir ".course-data"
 set "WORKSPACE=system\agents-eve\workshop"
 if not exist "%WORKSPACE%\agent\agent.ts" goto missing
 if not exist "%WORKSPACE%\agent\instructions.md" goto missing
@@ -48,6 +49,8 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 %COMPOSE% --profile session3 --profile session3-lab-wrapped up --build --force-recreate -d --remove-orphans %EXTRA_ARGS%
 if errorlevel 1 exit /b %ERRORLEVEL%
 call "%~dp0eve-ready.bat"
+if errorlevel 1 exit /b %ERRORLEVEL%
+call "%~dp0directory.bat" sync --wait 120
 exit /b %ERRORLEVEL%
 :missing
 echo Complete native EVE authoring under %WORKSPACE% before adoption. 1>&2

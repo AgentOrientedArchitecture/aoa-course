@@ -6,18 +6,15 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.getenv('COURSE_DIRECTORY_CLI', str(ROOT / '.course-tools/dirctl-1.8.0')))
-CONTRACT_FIELDS = ('id', 'version', 'kind', 'purpose', 'inputs', 'outputs', 'constraints')
-
-
-def fingerprint(card):
-    data = {key: card.get(key) for key in CONTRACT_FIELDS}
-    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+sys.path.insert(0, str(ROOT / 'system/services/planner'))
+from directory_contract import fingerprint, binding_fingerprint
 
 
 def registry_card(identifier):
@@ -27,21 +24,33 @@ def registry_card(identifier):
         return json.load(response)
 
 
-def export_record(card):
+def export_record(card, agent_card=None):
     # Verified against the pinned OASF v1.0.0 taxonomy; not a performance claim.
     if card['id'] == 'interviewer-questions':
         skill = {'id': 10205, 'name': 'natural_language_processing/natural_language_generation/question_generation'}
     elif card['id'].startswith('parser-'):
         skill = {'id': 10301, 'name': 'natural_language_processing/information_retrieval_synthesis/fact_extraction'}
     else:
-        raise ValueError('This lab maps parser capabilities and interviewer-questions only; review the OASF taxonomy before mapping another capability.')
+        # Other AUs retain their precise purpose and A2A skills. Do not invent
+        # an OASF taxonomy equivalence for an unreviewed course capability.
+        skill = None
+    modules = []
+    if agent_card is not None:
+        if agent_card.get('url') != card.get('a2a_endpoint') or not any(
+            skill.get('id') == card['id'] for skill in agent_card.get('skills', [])
+        ):
+            raise ValueError('The live A2A Agent Card does not match the local AU binding')
+        modules = [{'name': 'integration/a2a', 'data': {
+            'card_schema_version': agent_card['protocolVersion'], 'card_data': agent_card}}]
     return {
         'schema_version': '1.0.0', 'name': 'aoa-course/' + card['id'],
         'version': card.get('version', '0.1.0'), 'authors': ['AOA course workshop'],
         'description': card['purpose'].strip(),
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'skills': [skill], 'domains': [], 'modules': [],
+        'skills': [skill] if skill else [], 'domains': [], 'modules': modules,
         'annotations': {'aoa/capability-id': card['id'], 'aoa/contract-sha256': fingerprint(card),
+                        'aoa/binding-sha256': binding_fingerprint(card),
+                        'aoa/taxonomy-mapping': 'reviewed' if skill else 'not-yet-mapped',
                         'aoa/acceptance': 'Directory discovery is not local execution approval.'},
     }
 
@@ -71,6 +80,8 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     ex = sub.add_parser('export'); ex.add_argument('capability'); ex.add_argument('--card', help='Unadopted workshop YAML card, using PyYAML')
     sub.add_parser('start')
+    sync = sub.add_parser('sync', help='Publish the current adopted AU estate through the course Directory bridge')
+    sync.add_argument('--wait', type=int, default=0, help='Wait up to this many seconds for all active AUs')
     push = sub.add_parser('push'); push.add_argument('record')
     pull = sub.add_parser('pull'); pull.add_argument('cid', nargs='?'); pull.add_argument('--cid-file')
     search = sub.add_parser('search'); search.add_argument('name', nargs='?', default='aoa-course/*')
@@ -78,6 +89,12 @@ def main():
     for command in (ex, push, pull, search, check):
         command.add_argument('--out', help='Write output as UTF-8; paths are inside .course-data when using Docker')
     args = parser.parse_args()
+    if args.command == 'sync':
+        url = os.getenv('COURSE_DIRECTORY_BRIDGE_URL', 'http://directory-bridge:8892') + '/sync?wait=' + str(args.wait)
+        request = urllib.request.Request(url, data=b'', method='POST')
+        with urllib.request.urlopen(request, timeout=max(30, args.wait + 10)) as response:
+            print(json.dumps(json.load(response), indent=2))
+        return
     if args.command == 'pull':
         if bool(args.cid) == bool(args.cid_file):
             parser.error('Provide a CID or --cid-file, but not both')

@@ -9,9 +9,12 @@ then performs contract eligibility and bounded decision allocation in its own
 service before invoking the selected card.
 `GET /find?id=<id>` remains available for direct lookup and inspection.
 
-This is the runtime registry used by execution. The separately started AGNTCY
-Directory stores OASF discovery records and does not automatically register or
-authorise a local AU. See the [adoption diagram](../../../course/sessions/session-03-eve/ADOPTION.md#three-boundaries-to-demonstrate).
+This remains the local adoption/lifecycle authority. In revised Sessions 3–4,
+AGNTCY Directory becomes the planner's AU discovery source: a course adapter
+publishes running AUs with their actual A2A cards, and the planner matches
+retrieved records against current local approvals and bindings. Directory does
+not automatically adopt or authorise external AUs. Tools continue to resolve
+locally. See the [adoption diagram](../../../course/sessions/session-03-eve/ADOPTION.md#three-boundaries-to-demonstrate).
 
 On registration the registry also stamps a lightweight governance lifecycle
 onto the card. The course uses seeded actor identities such as

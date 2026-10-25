@@ -10,7 +10,7 @@ Use `scripts/directory.sh` or `scripts\directory.bat` from the repository root. 
 - `export`, `push`, `search`, `pull` and `check` execute the helper inside the running container. `cli` exposes the real upstream CLI.
 - `stop` retains the container's bind-mounted database and exported records. Global course stop/log commands also include this service.
 - The daemon listens on container port 8890. Its upstream HTTP gateway/catalogue listens on container port 8889, mapped to [localhost:8891](http://localhost:8891). Both host ports are loopback only. The client runs inside the container, while the helper reaches `http://registry:7100` on the course network.
-- The v1.8.0 catalogue projects A2A, MCP and Agent Skills modules. Plain course OASF records (`modules: []`) remain CLI-searchable but do not appear as catalogue cards. Read exported/pulled `.course-data/*.json` files for the full OASF record; the browser shows a catalogue projection.
+- The v1.8.0 catalogue projects A2A, MCP and Agent Skills modules. Automatic runtime publications embed actual A2A cards and appear in the catalogue. Manual/template OASF records (`modules: []`) remain CLI-searchable but do not appear as catalogue cards. Read exported/pulled `.course-data/*.json` files for the full OASF record; the browser shows a catalogue projection.
 - `.course-data` is mounted writable at `/course-data`; contract templates and the learner workshop are read-only. Provider environment files are neither mounted nor sent in the image build context.
 - Shell launchers use the host UID/GID for writable files on Linux. Docker Desktop uses the image's default UID through the batch route.
 
@@ -23,3 +23,11 @@ python3 tests/check_directory_container.py
 ```
 
 This check uses synthetic registry metadata and no model calls. It tests browser gateway availability, publication, retrieval, indexing, contract match/mismatch, failed-output preservation and persistence across stop/start. CI runs it on Linux amd64; native Windows command handling is covered by the cross-platform launcher tests.
+
+## Runtime discovery adapter
+
+Revised Sessions 3–4 start `directory-bridge` from the same image alongside the upstream daemon. This small course-owned HTTP adapter polls the active local registry and real A2A cards every five seconds, publishes changed OASF records and retains old records. `POST /sync` waits for the expected active estate; `GET /records` performs real Directory search/pull, with pagination, and returns those records. The adapter has no model credentials and exposes no host port.
+
+The planner joins retrieved records against current local adoption, lifecycle and binding hashes. It records the content IDs and fails closed on missing/stale publications or a Directory outage. The adapter does not implement a replacement registry or authorise external agents. All running AUs are published; deterministic tools remain local. OASF taxonomy mappings beyond parsers/interviewer are explicitly pending rather than invented.
+
+`directory.sh sync --wait 120` / `directory.bat sync --wait 120` triggers publication explicitly. Native authoring still runs without AOA. The original manual export/push/pull/check commands are retained.

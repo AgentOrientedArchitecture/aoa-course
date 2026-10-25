@@ -16,9 +16,9 @@ case "$mode" in
     exec "${compose[@]}" logs -f --tail=100 "$@" agntcy-directory;;
   cli)
     exec "${compose[@]}" exec -T agntcy-directory dirctl --server-addr 127.0.0.1:8890 --auth-mode insecure "$@";;
-  export|push|search|pull|check)
+  export|push|search|pull|check|sync)
     exec "${compose[@]}" exec -T agntcy-directory python /app/directory-lab.py "$mode" "$@";;
   help|--help|-h)
-    echo 'Usage: directory.sh up|stop|logs|export|push|search|pull|check|cli [arguments]';;
+    echo 'Usage: directory.sh up|stop|logs|export|push|search|pull|check|sync|cli [arguments]';;
   *) echo 'Unknown Directory command. Use directory.sh help.' >&2; exit 2;;
 esac

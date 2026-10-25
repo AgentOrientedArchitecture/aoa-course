@@ -17,7 +17,7 @@ if /I "%MODE%"=="start" goto up
 if /I "%MODE%"=="stop" goto stop
 if /I "%MODE%"=="logs" goto logs
 if /I "%MODE%"=="cli" goto cli
-for %%C in (export push search pull check) do if /I "%MODE%"=="%%C" goto helper
+for %%C in (export push search pull check sync) do if /I "%MODE%"=="%%C" goto helper
 if /I "%MODE%"=="help" goto help
 if /I "%MODE%"=="--help" goto help
 echo Unknown Directory command. Use directory.bat help. 1>&2
@@ -40,5 +40,5 @@ exit /b %ERRORLEVEL%
 %COMPOSE% exec -T agntcy-directory python /app/directory-lab.py %MODE% %EXTRA_ARGS%
 exit /b %ERRORLEVEL%
 :help
-echo Usage: directory.bat up^|stop^|logs^|export^|push^|search^|pull^|check^|cli [arguments]
+echo Usage: directory.bat up^|stop^|logs^|export^|push^|search^|pull^|check^|sync^|cli [arguments]
 exit /b 0

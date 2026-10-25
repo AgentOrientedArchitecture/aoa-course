@@ -362,3 +362,7 @@ boundary, and five returned questions.
 The ownership boundary is visible on disk: reusable course infrastructure lives
 under `system/agents-eve/runtime/`; the agent you authored and its generated
 contract live under `system/agents-eve/workshop/`.
+
+## Revised course: discover the adopted AU through AGNTCY
+
+With `.env.revised` selected, adoption also starts AGNTCY and publishes the running AU estate with actual A2A Agent Cards. Follow [the Directory walkthrough](DIRECTORY.md#use-agntcy-for-the-running-estate) before the CV/interview run. In Studio, inspect the `directory-discovery` event and the interviewer's content ID before its accepted binding and invocation. The local registry retains adoption/lifecycle authority; it is no longer the sole AU discovery source. Session 4 continues on this path.

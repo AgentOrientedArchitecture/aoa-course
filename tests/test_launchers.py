@@ -98,13 +98,16 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
             with self.subTest(session=session):
                 self.clean_log()
                 rows = self.invoke(f'session{session}-up', '--wait', '--wait-timeout', '90')
-                self.assertEqual(len(rows), 1)
+                self.assertEqual(len(rows), 2 if session == 4 else 1)
                 row = rows[0]
                 self.assert_revised(row)
                 self.assertIn(f'session{session}', row['argv'])
                 self.assertEqual(row['argv'][-3:], ['--wait', '--wait-timeout', '90'])
                 self.assertIn('evaluator-cv-data', row['registry'])
                 self.assertEqual('evaluator-plan-governance' in row['evaluator'], session == 4)
+                if session == 4:
+                    self.assertIn('directory', row['argv'])
+                    self.assertEqual(rows[-1]['argv'][-3:], ['sync', '--wait', '120'])
 
     def test_original_course_is_preserved_and_can_be_forced(self):
         self.env['AOA_REVISED'] = '0'
@@ -191,7 +194,8 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertEqual(rows[0]['argv'][-2:], ['build','eve-workshop-native'])
         self.assertIn('npm', rows[1]['argv'])
         self.assertIn('--force-recreate', rows[2]['argv'])
-        self.assertEqual([r['tool'] for r in rows[3:]], ['curl','curl'])
+        self.assertEqual([r['tool'] for r in rows[3:]], ['curl','curl','docker'])
+        self.assertEqual(rows[-1]['argv'][-3:], ['sync', '--wait', '120'])
         self.assertEqual(card.read_text(), 'custom learner contract')
         self.assertEqual((workspace/'agent/agent.ts').read_text(), 'learner-authored content')
         self.clean_log()

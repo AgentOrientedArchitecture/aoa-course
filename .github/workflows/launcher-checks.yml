@@ -2,9 +2,9 @@ name: Course launchers
 on:
   push:
     branches: [main]
-    paths: ['scripts/**', 'system/docker-compose.directory.yml', 'system/services/directory/**', 'tests/test_launchers.py', 'tests/check_directory_container.py', '.github/workflows/launcher-checks.yml']
+    paths: ['scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/services/planner/**', 'tests/**', '.github/workflows/launcher-checks.yml']
   pull_request:
-    paths: ['scripts/**', 'system/docker-compose.directory.yml', 'system/services/directory/**', 'tests/test_launchers.py', 'tests/check_directory_container.py', '.github/workflows/launcher-checks.yml']
+    paths: ['scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/services/planner/**', 'tests/**', '.github/workflows/launcher-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -33,3 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Real Directory publish, retrieve and restart
         run: python tests/check_directory_container.py
+      - name: Planner discovery and adoption boundary checks
+        run: |
+          python -m pip install -r tests/requirements.txt
+          python -m pytest -q tests

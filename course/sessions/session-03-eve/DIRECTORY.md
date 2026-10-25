@@ -2,6 +2,33 @@
 
 Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. EVE runs the interviewer, AGNTCY Directory publishes a portable description, and the local AOA registry and planner handle adoption and composition.
 
+## Use AGNTCY for the running estate
+
+In the revised course, **Session 3 adoption and Session 4 startup enable AGNTCY discovery for every running AU**. Sessions 1–2 retain the simple local discovery path. The original profile and manual exercises below remain available.
+
+`session3-adopt.sh/.bat` starts Directory and a small course-owned publication adapter alongside AOA. The adapter reads the active local AU contracts and each runtime's actual A2A Agent Card, publishes OASF records, and checks for changes every five seconds. Startup waits for the expected AUs to be published. Deterministic tools keep their local registrations; they are not labelled as AUs.
+
+To republish/check readiness explicitly:
+
+```bash
+./scripts/directory.sh sync --wait 120
+```
+
+Windows: `scripts\directory.bat sync --wait 120`. This populates the active estate, including the EVE interviewer. It does not invent agents from inactive templates or delete earlier published records.
+
+Open [AGNTCY's catalogue](http://localhost:8891), search for `aoa-course`, and select the interviewer. These runtime publications contain an **A2A module**, so they appear in the catalogue. Inspect the declared purpose, skills, endpoint and catalogue JSON. Use the returned content ID with `directory.sh pull <cid> --out discovered.json` (or `.bat`) to inspect the complete OASF record in your editor.
+
+Now run **CV fit + interview** in Studio:
+
+1. The planner searches AGNTCY and retrieves the published OASF records through the course adapter. The adapter uses the real upstream `dirctl`; it does not return the local registry list as a substitute.
+2. The planner matches those records against locally adopted, approved contracts and runtime bindings. Missing/stale publications or an unavailable Directory stop the run before any AU invocation.
+3. Contract eligibility and the bounded decision model select the AUs. The EVE interviewer receives the assessment through its adopted A2A endpoint and generates the questions.
+4. In **AU selection**, inspect **Published records and local adoption checks**. Find the EVE content ID, accepted binding and invocation. **Run review** retains the same discovery evidence with the output.
+
+For the architectural test, stop Directory after a successful run and submit a **new** intent. It must fail discovery without invoking an AU or falling back to the old registry search. Restart Directory and retry. Already-held results can still be reviewed: that is case-state recovery, not a new discovery request.
+
+Session 4 uses the same discovery path, including its governance/evidence AUs. After changing a card, wait for the publisher or run `sync` again before rerunning it. Historical records remain visible, but a stale binding or suspended local AU cannot become a candidate.
+
 ## Prepare the EVE capability
 
 Keep the [EVE walkthrough](WALKTHROUGH.md): native `eve init`, authored instructions, native acceptance and then AOA adoption. With `.env.revised` configured, use `session3-up.sh/.bat`, complete the native exercise and exit its shell, then run `session3-adopt.sh/.bat`. The [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop) covers both platforms. A healthy adopted `interviewer-questions` card must be in the local registry for the main export/comparison sequence below.
@@ -27,7 +54,7 @@ Directory's database and record store persist in **`.course-data/directory`**. E
 
 The CLI connection is insecure within this local teaching setup; container packaging does not add publisher verification or enterprise approval. The [original host-installed route](NATIVE-DIRECTORY.md) is retained. If you used it previously, stop its daemon with Ctrl+C before using the container: never run two daemons against the same data directory.
 
-## Publish, find and retrieve
+## Manual publish, find and retrieve exercise
 
 On **macOS/Linux**:
 
@@ -71,9 +98,9 @@ Open **`.course-data/interviewer.oasf.json`** in Zed or another text editor to r
 
 The upstream **AI Catalog** is also available at [http://localhost:8891](http://localhost:8891) after `directory.sh up` or `directory.bat up`. Select a listed card for its summary, tags and **Catalog Entry JSON**. This is AGNTCY's built-in interface, not a course viewer.
 
-**The v1.8.0 catalogue does not list every OASF record.** It projects records containing an A2A, MCP or Agent Skills module. The course's current export has `modules: []`, so it remains searchable and retrievable through the CLI but does not appear as a card in this browser catalogue. An apparently empty course search in the browser does not mean publication failed. The daemon's self-description may be the only visible card. Catalogue JSON is a projection, not the original OASF JSON. This behaviour is explicit in the [pinned upstream catalogue implementation](https://github.com/agntcy/dir/blob/v1.8.0/api/catalog/v1/catalog.go).
+**The v1.8.0 catalogue does not list every OASF record.** It projects records containing an A2A, MCP or Agent Skills module. The automatic runtime publications above include the actual A2A card and are visible. The manual/template export keeps `modules: []`, so it remains searchable and retrievable through the CLI but does not appear as a browser card. Catalogue JSON is a projection, not the original OASF JSON. This behaviour is explicit in the [pinned upstream catalogue implementation](https://github.com/agntcy/dir/blob/v1.8.0/api/catalog/v1/catalog.go).
 
-Use the editor files for this lab. A future catalogue-visible export needs a reviewed, accurate integration module; do not invent an endpoint or claim A2A compatibility simply to make a card appear. The browser's generic wording about verified records also does not establish that our local records are signed, trusted or approved for execution.
+Use the editor files for full OASF inspection. A catalogue-visible record needs an accurate integration module; do not invent an endpoint or claim A2A compatibility simply to make a card appear. The browser's generic wording about verified records does not establish that our local records are signed, trusted or approved for execution.
 
 ## Discover before adoption
 
@@ -90,7 +117,7 @@ Native EVE authoring stops AOA services. A comparison then needs the registry ru
 ## Three distinct boundaries
 
 - **Directory** stores and discovers a portable declaration. A name or annotation is not verified identity.
-- **Local registry** holds the adopted AU's contract and lifecycle. `check` compares declarations; it never imports or approves an external agent.
+- **Local registry** holds the adopted AU's contract and lifecycle. The planner checks discovered records against this local authority; `check` remains an informational comparison, not an adoption command.
 - **Planner and governance** decide whether the adopted AU fits this task and whether the complete plan may run in this use context.
 
 Save a copy of `.course-data/discovered.json` as `.course-data/mismatch.json`, change its contract digest in your editor and run `directory.sh check mismatch.json` or `directory.bat check mismatch.json`. Discovery still succeeded; local eligibility must be false. No Directory result is automatically executable.
@@ -112,7 +139,7 @@ Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE cap
 | A contract comparison fails | Inspect the fields and whether the record predates a card edit; publish a newly reviewed record rather than changing the digest to hide the difference |
 | Matching record but no working result | Check runtime health, model access, local selection and the actual EVE reply |
 
-The raw CLI remains available through `directory.sh cli ...` and `directory.bat cli ...`. Keep record paths relative to `.course-data`. The helper maps only parser and interviewer capabilities; it does not expose every AGNTCY feature.
+The raw CLI remains available through `directory.sh cli ...` and `directory.bat cli ...`. Keep record paths relative to `.course-data`. All active AUs can be published with their precise purpose and actual A2A skills. Only parser/interviewer capabilities currently have reviewed OASF skill mappings; the others explicitly carry `aoa/taxonomy-mapping: not-yet-mapped` and an empty OASF skill list. No performance or taxonomy equivalence is invented.
 
 ## Review questions
 

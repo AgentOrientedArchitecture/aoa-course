@@ -58,7 +58,7 @@ item under `constraints`:
 - Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
 ```
 
-Watch the registry hot-reload, then rerun **Agent card check**. Green means only
+Watch the registry hot-reload. In the revised course, wait for its changed binding to be republished to AGNTCY (or run `directory.sh sync --wait 120` / `directory.bat sync --wait 120`), then rerun **Agent card check**. Green means only
 that the declaration was observed. It does not prove implementation,
 effectiveness, legal compliance, or legal permission.
 
@@ -115,3 +115,7 @@ are not governance stages.
 **Original profile (`DURABLE_CASES=false`):** trace JSONL persists on disk, while active held drafts and locks live in planner memory. If the planner restarts, submit a new CV-fit intent and review its new draft.
 
 **Revised profile:** held drafts and ordered events are saved in SQLite. Follow [the restart exercise](DURABLE-CASES.md) to reopen and review the same result. Neither profile establishes production workflow guarantees or effective human oversight merely by recording a review.
+
+## Revised course discovery
+
+Session 4 starts AGNTCY and publishes its active AUs, including the governance and evidence evaluators. Every new plan requires current Directory records plus matching approved local contracts. Inspect the content IDs in Studio. Stopping Directory prevents new discovery; it does not erase cases or prevent review of an already-held exact result.

@@ -1,6 +1,6 @@
 # Adopting EVE with AGNTCY Directory
 
-The business already has CV parsing and assessment. It now needs interview questions based on that assessment. We build that capability in **EVE**, accept it in its own development environment, and then make it usable by the existing AOA system. **AGNTCY Directory** adds a separate exercise: publish a portable description, discover it and compare it with the capability adopted locally.
+The business already has CV parsing and assessment. It now needs interview questions based on that assessment. We build that capability in **EVE**, accept it in its own development environment, and then make it usable by the existing AOA system. From revised Session 3 onwards, **AGNTCY Directory supplies the planner's AU discovery**. All running AUs are published, including the EVE interviewer; local adoption and lifecycle checks still control which discovered capabilities may be selected.
 
 This is the course's concrete test of framework independence. The Python planner can use a TypeScript agent running in a third-party framework because the integration boundary describes the work, inputs, outputs and invocation. It does not require rewriting the agent in the Python scaffold.
 
@@ -15,7 +15,7 @@ Read the [system map](../../ARCHITECTURE.md) first. Follow the [native walkthrou
 | Adoption bridge | Course-owned JavaScript under `system/agents-eve/runtime/adapter/` | The integration work required to expose EVE as an AU is visible and inspectable |
 | AGNTCY Directory | Real **v1.8.0** `dirctl` daemon and client in Docker, using the pinned upstream binary | A description can be stored, indexed, searched and retrieved through external discovery infrastructure |
 | OASF record | **1.0.0** record exported by the course helper with a skill classification and contract digest | A portable declaration can be related to the local capability contract |
-| Runtime registry | Course HTTP service with persisted cards and seeded lifecycle actors | Local discovery and runtime composition work; enterprise publisher identity/approval is simplified |
+| Runtime registry | Course HTTP service with persisted cards and seeded lifecycle actors | Local adoption and lifecycle remain authoritative; enterprise publisher identity/approval is simplified |
 
 We adopt a learner-owned agent built with third-party technology. We do not download an unknown vendor agent from Directory or demonstrate cross-company trust. This distinction keeps the demonstrated interoperability separate from the further work involved in adopting an externally owned service.
 
@@ -29,7 +29,7 @@ EVE's upstream project describes its framework and agent tooling; AGNTCY documen
 
 **Adoption:** Can the accepted implementation fulfil an AU contract in this estate? The course bridge publishes the capability, translates the invocation into an EVE turn and returns the result. The same authored files remain in the workshop. The implementation now has a registered outward boundary.
 
-**Discovery and comparison:** Can someone retrieve a portable declaration and relate it to the adopted capability? Directory stores the OASF record. The course helper compares selected contract fields with the local registry card. A successful comparison is evidence about those declarations, not proof of identity, behaviour or permission.
+**Discovery and comparison:** Can the planner find the adopted capability through AGNTCY? Directory stores the OASF record and actual A2A card; a course adapter publishes and retrieves them. The planner checks the current local binding and approval before allocation. The manual helper comparison remains available. Neither a matching declaration nor discovery proves identity, behaviour or permission.
 
 ## Who owns which responsibility?
 
@@ -37,7 +37,7 @@ EVE's upstream project describes its framework and agent tooling; AGNTCY documen
 |---|---|---|---|
 | Agent behaviour, model wiring and native sessions | Runs the learner agent | — | Bridge delegates a turn to EVE |
 | Native developer workflow | `eve init`, `eve info`, `eve dev` | — | Docker supplies the pinned environment |
-| Portable description and discovery | — | Stores/indexes OASF records; returns a content ID | Helper exports the local declaration and compares a pulled record |
+| Portable description and discovery | — | Stores/indexes OASF records; returns a content ID | Adapter publishes runtime records; planner checks retrieved records against adopted bindings |
 | Local capability contract and Agent ID | — | An annotation can reference them | Bridge stamps and publishes; registry persists |
 | Outward invocation | EVE client/session interface | Not in the invocation path | Bridge exposes the course A2A surface |
 | Task allocation and composition | — | Does not select the task executor here | Planner reads local cards, allocates, validates and invokes |
@@ -50,7 +50,7 @@ Keeping these responsibilities distinct allows a framework or discovery service 
 
 ![Planner to AOA bridge to real EVE runtime and back](../../diagrams/eve-invocation.svg)
 
-1. The planner resolves `interviewer-questions` as the final step in the CV/interview workflow. The inputs are the prior assessment and optional structured CV.
+1. The planner searches AGNTCY, pulls the OASF records and matches their bindings against current approved local cards. It resolves `interviewer-questions` as the final step in the CV/interview workflow and records the Directory content ID. The inputs are the prior assessment and optional structured CV.
 2. It sends an A2A JSON-RPC `message/send` request to the adopted card's endpoint. The request carries the capability ID and shared `trace_id`.
 3. The bridge extracts inputs and builds a JSON-in/JSON-out message using the capability card. It does not implement the interviewer's reasoning.
 4. The bridge's `eve/client` creates an EVE session and sends the message. The actual EVE runtime executes the learner agent using the configured model. A fresh native session is created for each invocation; this lab does not teach cross-request interview memory.
@@ -68,9 +68,11 @@ The outward bridge uses the **A2A v0.3 message/card shape**. It is not an A2A v1
 | **A2A Agent Card** | Describes the adopted agent's outward protocol endpoint and advertised capabilities. | `http://localhost:7311/.well-known/agent-card.json` |
 | **OASF record** | Portable discovery description: name, schema version, skills and course annotations. | Exported JSON under `.course-data/`, then stored and retrieved through Directory |
 
-The OASF exporter maps `interviewer-questions` to question generation and parser capabilities to fact extraction. It supports only those mappings; adding another capability requires choosing and checking a taxonomy entry. It includes `aoa/capability-id` and `aoa/contract-sha256` annotations. These are course conventions, not a universal AOA acceptance mechanism supplied by OASF.
+The OASF exporter maps `interviewer-questions` to question generation and parser capabilities to fact extraction. Other AUs retain their precise purpose and actual A2A skills, with an explicitly unmapped OASF skill list pending taxonomy review. Automatic publications embed each runtime's actual A2A Agent Card. The manual template export remains available without that module. `aoa/capability-id` and the digest annotations are course conventions, not a universal AOA acceptance mechanism supplied by OASF.
 
 The comparison hash covers `id`, `version`, `kind`, `purpose`, `inputs`, `outputs` and `constraints`. It does **not** hash the model, instructions, implementation code, endpoint, identity or measured performance. A matching hash establishes equality of those selected declaration fields. Inspect `skills_hash` and actual behaviour separately.
+
+The planner additionally requires `aoa/binding-sha256`, covering those contract fields plus `agent_id`, `identity`, `endpoint`, `a2a_endpoint`, `agent_card_url` and `provenance` (including the instructions hash when present). It also checks the A2A module's endpoint/skill and current local lifecycle. This prevents a stale publication or external endpoint from replacing an adopted binding. It does not verify publisher identity or establish behavioural quality. No current publication means no new run; there is no local discovery fallback in Sessions 3–4.
 
 Directory's content ID identifies the published record. It is distinct from the contract digest inside that record and from the local Agent ID. None of those identifiers alone proves that a running service belongs to a trusted supplier.
 
@@ -81,10 +83,10 @@ Directory's content ID identifies the published record. It is distinct from the 
 | 1 · Prepare | Use the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop); pre-build Session 3 images | Pinned EVE image and configured model route |
 | 2 · Author | Start native EVE; follow the [walkthrough](WALKTHROUGH.md) through `eve init`, provider configuration and `eve dev` | Learner files; native output for the supplied synthetic input |
 | 3 · Accept natively | Check five questions, field/word limits, grounding and no hiring decision | The observed reply and any failure/correction |
-| 4 · Adopt | Exit the native shell and run `session3-adopt.sh` or `.bat` | Healthy bridge and `interviewer-questions` in the runtime registry |
-| 5 · Discover | Export, publish, search and pull through the [Directory lab](DIRECTORY.md) | OASF JSON, Directory content ID, retrieved record |
+| 4 · Adopt | Exit the native shell and run `session3-adopt.sh` or `.bat` | Healthy bridge, local card and automatic publication of the running AU estate |
+| 5 · Discover | Browse AGNTCY and pull an actual runtime record through the [Directory lab](DIRECTORY.md) | OASF with actual A2A card, Directory content ID, retrieved record |
 | 6 · Compare | Run the helper's `check` command | Matching local contract/lifecycle fields; `execution_authorised: false` |
-| 7 · Compose | In Studio choose **CV fit + interview**, using the same CV/JD fixtures | Selected EVE capability, A2A request, shared trace ID, five returned questions |
+| 7 · Compose | In Studio choose **CV fit + interview**, using the same CV/JD fixtures | AGNTCY discovery event, EVE content ID, accepted binding, A2A request and five returned questions |
 | 8 · Challenge | Change a copy of the discovery record's contract hash; check it again | A mismatch, with no change to local adoption or lifecycle state |
 
 In the revised course, a specialist evaluator may be selected before the EVE step. Inspect that accepted binding. The Session 3 task plan is fixed to keep attention on the adoption boundary; AU allocation still uses the revised contract/decision path.

@@ -14,6 +14,13 @@ case "$session" in
   4) files+=(-f system/docker-compose.session4.yml);;
   *) echo 'Choose session 1, 2, 3 or 4.' >&2; exit 2;;
 esac
+
+export COURSE_DISCOVERY_BACKEND=local
+if [[ "$session" == 3 || "$session" == 4 ]]; then
+  compose+=(--profile directory)
+  export COURSE_DISCOVERY_BACKEND=agntcy
+  export DIRECTORY_UID="$(id -u)" DIRECTORY_GID="$(id -g)"
+fi
 files+=(-f system/docker-compose.revised.yml)
 [[ "$session" != 3 ]] || files+=(-f system/docker-compose.revised-eve.yml)
 
@@ -30,3 +37,5 @@ case "$session" in
     export COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,parser-estate,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit
     export COURSE_EVALUATOR_ALLOWLIST=evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence;;
 esac
+export COURSE_DIRECTORY_EXPECTED_AUS
+COURSE_DIRECTORY_EXPECTED_AUS="$(tr ',' '\n' <<< "$COURSE_REGISTRY_ALLOWLIST" | sed '/^tool-/d' | paste -sd, -)"

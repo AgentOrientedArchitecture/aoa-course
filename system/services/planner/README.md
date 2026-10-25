@@ -20,6 +20,16 @@ before application execution. `validate_composition` checks required tasks,
 input/output compatibility and evidence dependencies before accepted bindings
 are recorded. See the [selection diagram](../../../course/ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au).
 
+Revised Sessions 3–4 set `DISCOVERY_BACKEND=agntcy`. Before planning/allocation,
+the service retrieves actual Directory search/pull results from the course
+`directory-bridge`, then matches OASF binding hashes and A2A modules against
+current approved local AU cards. The registry list is the adoption authority,
+not a substitute discovery result. Missing/stale publications or unavailable
+Directory stop new runs with no AU invocation and no local discovery fallback.
+Trace events retain content IDs, accepted/excluded records and missing bindings.
+Tools remain local; they are not AU candidates. Sessions 1–2 and the original
+profile retain local discovery. Held-result review requires no new discovery.
+
 Task planning and AU allocation are separate settings: fixed Session 3/4 plans
 can still receive decision-model allocation. The workflow catalogue and
 reference contracts bound what the model can propose. Execution is sequential.

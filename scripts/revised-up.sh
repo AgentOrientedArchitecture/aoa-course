@@ -6,4 +6,9 @@ if [[ "$session" == 3 ]]; then
   echo 'Use revised-eve.sh native for authoring, then revised-eve.sh adopt.' >&2
   exit 2
 fi
+if [[ "$session" == 4 ]]; then
+  mkdir -p "${COURSE_DIRECTORY_DATA_ROOT:-.course-data}"
+  "${compose[@]}" "${files[@]}" --profile "session$session" up --build -d --remove-orphans "$@"
+  exec ./scripts/directory.sh sync --wait 120
+fi
 exec "${compose[@]}" "${files[@]}" --profile "session$session" up --build -d --remove-orphans "$@"

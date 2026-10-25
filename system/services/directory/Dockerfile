@@ -5,6 +5,7 @@ COPY --from=upstream /usr/local/bin/dirctl /usr/local/bin/dirctl
 COPY system/services/directory/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY scripts/directory-lab.py /app/directory-lab.py
+COPY system/services/directory/bridge.py system/services/planner/directory_contract.py /app/
 ENV COURSE_DIRECTORY_CLI=/usr/local/bin/dirctl
 WORKDIR /course-data
 USER 1000:1000
