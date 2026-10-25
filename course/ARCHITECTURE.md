@@ -1,6 +1,6 @@
 # How the course system works
 
-This guide describes the **October implementation on `codex/october-course-rebuild`**, with `.env.revised` present. Start with the [setup and launcher table](pre-work/01-revised-model-access.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
+This guide describes the **October implementation on `main`**, with `.env.revised` present. Start with the [setup and launcher table](pre-work/01-revised-model-access.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
 
 The course builds one estate across four examples: assess a CV, curate a wiki, adopt an EVE interviewer, then review a persistent business result. A capability is a job the system can ask for; an Agentic Unit is the runtime responsible for fulfilling its contract. A model is one possible implementation component inside that boundary.
 

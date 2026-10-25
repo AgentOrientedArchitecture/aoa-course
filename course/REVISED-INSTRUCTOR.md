@@ -2,7 +2,7 @@
 
 ## Before the class
 
-- Start on the reviewed revision of `codex/october-course-rebuild` in `aoa-course`, on Spark or the teaching laptop. Use the [launcher table](pre-work/01-revised-model-access.md#start-and-stop) for macOS/Linux and Windows commands.
+- Use `main` in `aoa-course`, on Spark or the teaching laptop, and record the commit used for rehearsal. Follow the [checkout instructions](pre-work/01-revised-model-access.md#update-an-existing-checkout) when updating an existing installation, then use the [launcher table](pre-work/01-revised-model-access.md#start-and-stop) for macOS/Linux and Windows commands.
 - Use the [architecture diagrams](ARCHITECTURE.md) to locate each component before running its example. Read the [EVE/AGNTCY adoption explanation](sessions/session-03-eve/ADOPTION.md) before Session 3; the practical integration is a main course argument, not an optional product overview.
 - Use the [provider setup](pre-work/01-revised-model-access.md). Verify actual Cerebras and TypeSafe calls, account quota and access from the teaching environment. Keep the local route ready and label it when used.
 - Build all images before the session. EVE retains its pinned native workspace and framework version; do not replace learner files to make a demo pass.
@@ -37,7 +37,7 @@ For stable-model utility, judge each output against explicit task criteria befor
 
 ## Remote use
 
-Spark remains available for remote builds and execution; a local laptop checkout can run the same course independently. From an authorised computer, forward port 8080 to view Spark's Studio; no public exposure is required. Docker services and a Directory process in a persistent terminal can outlive the Mac connection. Use the reviewed branch and commit when continuing from another client. Private provider keys and persisted runtime data do not travel with Git. Final presentation rendering can remain on the Mac.
+Spark remains available for remote builds and execution; a local laptop checkout can run the same course independently. From an authorised computer, forward port 8080 to view Spark's Studio; no public exposure is required. Docker services and a Directory process in a persistent terminal can outlive the Mac connection. Use `main` and confirm the same reviewed commit when continuing from another client. Private provider keys and persisted runtime data do not travel with Git. Final presentation rendering can remain on the Mac.
 
 ## Scope still open for a later course iteration
 

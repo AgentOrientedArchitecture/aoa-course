@@ -4,20 +4,34 @@ Use Docker and the existing course repository. macOS/Linux use `.sh` launchers; 
 
 ## Get the October course
 
-Use branch **`codex/october-course-rebuild`**. The revised course and Studio inspection views are on this branch, not `main`. The separate `aoa-course-v2` prototype and `feat/decision-allocator` branch are not prerequisites for this walkthrough.
+Use **`main`** for the course, including the revised examples, Studio inspection views and architecture documentation. The separate `aoa-course-v2` prototype and `feat/decision-allocator` branch are not prerequisites for this walkthrough.
 
 For a fresh participant-install test, clone into a new directory. This avoids reusing saved cases, uploaded inputs or an authored EVE workshop from an earlier run. Keep the existing checkout and its data.
 
 On **macOS/Linux**, use Terminal. On **Windows**, use Command Prompt, or a WSL2 Linux terminal with Docker available there. The following clone and check commands work in either:
 
 ```bash
-git clone --branch codex/october-course-rebuild --single-branch https://github.com/AgentOrientedArchitecture/aoa-course.git aoa-course-october-test
+git clone --branch main https://github.com/AgentOrientedArchitecture/aoa-course.git aoa-course-october-test
 cd aoa-course-october-test
 git status --short --branch
 docker compose version
 ```
 
-Confirm the branch name and that Docker Compose is available before continuing. Configure one model route below, then use the matching session launcher. The presence of `.env.revised` selects the revised course automatically.
+Confirm that the branch is `main` and Docker Compose is available before continuing. Configure one model route below, then use the matching session launcher. The presence of `.env.revised` selects the revised course automatically.
+
+### Update an existing checkout
+
+Run `git status --short` first. Commit or otherwise save any listed source edits before switching branches; keep existing configuration and learner data. From the repository root:
+
+```bash
+git remote set-branches --add origin main
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git status --short --branch
+```
+
+The first command also makes `main` available to checkouts originally cloned with `--single-branch`. These commands work in Terminal, Windows Command Prompt and WSL2. They retain existing branches and do not reset the EVE workshop, saved cases or private environment files. For later updates while already on `main`, use `git pull --ff-only origin main`; if Git reports divergent commits or local changes, resolve those rather than resetting the checkout.
 
 The recorded end-to-end validation is on Spark. Fresh macOS and Windows walkthroughs are pending; see [validation record](../REVISED-VALIDATION.md). Record any setup or instruction failures as part of those tests.
 

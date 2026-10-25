@@ -1,6 +1,10 @@
 # Revised course validation
 
-Checked on Spark on 21 October 2026, in `/home/lewis/work/AOA/aoa-course`, branch `codex/october-course-rebuild`, based on main `13ed2a3`.
+Use `main` for current course setup and delivery. The dated records below retain the revisions and environments actually checked; they are not instructions to use a development branch.
+
+## Spark integration, 21 October 2026
+
+Checked in `/home/lewis/work/AOA/aoa-course` on the then-development branch `codex/october-course-rebuild`, based on main `13ed2a3`.
 
 ## Verified
 
@@ -42,7 +46,7 @@ uv pip install --python .venv-course/bin/python -r tests/requirements.txt
 .venv-course/bin/python -m pytest -q tests
 ```
 
-Live run evidence remains in the planner's persisted traces and the ignored `.course-data/` fixture directory on Spark. The local EVE validation fixture is separate from `system/agents-eve/workshop`, which remains ready for learner authoring. The source branch is the continuation point; temporary test fixtures are not course source.
+Live run evidence remains in the planner's persisted traces and the ignored `.course-data/` fixture directory on Spark. The local EVE validation fixture is separate from `system/agents-eve/workshop`, which remains ready for learner authoring. Continue course work on `main`; temporary test fixtures are not course source.
 
 The 21 October Spark preview used Session 3 with the isolated EVE validation fixture; this is not a claim about which services are running now. Use the launchers in the guide to switch sessions; original source material and all saved cases remain available.
 

@@ -1,6 +1,6 @@
 # Documentation review — 25 October 2026
 
-Reviewed the October branch against the current Compose overlays, launchers, registry, planner/allocation, decision adapters, case store, EVE bridge and Directory helper. This was an implementation/documentation review, not a fresh provider-backed rehearsal or a legal review of the curated corpus.
+Reviewed the October course implementation against the current Compose overlays, launchers, registry, planner/allocation, decision adapters, case store, EVE bridge and Directory helper. This was an implementation/documentation review, not a fresh provider-backed rehearsal or a legal review of the curated corpus. Current setup and delivery use `main`.
 
 ## Findings addressed
 

@@ -2,7 +2,7 @@
 
 The course still builds the same estate: **CV assessment → knowledge wiki → an EVE-authored interviewer → governance and compliance evidence**. The new work makes planning, judgement, discovery and persistent state inspectable within that story.
 
-Use this page as the entry point for the revised branch. All original walkthroughs, examples and launchers remain available. The expense prototype in `aoa-course-v2` is a separate companion; it is not a prerequisite or a replacement.
+Use this page as the entry point for the course on `main`. All original walkthroughs, examples and launchers remain available. The expense prototype in `aoa-course-v2` is a separate companion; it is not a prerequisite or a replacement.
 
 ## Reading order
 
@@ -44,7 +44,7 @@ There is no extra personal-agent framework to install for this course. The brows
 
 ## Evidence and limits
 
-The architectural boundaries draw on the knowledge-base pages [[bounded-decision-models]], [[decision-contract]], [[agntcy]], [[shared-state-and-parallelism]] and [[cloudflare-durable-objects]]. These pages describe proposals and substrate patterns; the course implementation and its validation report establish only what this branch actually demonstrates.
+The architectural boundaries draw on the knowledge-base pages [[bounded-decision-models]], [[decision-contract]], [[agntcy]], [[shared-state-and-parallelism]] and [[cloudflare-durable-objects]]. These pages describe proposals and substrate patterns; the course implementation and its validation report establish only what the runnable examples actually demonstrate.
 
 - A valid choice and a high model probability do not prove semantic correctness. The default 0.65 gate is a teaching setting, not a calibrated production threshold.
 - Composition checks cover this bounded set of course responsibilities, dependencies and contracts. They are not a general-purpose proof of arbitrary DAG correctness.
