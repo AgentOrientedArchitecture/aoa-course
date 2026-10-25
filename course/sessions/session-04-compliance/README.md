@@ -1,8 +1,10 @@
 # Session 4: evidence, review and recovery
 
 Follow [`WALKTHROUGH.md`](WALKTHROUGH.md) from start to finish. It covers three
-stages: inspect declared card evidence, produce and review a CV assessment that
-survives a planner restart, then audit what actually happened.
+stages: check the general CV evaluator’s declaration against wiki evidence,
+produce and review its held assessment, then audit what actually happened.
+There is one CV evaluator and one card to edit in this session. Restart
+recovery remains an optional extension in the same walkthrough.
 
 The session uses AGNTCY to discover AUs, the wiki for cited policy evidence and
 SQLite to retain the exact result awaiting review. These serve different

@@ -85,10 +85,12 @@ Open **AU selection**, select the assessment task and work through the stages:
 5. **Accepted binding:** which concrete AU was authorised to execute after
    those checks? A returned model choice is not yet an accepted binding.
 
-The choice uses the task purpose and your **Assessment emphasis**. It does
-not read the CV and job text at allocation time. The chosen evaluator reads
-the parsed CV and the job description when it executes. A single eligible AU is bound without
-a decision-model call.
+The choice uses the task purpose and your **Assessment emphasis**. If you leave
+that field blank, it uses the first 16,000 characters of the job description,
+whether pasted or uploaded. Uploaded job text is prepared by the existing
+document reader before planning. The allocator does not read the CV; the chosen
+evaluator receives the parsed CV and job description when it executes. A single
+eligible AU is bound without a decision-model call.
 
 Open **Run review** and select each AU output. Compare **Complete output JSON**,
 the recorded invocation inputs and observed signals. For the assessment,

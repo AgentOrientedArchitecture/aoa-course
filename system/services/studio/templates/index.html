@@ -51,15 +51,16 @@
           <p class="mode-note">
             Inspect evidence declared by each capability card. Open the trace to
             see <code>tool-wiki-store</code> queries and cited passage IDs, then
-            inspect the report for each source and complete quote. Edit the
-            card of the evaluator selected in <strong>AU selection</strong>,
-            watch it hot-reload, wait for Directory publication and rerun the check.
+            inspect the report for each source and complete quote. This session
+            uses <code>evaluator-cv</code>. Add the human-review declaration to
+            <code>system/agents/evaluator/capabilities/cv/capability-card.yaml</code>,
+            save, sync the Directory and rerun the check.
           </p>
         </div>
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "cv-fit" %} hidden{% endif %}" data-mode-panel="cv-fit">
           {% set discovery_note = 'Drop or paste a CV and a job description, then submit. The planner discovers AUs through AGNTCY Directory, checks local adoption and composes the work.' if studio_config.discovery_backend == 'agntcy' else 'Drop or paste a CV and a job description, then submit. The planner discovers the parser, evaluator, and reporter from the registry and runs them as one workflow.' %}
-          <p class="mode-note" id="cv-fit-note" data-naive-note="{{ discovery_note }}" data-governed-note="The baseline card is ineligible, so this plan is blocked before any application AU runs. After you fix the card, execution produces a held draft; review the actual evaluation and approve or reject its exact result digest below.">
+          <p class="mode-note" id="cv-fit-note" data-naive-note="{{ discovery_note }}" data-governed-note="Session 4 uses evaluator-cv. The planner checks its declaration and retrieves policy evidence from the wiki before allowing the assessment. After the check passes, open Run review to inspect the held draft, add your notes and approve or reject it.">
             {{ discovery_note }}
           </p>
           <label class="drop-field">

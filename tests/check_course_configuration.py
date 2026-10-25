@@ -1,7 +1,9 @@
-"""Compare the consolidated course with the preserved, working overlay stack.
+"""Compare the current course with the preserved, working overlay stack.
 
 Real Compose parsing, both model routes, all four sessions. No containers or
-providers are started; fixtures contain dummy keys only.
+providers are started; fixtures contain dummy keys only. The intentional
+Session 4 change is explicit: one CV evaluator keeps the governance exercise
+focused, while specialist allocation remains in Sessions 1–3.
 """
 import copy
 import json
@@ -86,19 +88,34 @@ def main():
                 if session == 3: profiles += ['session3-lab-wrapped']
                 if session in (3,4): profiles += ['directory']
                 expected = normalise(config(files,profiles,env,env_file)['services'], historical=True)
+                if session == 4:
+                    # Preserve the original archive. Only these two services
+                    # intentionally leave Session 4; the rest must still match.
+                    expected.pop('cv-data-evaluator')
+                    expected.pop('cv-frontend-evaluator')
                 current_env = {k:v for k,v in env.items() if k not in {
                     'CEREBRAS_API_KEY', 'TYPESAFE_API_KEY', 'AOA_OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ANTHROPIC_API_KEY'}}
                 current_env.update(LLM_API_KEY='fixture-generation-key',
                                    LLM_BASE_URL=values['OPENAI_BASE_URL'],
                                    DECISION_API_KEY='fixture-decision-key')
                 actual = normalise(config([ROOT/'system/docker-compose.yml'],profiles,current_env,env_file)['services'])
+                cv_cards = {'evaluator-cv', 'evaluator-cv-data', 'evaluator-cv-frontend'}
+                active_cards = set(actual['registry']['environment']['REGISTRY_CARD_ALLOWLIST'].split(','))
+                expected_cv = {'evaluator-cv'} if session == 4 else cv_cards
+                assert active_cards & cv_cards == expected_cv, (route, session, active_cards & cv_cards)
+                for name in ('cv-data-evaluator', 'cv-frontend-evaluator'):
+                    assert (name in actual) == (session != 4), (route, session, name)
+                if session in (3, 4):
+                    directory_aus = set(actual['directory-bridge']['environment']['COURSE_DIRECTORY_EXPECTED_AUS'].split(','))
+                    assert directory_aus == {name for name in active_cards if not name.startswith('tool-')}
                 assert actual.keys() == expected.keys(), (route,session,actual.keys() ^ expected.keys())
                 for name in expected:
                     assert actual[name] == expected[name], (route,session,name,
                         {k:(expected[name].get(k),actual[name].get(k)) for k in expected[name].keys() | actual[name].keys() if expected[name].get(k)!=actual[name].get(k)})
                 assert actual['evaluator']['environment']['LLM_API_KEY'] == 'fixture-generation-key'
                 assert actual['decision']['environment']['DECISION_API_KEY'] == 'fixture-decision-key'
-                print(f'PASS: {route}, session {session}: services, mounts, endpoints and runtime settings match')
+                scope = 'one CV evaluator; remaining configuration matches' if session == 4 else 'configuration matches'
+                print(f'PASS: {route}, session {session}: {scope}')
         # Native authoring must mount the same real learner folder.
         native = config([ROOT/'system/docker-compose.yml'],['session3-lab-native'],current_env,env_file)['services']['eve-workshop-native']
         mount = next(v for v in native['volumes'] if v['target']=='/workshop')

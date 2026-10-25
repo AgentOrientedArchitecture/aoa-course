@@ -1,10 +1,13 @@
 # Session 4: card evidence, result review and flow audit
 
-Follow this page for the whole session. You will check what an AU declares,
-review the actual CV assessment after a planner restart, and audit the recorded
-control. The three core stages are **Agent card check**, **CV fit** and
-**Flow audit**. **Graph** and **Ask** remain optional evidence-exploration
-utilities.
+The lesson is to make governance part of the AOA platform. The wiki supplies
+cited policy evidence; governance AUs check the declared contract and recorded
+behaviour; the planner holds the actual assessment until a human reviews it.
+
+Follow three stages on this page: **Agent card check → CV fit → Flow audit**.
+This session uses just **`evaluator-cv`** for CV assessment, so there is one card
+to edit. The specialist-selection exercise remains in Sessions 1–3. Restart
+recovery, **Graph** and **Ask** are optional extensions after the core exercise.
 
 ## Start and seed
 
@@ -31,8 +34,9 @@ scripts\session4-seed.bat
 The launcher starts AGNTCY and publishes the active AUs, including the governance
 and evidence evaluators. Every new plan needs current Directory records and
 matching approved local contracts. Studio's **AU selection** view shows the
-discovery evidence and content IDs. The task sequence is fixed in this session;
-AU allocation can still select a general, data or frontend evaluator.
+discovery evidence and content IDs. The task sequence and general CV evaluator
+are fixed for this governance exercise. Contract validation still runs; there
+is no decision-model call when only one compatible AU is available.
 
 The seed script loads the curated EU AI Act notes without a model call. It then
 checks the Annex III employment and Article 14 human-oversight queries. Both
@@ -46,15 +50,16 @@ state and removes the general evaluator's added constraint.
 
 ## 1. Inspect declared card evidence
 
-Select **Agent card check** and submit:
+Select **1. Agent card check** and click **Run agent card check**. Its workflow is:
 
 ```text
 parser-estate → evaluator-agent-evidence → reporter-agent-evidence
 ```
 
-On a fresh checkout, the CV evaluator cards lack the required review-before-use
-declaration and show red for Article 14. If you have already edited a card, it
-may be green; keep that history rather than deleting the declaration to
+Find **`evaluator-cv`** in the report. On a fresh checkout, its card lacks the
+required review-before-use declaration and shows red for Article 14. If you
+have already edited the card, it may be green; keep that history rather than
+deleting the declaration to
 manufacture a failure.
 
 In the trace and report, confirm that `evaluator-agent-evidence` calls
@@ -66,43 +71,26 @@ Now select **CV fit**, drop or paste a synthetic CV and job description from
 Session 1, and submit. For example, use
 [`jordan-okafor.txt`](../session-01-cv-fit/cv-examples/jordan-okafor.txt) and
 [`senior-data-engineer-fintech.txt`](../session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt).
-Use **AU selection** to inspect the accepted evaluator binding. Before its
-declaration is added, governance rejects the plan before any application AU
-`lookup` or `invoke`; there is no CV assessment draft to review.
+Before the declaration is added, the platform rejects this CV fit run. Inspect
+the reason: `evaluator-cv` has not declared review before employment use. The
+trace shows the governance check and its wiki evidence, with no CV assessment
+AU invoked and no draft produced. This is the first enforcement point.
 
-If AU allocation itself is held, resolve that first using its recorded reason.
-A missing Directory publication or an unavailable decision provider is not the
-same outcome as governance rejecting the selected card.
+If the error is about missing Directory records, run Directory sync and retry.
+If the wiki evidence is missing, rerun the seed script. Those setup problems
+are different from the intended rejection for a missing card declaration.
 
-### Edit the capability card for the evaluator this run selected
+### Add the declaration to one file
 
-The exercise is to declare that a CV assessment is a draft until a human has
-reviewed it. You make this change in a YAML file in your checked-out repository,
-using your text editor. Studio displays the card; it does not edit the file.
+In your text editor, open this file in your checked-out repository:
 
-First identify which evaluator the planner chose for the CV fit run you just
-submitted:
+```text
+system/agents/evaluator/capabilities/cv/capability-card.yaml
+```
 
-1. In Studio, open **AU selection**.
-2. Select the task **evaluate cv fit**, then **Accepted binding**.
-3. Read the capability ID on the **right** of the arrow. For example,
-   `evaluate-cv-fit → evaluator-cv-data` means the data specialist was selected.
-
-Here, “binding” just means **the AU assigned to that task**. Accepted selection
-does not mean governance allowed it to execute. At this point, the missing
-declaration should have stopped application work.
-
-Open the file that matches that ID. These paths start at your repository root:
-
-| Selected capability ID | File to open |
-| --- | --- |
-| `evaluator-cv` | `system/agents/evaluator/capabilities/cv/capability-card.yaml` |
-| `evaluator-cv-data` | `system/agents/evaluator/capabilities/cv-data/capability-card.yaml` |
-| `evaluator-cv-frontend` | `system/agents/evaluator/capabilities/cv-frontend/capability-card.yaml` |
-
-Find the existing `constraints:` section. Keep its existing entries and add
-the final line shown below, with **two spaces before the dash**. Save the file.
-Use the sentence as written: the course check looks for this explicit
+Under the existing `constraints:` list, add the final line shown below. Keep
+all existing entries and use **two spaces before the dash**. Save the file.
+Use the sentence as written: the teaching policy checks for this explicit
 review-before-use declaration.
 
 ```yaml
@@ -115,15 +103,10 @@ constraints:
   - Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
 ```
 
-This updates the AU's declared contract. It does not itself add a human-review
-mechanism: the planner already implements the hold-and-review control you will
-test in stage 2.
-
-The saved card automatically reloads into the local registry. In Studio, open
-**Capability cards**, select that evaluator and wait until **Declared
-constraints** includes the new sentence. Then run the command below from your repository root to publish the
-updated contract to AGNTCY. New plans require the published record to match the
-local card:
+In Studio, open **Capability cards**, select **evaluator-cv** and wait until
+**Declared constraints** includes the new sentence. The file reloads
+automatically; there is no container restart. Then publish the changed contract
+from the repository root:
 
 macOS or Linux:
 
@@ -137,55 +120,33 @@ Windows Command Prompt:
 scripts\directory.bat sync --wait 120
 ```
 
-Return to **Studio · all controls**, rerun **Agent card check** and inspect that
-card's Article 14 result. Green means
-the required declaration was observed. It does not prove that the control works
-or that the system is legally compliant. Recheck the accepted binding on each
-CV run: if allocation chooses a different evaluator, its own card must carry
-the declaration too.
+Return to **Studio · all controls** and rerun **Agent card check**. That card's
+Article 14 declaration should now be green. This means the declaration is
+present; it does not prove that review happens. The planner already implements
+the hold-and-review control, which you will exercise next.
 
-The earlier rejected run remains as evidence. Submit a new CV fit run in the
-next stage; editing a card does not resume a rejected run.
+The earlier rejected run remains as evidence. Submit a new run below.
 
-## 2. Recover and review the actual CV result
+## 2. Produce and review the CV assessment
 
 In **Studio · all controls**, return to **CV fit** with the same inputs. The deterministic
 `evaluator-plan-governance` check permits execution only when the selected
 card declaration, result-release control and cited Annex III employment and
 Article 14 evidence are present. Missing required evidence stops execution.
 
-The application AUs produce a frozen draft. In **Run review**, inspect the
-assessment against the actual CV and job description. The state must be
-`draft-held`; the trace contains `result-draft` and `result-hold`. Record the
-trace ID and displayed `result_digest`. In **Studio · all controls**, expand the
-`result-draft` trace record to inspect its `plan_digest` too. Do not approve or
-reject yet.
+Open **Run review** and compare the assessment with the actual CV and job
+description. The state must be `draft-held`: the AUs have produced an assessment,
+but the platform has not released it. This is the second enforcement point.
+Studio displays the result digest and submits it with your review automatically;
+you do not need to copy a hash or use the API.
 
-### Restart while the result is held
+For the Jordan example, check three concrete points before accepting a report:
 
-In another host terminal, restart only the planner. This command is the same
-on macOS, Linux and Windows:
-
-```text
-docker restart aoa-planner
-```
-
-Wait for [planner health](http://localhost:7200/healthz) to respond, then:
-
-1. Refresh Studio and select **AU selection**.
-2. Choose **Open a saved case**, then the recorded `cv-fit` trace ID.
-3. Open **Run review** and confirm the same result digest. The saved trace in
-   **Studio · all controls** also retains the recorded `plan_digest`.
-4. Compare the held output with the draft you inspected before the restart.
-   Opening the saved case replays evidence; it does not execute the CV AUs again.
-
-The snapshot and ordered events are saved in SQLite on the host. Remembering a
-conversation is insufficient here: recovery needs the selected contracts,
-eligibility decision, exact draft and review state. The
-[case lifecycle diagram](../../ARCHITECTURE.md#session-4-a-result-that-survives-the-process)
-shows those boundaries.
-
-### Review that exact draft
+- The CV explicitly mentions the on-call rota. Has that evidence survived parsing?
+- NHS experience and GDPR/DPA practice are **nice to have** in this job description.
+  Has the assessment incorrectly treated them as essential?
+- Mentoring is stated, but formal team leadership and five years of regulated
+  work need verification. Does the report preserve those uncertainties?
 
 Write reviewer notes that explain your decision, then choose:
 
@@ -211,13 +172,14 @@ automatically rerun: its outside effect may be unknown.
 ## 3. Audit the observed flow
 
 Return to **Studio · all controls**, select **Follow live runs** if a saved case
-is still pinned, then run **Flow audit**:
+is still pinned, then select **3. Flow audit** and click **Run flow audit**:
 
 ```text
 parser-estate → evaluator-flow-evidence → reporter-flow-audit
 ```
 
-Find the trace you just reviewed. Check evidence for:
+Find the trace you just reviewed. The earlier blocked run remains in the
+history; it did not produce an assessment to approve. Check the reviewed run for:
 
 - employment eligibility before application invocation;
 - application completion before `result-draft` and `result-hold`;
@@ -233,6 +195,37 @@ Red legacy rows mean current evidence is absent, not necessarily that the earlie
 execution failed. Legacy `hold`, `plan-approval` and `resume` events do not
 establish review of the actual result.
 
+## Optional: prove that a held result survives restart
+
+Submit a fresh CV fit run and leave it at `draft-held`. Record its trace ID
+and displayed `result_digest` before approving or rejecting it.
+
+In another host terminal, restart only the planner. This command is the same
+on macOS, Linux and Windows:
+
+```text
+docker restart aoa-planner
+```
+
+Wait for [planner health](http://localhost:7200/healthz) to respond, then:
+
+1. Refresh Studio and select **AU selection**.
+2. Choose **Open a saved case**, then the recorded `cv-fit` trace ID.
+3. Open **Run review** and confirm the same result digest. The saved trace in
+   **Studio · all controls** also retains the recorded `plan_digest`.
+4. Compare the held output with the draft you inspected before the restart.
+   Opening the saved case replays evidence; it does not execute the CV AUs again.
+
+The snapshot and ordered events are saved in SQLite on the host. Remembering a
+conversation is insufficient here: recovery needs the selected contracts,
+eligibility decision, exact draft and review state. The
+[case lifecycle diagram](../../ARCHITECTURE.md#session-4-a-result-that-survives-the-process)
+shows those boundaries.
+
+Continue with the review controls above. The same held draft can be approved or
+rejected after recovery. The optional [persistence reference](DURABLE-CASES.md)
+explains storage, plan/result digests and repeated review requests in more detail.
+
 ## Optional evidence exploration
 
 Use **Graph** to visualise the seeded wiki. Use **Ask** to ask about the EU AI Act
@@ -245,8 +238,8 @@ These support evidence exploration; they are not additional governance stages.
 - Which evidence allowed the plan to run, and which evidence allowed its result
   to be released?
 - Why must review identify the exact output rather than just the plan or model?
-- What survived the planner restart? What would happen after an interrupted
-  external action instead?
+- If you tried restart recovery, what survived? What would happen after an
+  interrupted external action instead?
 - Why must retrying a review avoid a second release?
 - What extra work would establish effective oversight in a real organisation?
 

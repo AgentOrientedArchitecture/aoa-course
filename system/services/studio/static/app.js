@@ -1384,6 +1384,57 @@ function taskDetail(task) {
   };
 }
 
+function renderCardCheckFocus(life) {
+  if (!governanceUiDefault || life.workflow !== "agent-card-check") return null;
+  const response = state.records.filter(record => record.step === "response"
+    && record.capability === "evaluator-agent-evidence").at(-1);
+  const findings = response?.outputs?.findings;
+  if (!Array.isArray(findings)) return null;
+  const finding = findings.find(item => item.capability_id === "evaluator-cv" && item.article === "Art 14");
+  if (!finding || !["red", "amber", "green", "unknown"].includes(finding.severity)
+      || typeof finding.checked !== "string" || !finding.evidence) return null;
+
+  const root = document.createElement("section");
+  root.className = "rendered-markdown";
+  const add = (tag, text) => {
+    const element = document.createElement(tag);
+    element.textContent = text;
+    root.appendChild(element);
+    return element;
+  };
+  add("h3", "CV evaluator: human-review declaration");
+  add("p", `Recorded Article 14 finding: ${finding.severity}.`);
+  add("p", `Checked: ${finding.checked}.`);
+  if (finding.gap) add("p", finding.gap);
+  const declared = finding.evidence.value;
+  if (typeof declared === "string" && declared.trim()) {
+    add("h4", "Declaration found on the card");
+    add("blockquote", declared);
+  }
+  add("p", finding.severity === "green"
+    ? "The declaration is present. Run CV fit next to test the platform's hold-and-review control."
+    : finding.severity === "red"
+      ? "Use the walkthrough to update the CV evaluator card, sync Directory and rerun Agent card check."
+      : "Read the recorded gap above. If wiki evidence is missing, rerun the seed script before repeating Agent card check.");
+  add("p", "Card to edit:");
+  add("code", "system/agents/evaluator/capabilities/cv/capability-card.yaml");
+  add("p", "A card declaration does not prove that human review happens. The next stage checks the actual assessment and its release.");
+
+  add("h4", "Evidence retrieved from the wiki");
+  const query = response.outputs.summary?.knowledge_evidence?.queries?.["Art 14"];
+  if (query) add("p", `Query: ${query}`);
+  const citation = finding.regulation_citation;
+  if (citation?.passage_id && citation.source_path && typeof citation.quote === "string") {
+    add("p", `Passage: ${citation.passage_id}`);
+    add("p", `Source: ${citation.source_path}`);
+    add("blockquote", citation.quote);
+  } else {
+    add("p", "No complete wiki citation was recorded for this finding. Inspect the full report below.");
+  }
+  add("p", "This view focuses on the CV exercise. The full estate report below retains the other AUs and article checks. These are evidence findings, not a legal compliance determination.");
+  return root;
+}
+
 function renderResult(life) {
   const resultState = $("result-state");
   const body = $("result-body");
@@ -1404,7 +1455,18 @@ function renderResult(life) {
   resultState.textContent = life.result.error ? "error" : life.status === "released" ? "released" : "complete";
   body.className = "result-body";
   if (markdown) {
-    body.appendChild(renderMarkdown(markdown));
+    const focus = renderCardCheckFocus(life);
+    if (focus) {
+      body.appendChild(focus);
+      const fullReport = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Full estate report";
+      fullReport.appendChild(summary);
+      fullReport.appendChild(renderMarkdown(markdown));
+      body.appendChild(fullReport);
+    } else {
+      body.appendChild(renderMarkdown(markdown));
+    }
   } else {
     const pre = document.createElement("pre");
     pre.className = "json-view";

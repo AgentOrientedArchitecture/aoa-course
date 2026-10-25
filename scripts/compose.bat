@@ -44,7 +44,7 @@ set "COURSE_PLANNER_STRATEGY=deterministic"
 set "COURSE_PLAN_GOVERNANCE_CAPABILITY=evaluator-plan-governance"
 set "COURSE_ALLOW_WIKI_RESET=false"
 set "COURSE_REPORTER_ALLOWLIST=reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit"
-set "COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,parser-estate,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit"
+set "COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,parser-estate,evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit"
 set "COURSE_EVALUATOR_ALLOWLIST=evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence"
 :finish
 set "COURSE_DISCOVERY_BACKEND=local"

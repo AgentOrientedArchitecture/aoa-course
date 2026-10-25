@@ -7,10 +7,15 @@
     <div id="course-diagram" class="course-diagram">Run a workflow to see its recorded plan.</div>
     <details class="course-raw-allocations"><summary>Full allocation and promotion evidence</summary><div id="course-decisions"></div></details><div id="course-cases"></div>`;
   document.getElementById("allocation-inspector").after(host);
-  const brief = document.createElement("label");
-  brief.className = "drop-field";
-  brief.innerHTML = `<span class="drop-label"><strong>Assessment emphasis</strong></span><textarea id="allocation-brief" rows="2" placeholder="For example: assess production data pipelines and data reliability, or frontend accessibility and design systems."></textarea><small>The planner uses this brief to choose among compatible assessment AUs. Candidate descriptions are declarations; the exercise measures their results.</small>`;
-  document.querySelector('[data-mode-panel="cv-fit"]').append(brief);
+  // Session 4 uses one CV evaluator so the exercise can focus on governance.
+  const workflows = window.STUDIO_CONFIG?.workflows || [];
+  const governanceSession = workflows.includes("agent-card-check") && workflows.includes("flow-audit");
+  if (!governanceSession) {
+    const brief = document.createElement("label");
+    brief.className = "drop-field";
+    brief.innerHTML = `<span class="drop-label"><strong>Assessment emphasis</strong></span><textarea id="allocation-brief" rows="2" placeholder="For example: assess production data pipelines and data reliability, or frontend accessibility and design systems."></textarea><small>The planner uses this brief to choose among compatible assessment AUs. Candidate descriptions are declarations; the exercise measures their results.</small>`;
+    document.querySelector('[data-mode-panel="cv-fit"]').append(brief);
+  }
 
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   let active = null, records = [];

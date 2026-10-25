@@ -536,7 +536,6 @@ services:
     - session1
     - session2
     - session3
-    - session4
     build:
       context: ./agents
       dockerfile: evaluator/Dockerfile
@@ -576,7 +575,6 @@ services:
     - session1
     - session2
     - session3
-    - session4
     build:
       context: ./agents
       dockerfile: evaluator/Dockerfile

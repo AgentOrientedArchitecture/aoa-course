@@ -114,7 +114,8 @@ In Sessions 1–2, the planner gives the generation model compact registry
 context and asks for a task plan. It validates the proposal and records any
 fallback to the fixed course plan. Sessions 3–4 use fixed task plans. All four
 sessions then filter AU contracts and use the decision service when several
-eligible candidates remain. Sessions 3–4 require current AGNTCY publications
+eligible candidates remain. Session 4 exposes only the general CV evaluator
+so its assessment task needs no decision call. Sessions 3–4 require current AGNTCY publications
 matched against the local adoption records before allocation. Whole-plan
 validation precedes accepted bindings. When plan governance is enabled, the planner records the
 resolved plan and digest and invokes the control-plane

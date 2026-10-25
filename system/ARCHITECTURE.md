@@ -48,7 +48,10 @@ parser-cv → evaluator-cv → reporter-cv-fit
 ```
 
 You submit a CV, a job description and an optional assessment emphasis through
-Studio. The planner proposes tasks, checks contracts and allocates eligible
+Studio. When emphasis is absent, Studio supplies job-description text as the
+selection context; uploaded descriptions use the registered document reader
+for deterministic input preparation. This precedes the governed application
+run. The planner proposes tasks, checks contracts and allocates eligible
 AUs before any application work. It invokes `parser-cv` over A2A
 `message/send`; the parser returns structured CV data. The selected general,
 data or frontend evaluator receives that CV and the job description and
@@ -155,8 +158,9 @@ Each is something you can see on screen as you build:
 
 ## The agent set
 
-Three Python agent codebases are deployed as seven distinct governed runtimes
-by Session 4. Each session registers only its active capability set:
+Three Python agent codebases supply the following governed runtimes across the
+course. Each session registers only its active capability set; Session 4 omits
+the two specialist CV evaluators to focus on governance of the general one:
 
 | Runtime | Codebase | Capabilities |
 |---|---|---|
@@ -258,8 +262,9 @@ the AOA services and generic EVE bridge around the learner's accepted files.
 Session 4 adds `estate-parser`, enables the plan-governance, agent-evidence,
 and flow-evidence capabilities, and uses the `estate-filesystem` container
 with read-only registry/trace mounts under the same `tool-filesystem` contract.
-It presents three core governance stages plus optional Graph and
-Ask evidence utilities, and sets the planner strategy to deterministic. The
+It uses only the general CV evaluator and presents three core governance stages
+plus optional Graph, Ask and restart-recovery exercises. The planner strategy
+is deterministic; the single compatible CV contract needs no decision call. The
 wiki tool remains explicit in AU tool traces and evidence reports. Optional
 Ollama runs only when the `local` profile is enabled.
 

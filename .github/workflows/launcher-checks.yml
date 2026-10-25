@@ -2,9 +2,9 @@ name: Course launchers
 on:
   push:
     branches: [main]
-    paths: ['.env.example', 'scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/agents-eve/runtime/**', 'system/services/planner/**', 'tests/**', '.github/workflows/launcher-checks.yml']
+    paths: ['.env.example', 'scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/agents-eve/runtime/**', 'system/services/planner/**', 'system/services/studio/**', 'tests/**', '.github/workflows/launcher-checks.yml']
   pull_request:
-    paths: ['.env.example', 'scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/agents-eve/runtime/**', 'system/services/planner/**', 'tests/**', '.github/workflows/launcher-checks.yml']
+    paths: ['.env.example', 'scripts/**', 'system/docker-compose*.yml', 'system/services/directory/**', 'system/agents-eve/runtime/**', 'system/services/planner/**', 'system/services/studio/**', 'tests/**', '.github/workflows/launcher-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -41,3 +41,5 @@ jobs:
         run: |
           python -m pip install -r tests/requirements.txt
           python -m pytest -q tests
+      - name: Studio inspection and governance rendering
+        run: node --test tests/*.mjs

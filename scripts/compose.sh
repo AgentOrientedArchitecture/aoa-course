@@ -43,7 +43,7 @@ case "$session" in
     export COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-notes,parser-query,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-promote,evaluator-wiki-query,reporter-cv-fit,reporter-ingest-summary,reporter-answer
     export COURSE_EVALUATOR_ALLOWLIST=evaluator-cv,evaluator-promote,evaluator-wiki-query;;
   4)
-    export COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,parser-estate,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit
+    export COURSE_REGISTRY_ALLOWLIST=tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-query,parser-estate,evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-answer,reporter-agent-evidence,reporter-flow-audit
     export COURSE_EVALUATOR_ALLOWLIST=evaluator-cv,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence;;
 esac
 export COURSE_DIRECTORY_EXPECTED_AUS

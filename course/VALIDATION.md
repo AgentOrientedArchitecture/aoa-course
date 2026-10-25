@@ -22,6 +22,15 @@ records exact models, bindings, content IDs and outage behaviour. The
 preserves the environments, commits and earlier observations; it is historical
 evidence, not setup instructions.
 
+## Session 4 simplification rehearsal
+
+The [25 October Mac rehearsal](validation/2026-10-25-session4/README.md) verified
+the single-evaluator path end to end: wiki-backed rejection, one card edit and
+Directory sync, held output, restart recovery, approval, quarantine, repeated
+review protection and cited flow audit. Missing wiki evidence blocked execution.
+Actual Studio uploads and browser review were also exercised. The record keeps
+the passing controls separate from observed assessment-content errors.
+
 ## Run the checks
 
 Create an isolated Python environment and install `tests/requirements.txt`:

@@ -17,7 +17,7 @@ Follow the four [session walkthroughs](sessions/README.md). Introduce each busin
 1. CV: one complete run, inspect the plan, switch assessment speciality, compare the output with the same generation model.
 2. Wiki: relevant note, irrelevant note, uncertain note. Separate extraction fidelity, semantic judgement and publication.
 3. EVE: native authoring and acceptance, adoption, automatic publication of the AU estate, then an AGNTCY-discovered CV/interview run. Inspect the local approval check and the EVE content ID before its A2A invocation.
-4. Compliance: red card, declared review, exact held result, restart, review, duplicate request, audit.
+4. Compliance: wiki evidence, red general evaluator card, blocked CV run, one card edit and Directory sync, held assessment, human review, audit. Restart recovery and duplicate-request checks are optional extensions.
 
 The existing slide placeholders can still lead into these live examples. The repository's hands-on session numbers are not a proposal to renumber the deck.
 

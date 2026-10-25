@@ -111,6 +111,32 @@ async def _write_upload(upload: Any, suggested_name: str) -> Path:
     return path
 
 
+async def _job_description_text(path: Path) -> str:
+    """Prepare uploaded JD context through the registered document reader.
+
+    This is deterministic input preparation, before planning or application AU
+    execution. The evaluator still receives the original document path.
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        card_response = await client.get(
+            f"{REGISTRY_URL}/find", params={"id": "tool-document-text"}
+        )
+        card_response.raise_for_status()
+        endpoint = card_response.json().get("endpoint")
+        if not endpoint:
+            raise ValueError("document reader has no registered endpoint")
+        response = await client.post(
+            endpoint,
+            params={"capability": "tool-document-text"},
+            json={"trace_id": "studio-job-description", "inputs": {"path": str(path)}},
+        )
+        response.raise_for_status()
+        text = response.json().get("outputs", {}).get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("document reader returned no text")
+        return text
+
+
 # ----------------------------------------------------------------------
 # Upstream SSE fan-in
 # ----------------------------------------------------------------------
@@ -348,9 +374,9 @@ async def reset_wiki() -> JSONResponse:
 async def submit_intent(request: Request) -> JSONResponse:
     """Persist browser payloads to the inbox and submit paths to the planner.
 
-    The browser sends pasted text or uploaded files. The studio writes payloads
-    to ``inbox/`` so the filesystem tool can later read or extract them. Agents
-    only ever see paths — never bytes — from the studio.
+    The browser sends pasted text or uploaded files. Studio writes payloads to
+    ``inbox/`` for the application AUs. CV allocation also receives the supplied
+    assessment emphasis or job-description text, regardless of upload method.
     """
     content_type = request.headers.get("content-type", "")
     files: dict[str, Any] = {}
@@ -429,9 +455,21 @@ async def _submit_cv_fit(
     else:
         jd_path = _write_inbox(jd_text, jd_name)
 
+    assessment_emphasis = (inputs.get("allocation_brief") or "").strip()
+    if not assessment_emphasis and files.get("jd_file"):
+        try:
+            jd_text = await _job_description_text(jd_path)
+        except (httpx.HTTPError, ValueError):
+            return JSONResponse(
+                {"error": "Could not read the uploaded job description for AU selection. "
+                 "Check that the document reader is running, or paste the job description "
+                 "as text. No plan has been submitted."},
+                status_code=422,
+            )
+
     planner_body = {
         "kind": kind,
-        "selection_context": inputs.get("allocation_brief") or jd_text[:16000] or "Assess CV fit against the supplied job description",
+        "selection_context": assessment_emphasis or jd_text[:16000],
         "use_context": {
             "domain": "employment",
             "data_subjects": ["candidates"],

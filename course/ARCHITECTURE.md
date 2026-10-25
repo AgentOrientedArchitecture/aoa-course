@@ -64,7 +64,7 @@ Before application invocation, the deterministic governance evaluator checks the
 
 Review binds to the exact result digest and requires notes. Approval releases the same payload; rejection quarantines it. Snapshot and review/release events commit in one SQLite transaction. An identical retry returns the recorded outcome; a conflicting review is rejected. JSONL is regenerated from the stored events for the original audit tools.
 
-A restart during execution marks the case interrupted. The implementation cannot know whether an external effect occurred, so it does not automatically replay that invocation. The course uses a single planner process, not a distributed workflow engine or Cloudflare Durable Objects deployment. Its configured reviewer ID is a classroom actor label, not authenticated reviewer identity. Continue with the [durable case exercise](sessions/session-04-compliance/WALKTHROUGH.md).
+A restart during execution marks the case interrupted. The implementation cannot know whether an external effect occurred, so it does not automatically replay that invocation. The course uses a single planner process, not a distributed workflow engine or Cloudflare Durable Objects deployment. Its configured reviewer ID is a classroom actor label, not authenticated reviewer identity. The [Session 4 walkthrough](sessions/session-04-compliance/WALKTHROUGH.md) teaches wiki-backed governance first and offers restart recovery as an optional extension.
 
 ## What changes between sessions
 
@@ -73,9 +73,9 @@ A restart during execution marks the case interrupted. The implementation cannot
 | 1 · CV | Hybrid LLM proposal with recorded fallback | Contract checks then decision model when several eligible | General/data/frontend evaluator choice | Normal completion; saved case and trace |
 | 2 · wiki | Hybrid LLM proposal with recorded fallback | Same allocation path | Decision-powered promotion and wiki tools | Conditional publication; saved case and trace |
 | 3 · EVE | Fixed course plan | Same allocation path after adoption | Real EVE runtime, adoption bridge, AGNTCY AU discovery | Interview questions; saved case and trace |
-| 4 · compliance | Fixed course plan | Same allocation path, followed by governance eligibility | Evidence AUs and exact-result review | Held employment result, release/quarantine and restart recovery |
+| 4 · compliance | Fixed course plan | One compatible CV evaluator; contract checks and governance eligibility | Evidence AUs and exact-result review | Held employment result, release/quarantine and restart recovery |
 
-Sessions 3 and 4 deliberately fix task planning to keep attention on adoption and governance. They can still use TypeSafe for AU allocation. `PLANNER_STRATEGY`, `ALLOCATION_MODE` and `DURABLE_CASES` control different things; inspect `/healthz` rather than inferring behaviour from a single model setting.
+Sessions 3 and 4 deliberately fix task planning to keep attention on adoption and governance. Session 3 can still use the decision model for specialist AU allocation. Session 4 exposes only the general CV evaluator; the sole eligible contract is selected without a model call. `PLANNER_STRATEGY`, `ALLOCATION_MODE` and `DURABLE_CASES` control different things; inspect `/healthz` rather than inferring behaviour from a single model setting.
 
 ## Files that explain the implementation
 

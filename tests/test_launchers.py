@@ -107,7 +107,9 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
                 self.assert_current(row)
                 self.assertIn(f'session{session}', row['argv'])
                 self.assertEqual(row['argv'][-3:], ['--wait', '--wait-timeout', '90'])
-                self.assertIn('evaluator-cv-data', row['registry'])
+                cv_evaluators = {value for value in row['registry'].split(',') if value.startswith('evaluator-cv')}
+                self.assertEqual(cv_evaluators, {'evaluator-cv'} if session == 4 else
+                                 {'evaluator-cv', 'evaluator-cv-data', 'evaluator-cv-frontend'})
                 self.assertEqual(row['discovery'], 'agntcy' if session == 4 else 'local')
                 self.assertEqual(row['governance'], 'evaluator-plan-governance' if session == 4 else '')
                 self.assertEqual(row['workflows'], {1:'cv-fit', 2:'cv-fit,knowledge-ingest,wiki-graph,knowledge-query', 4:'agent-card-check,cv-fit,flow-audit,wiki-graph,knowledge-query'}[session])
@@ -180,6 +182,8 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertEqual(rows[2]['argv'][-1], 'eve-workshop-native')
         self.assertEqual(rows[2]['discovery'], 'agntcy')
         self.assertEqual(rows[2]['workflows'], 'cv-fit,cv-fit-interview')
+        self.assertIn('evaluator-cv-data', rows[2]['registry'].split(','))
+        self.assertIn('evaluator-cv-frontend', rows[2]['registry'].split(','))
         self.assertFalse((self.root/'system/agents-eve/workshop/capability-card.yaml').exists())
 
     def test_failed_build_never_enters_workshop(self):
