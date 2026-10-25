@@ -133,13 +133,14 @@ Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE cap
 | Host port 8890 is already in use | Stop the old host Directory daemon or identify the existing container; do not run two daemons on the same data |
 | Browser port 8891 is already in use | Set `COURSE_DIRECTORY_UI_PORT` to a free host port before `directory.sh up` or `directory.bat up`, then browse that port |
 | CLI finds the record but the catalogue does not | Plain OASF records without a recognised integration module are not projected into the v1.8.0 catalogue; inspect the pulled JSON |
+| Automatic publication is not ready | Read the reported capability/error; inspect `logs.sh directory-bridge` or `logs.bat directory-bridge`. Check that each running AU exposes its A2A Agent Card and has a reviewed OASF skill mapping |
 | Search is initially empty | Allow indexing to finish; retrieve using the returned content ID |
 | Registry connection fails | Run the adopted AOA session or the registry-only command above, in the same checkout/project |
 | A file cannot be found | Helper paths are relative to `.course-data`; use the filename, not a Windows host path |
 | A contract comparison fails | Inspect the fields and whether the record predates a card edit; publish a newly reviewed record rather than changing the digest to hide the difference |
 | Matching record but no working result | Check runtime health, model access, local selection and the actual EVE reply |
 
-The raw CLI remains available through `directory.sh cli ...` and `directory.bat cli ...`. Keep record paths relative to `.course-data`. All active AUs can be published with their precise purpose and actual A2A skills. Only parser/interviewer capabilities currently have reviewed OASF skill mappings; the others explicitly carry `aoa/taxonomy-mapping: not-yet-mapped` and an empty OASF skill list. No performance or taxonomy equivalence is invented.
+The raw CLI remains available through `directory.sh cli ...` and `directory.bat cli ...`. Keep record paths relative to `.course-data`. All active AUs are published with their precise purpose, actual A2A skills and an explicit OASF v1.0.0 mapping. OASF requires a non-empty skill list. A new capability needs a reviewed mapping before publication; a taxonomy label is a declaration, not performance evidence.
 
 ## Review questions
 
@@ -148,3 +149,21 @@ The raw CLI remains available through `directory.sh cli ...` and `directory.bat 
 - Does a matching contract hash prove the runtime behaves as declared?
 
 This lab covers a real local publish/discover round trip and local comparison. Federation, verified identity, SLIM and AGNTCY observability remain later course extensions. Primary references: [Directory local deployment](https://dir.agntcy.org/latest/dir/dir-deployment-local/) and [container CLI quickstart](https://dir.agntcy.org/latest/dir/dir-quickstart/).
+
+## OASF skill mappings
+
+The exporter retains each AU's specific purpose and A2A skill ID. Its broader OASF v1.0.0 taxonomy mapping is:
+
+| Course capability | Declared OASF skill | ID |
+|---|---|---|
+| Parsers | Fact extraction | 10301 |
+| EVE interviewer | Question generation | 10205 |
+| CV evaluators, including specialists | Natural language inference (relationship between CV evidence and role requirements) | 10903 |
+| Wiki promotion evaluator | Quality evaluation | 1103 |
+| Wiki query evaluator | Document and passage retrieval | 10305 |
+| Governance/evidence evaluators | Compliance assessment of the bounded course declarations, plan or trace | 1302 |
+| Grounded answer reporter | Question answering | 10302 |
+| CV, ingest and agent-evidence reporters | Text summarisation | 10202 |
+| Flow audit reporter | Audit trail summarisation | 1303 |
+
+These are course mappings to the [pinned taxonomy](https://github.com/agntcy/oasf/tree/v1.0.0/schema/skills), checked against its released JSON schemas, for example [natural language inference](https://schema.oasf.outshift.com/schema/1.0.0/skills/natural_language_inference). A broad taxonomy label does not replace the precise task contract or establish measured competence. The governance label does not confer legal compliance or certification.

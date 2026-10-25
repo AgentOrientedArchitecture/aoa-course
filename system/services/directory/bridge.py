@@ -90,7 +90,8 @@ def sync_once():
                     published[card['id']] = {'digest': digest, 'cid': cid}
                 results.append({'capability': card['id'], 'cid': published[card['id']]['cid']})
             except Exception as exc:
-                errors.append({'capability': card['id'], 'error': type(exc).__name__})
+                detail = exc.stderr.strip()[-1500:] if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+                errors.append({'capability': card['id'], 'error': type(exc).__name__, 'detail': detail})
         expected = set(os.getenv('COURSE_DIRECTORY_EXPECTED_AUS', '').split(',')) - {''}
         missing = sorted(expected - {row['capability'] for row in results})
         status = {'published': results, 'errors': errors, 'missing': missing,
@@ -99,11 +100,13 @@ def sync_once():
 
 
 async def publisher():
+    global status
     while True:
         try:
             await asyncio.to_thread(sync_once)
         except Exception as exc:
             logging.warning('Directory publication unavailable: %s', type(exc).__name__)
+            status = {**status, 'ready': False, 'errors': [{'error': type(exc).__name__}]}
         await asyncio.sleep(5)
 
 
@@ -132,6 +135,11 @@ def sync(wait: int = 0):
     while True:
         try:
             result = sync_once()
+            if result['ready']:
+                indexed = {item['cid'] for item in records()}
+                waiting = [row['capability'] for row in result['published'] if row['cid'] not in indexed]
+                if waiting:
+                    result = {**result, 'ready': False, 'waiting_for_index': waiting}
         except Exception as exc:
             result = {'ready': False, 'error': type(exc).__name__}
         if result['ready']:

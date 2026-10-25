@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Real local AGNTCY Directory; discovery never mutates AOA acceptance state."""
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +14,24 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = Path(os.getenv('COURSE_DIRECTORY_CLI', str(ROOT / '.course-tools/dirctl-1.8.0')))
 sys.path.insert(0, str(ROOT / 'system/services/planner'))
 from directory_contract import fingerprint, binding_fingerprint
+
+# Exact IDs/names checked against schema.oasf.outshift.com/schema/1.0.0/skills/.
+# These describe the bounded job, not measured quality or legal certification.
+SKILL_MAPPINGS = {
+    'evaluator-cv': (10903, 'natural_language_processing/text_classification/natural_language_inference'),
+    'evaluator-cv-data': (10903, 'natural_language_processing/text_classification/natural_language_inference'),
+    'evaluator-cv-frontend': (10903, 'natural_language_processing/text_classification/natural_language_inference'),
+    'evaluator-promote': (1103, 'evaluation_monitoring/quality_evaluation'),
+    'evaluator-wiki-query': (10305, 'natural_language_processing/information_retrieval_synthesis/document_passage_retrieval'),
+    'evaluator-agent-evidence': (1302, 'governance_compliance/compliance_assessment'),
+    'evaluator-flow-evidence': (1302, 'governance_compliance/compliance_assessment'),
+    'evaluator-plan-governance': (1302, 'governance_compliance/compliance_assessment'),
+    'reporter-answer': (10302, 'natural_language_processing/information_retrieval_synthesis/question_answering'),
+    'reporter-cv-fit': (10202, 'natural_language_processing/natural_language_generation/summarization'),
+    'reporter-ingest-summary': (10202, 'natural_language_processing/natural_language_generation/summarization'),
+    'reporter-agent-evidence': (10202, 'natural_language_processing/natural_language_generation/summarization'),
+    'reporter-flow-audit': (1303, 'governance_compliance/audit_trail_summarization'),
+}
 
 
 def registry_card(identifier):
@@ -30,10 +47,11 @@ def export_record(card, agent_card=None):
         skill = {'id': 10205, 'name': 'natural_language_processing/natural_language_generation/question_generation'}
     elif card['id'].startswith('parser-'):
         skill = {'id': 10301, 'name': 'natural_language_processing/information_retrieval_synthesis/fact_extraction'}
+    elif card['id'] in SKILL_MAPPINGS:
+        identifier, name = SKILL_MAPPINGS[card['id']]
+        skill = {'id': identifier, 'name': name}
     else:
-        # Other AUs retain their precise purpose and A2A skills. Do not invent
-        # an OASF taxonomy equivalence for an unreviewed course capability.
-        skill = None
+        raise ValueError('Review an OASF v1.0.0 skill mapping before publishing this new capability')
     modules = []
     if agent_card is not None:
         if agent_card.get('url') != card.get('a2a_endpoint') or not any(
@@ -47,10 +65,10 @@ def export_record(card, agent_card=None):
         'version': card.get('version', '0.1.0'), 'authors': ['AOA course workshop'],
         'description': card['purpose'].strip(),
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'skills': [skill] if skill else [], 'domains': [], 'modules': modules,
+        'skills': [skill], 'domains': [], 'modules': modules,
         'annotations': {'aoa/capability-id': card['id'], 'aoa/contract-sha256': fingerprint(card),
                         'aoa/binding-sha256': binding_fingerprint(card),
-                        'aoa/taxonomy-mapping': 'reviewed' if skill else 'not-yet-mapped',
+                        'aoa/taxonomy-mapping': 'course-reviewed-declaration-not-performance-evidence',
                         'aoa/acceptance': 'Directory discovery is not local execution approval.'},
     }
 
@@ -92,8 +110,12 @@ def main():
     if args.command == 'sync':
         url = os.getenv('COURSE_DIRECTORY_BRIDGE_URL', 'http://directory-bridge:8892') + '/sync?wait=' + str(args.wait)
         request = urllib.request.Request(url, data=b'', method='POST')
-        with urllib.request.urlopen(request, timeout=max(30, args.wait + 10)) as response:
-            print(json.dumps(json.load(response), indent=2))
+        try:
+            with urllib.request.urlopen(request, timeout=max(30, args.wait + 10)) as response:
+                print(json.dumps(json.load(response), indent=2))
+        except urllib.error.HTTPError as exc:
+            print('Directory publication is not ready: ' + exc.read().decode(), file=sys.stderr)
+            raise SystemExit(1) from exc
         return
     if args.command == 'pull':
         if bool(args.cid) == bool(args.cid_file):

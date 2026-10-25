@@ -95,6 +95,7 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
     const discovery = records.find(r => r.step === 'directory-discovery');
     const unavailable = records.find(r => r.step === 'directory-unavailable');
     const discoveryHtml = discovery ? `<p class="inspection-notice">AU discovery: AGNTCY Directory. ${discovery.accepted.length} current, locally adopted AUs matched retrieved OASF records.</p>
+      ${discovery.missing_current_publication?.length ? `<p class="inspection-warning">Missing or stale publication: ${esc(discovery.missing_current_publication.join(', '))}. No AU was invoked. Wait for publication or run Directory sync.</p>` : ''}
       <details><summary>Published records and local adoption checks</summary>${discovery.accepted.map(row=>`<p><strong>${esc(row.capability)}</strong><br>Content ID: <code>${esc(row.cid)}</code></p>`).join('')}${detail('Complete discovery evidence', discovery)}</details>`
       : unavailable ? '<p class="inspection-warning">AGNTCY Directory is unavailable. This run did not fall back to local AU discovery.</p>'
       : records.length ? '<p class="inspection-muted">This trace does not record AGNTCY discovery; earlier sessions use the local registry.</p>' : '';

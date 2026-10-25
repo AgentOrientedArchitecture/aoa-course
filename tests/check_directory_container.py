@@ -5,6 +5,7 @@ the same check can run on an Apple Silicon teaching laptop.
 """
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -26,13 +27,16 @@ def main():
         fixture = temp / 'registry.yml'
         agent = temp / 'agent'
         agent.mkdir()
+        identifiers = ['interviewer-questions'] + [re.search(r'^id:\s*(\S+)', path.read_text(), re.M).group(1)
+                      for path in (ROOT / 'system/agents').glob('*/capabilities/*/capability-card.yaml')]
+        env['COURSE_DIRECTORY_EXPECTED_AUS'] = ','.join(identifiers)
         (agent / 'agent-card.json').write_text(json.dumps({
             'protocolVersion': '0.3.0', 'name': 'synthetic-course-au', 'description': 'Synthetic integration fixture',
             'url': 'http://agent-fixture:8888/a2a', 'version': '0.1.0',
             'capabilities': {'streaming': False}, 'defaultInputModes': ['application/json'],
             'defaultOutputModes': ['application/json'],
             'skills': [{'id': name, 'name': name, 'description': 'Synthetic integration fixture', 'tags': ['test']}
-                       for name in ('interviewer-questions', 'evaluator-test')]}))
+                       for name in identifiers]}))
         fixture.write_text(json.dumps({'services': {'registry': {
             'build': {'context': str(ROOT / 'system/services/registry')},
             'environment': {'REGISTRY_DATA_DIR': '/data'},
@@ -42,6 +46,7 @@ def main():
                 'interval': '2s', 'timeout': '3s', 'retries': 30}},
             'agent-fixture': {'image': 'python:3.12-slim', 'command': ['python', '-m', 'http.server', '8888', '--directory', '/fixture'],
                               'volumes': [str(agent) + ':/fixture:ro']},
+            'agntcy-directory': {'volumes': [str(ROOT / 'system/agents') + ':/fixture-agents:ro']},
             'directory-bridge': {'ports': ['127.0.0.1:18892:8892']}}}))
         compose = ['docker', 'compose', '-f', str(ROOT / 'system/docker-compose.directory.yml'), '-f', str(fixture)]
 
@@ -56,7 +61,7 @@ def main():
 
         try:
             run([*compose, 'up', '--build', '-d', '--wait', 'registry'])
-            lab('up')
+            run([*compose, '--profile', 'directory', 'up', '--build', '-d', '--wait', 'agntcy-directory'])
             print('Real Directory daemon and isolated course registry are healthy.', flush=True)
             with urllib.request.urlopen('http://127.0.0.1:18891/', timeout=10) as response:
                 page = response.read().decode()
@@ -99,12 +104,24 @@ urllib.request.urlopen(request,timeout=10).read()
             failure = subprocess.run(['bash', str(ROOT / 'scripts/directory.sh'), 'pull', 'invalid-cid', '--out', 'keep.json'],
                                      cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
             assert failure.returncode != 0 and sentinel.read_text() == 'keep existing output'
+            register_all = """
+import json,urllib.request,yaml
+from pathlib import Path
+paths=list(Path('/fixture-agents').glob('*/capabilities/*/capability-card.yaml'))
+assert len(paths) > 10, 'Missing course AU fixtures'
+for path in paths:
+    card=yaml.safe_load(path.read_text())
+    card.update(endpoint='http://fixture.invalid/invoke',a2a_endpoint='http://agent-fixture:8888/a2a',agent_card_url='http://agent-fixture:8888/agent-card.json')
+    request=urllib.request.Request('http://registry:7100/register',data=json.dumps(card).encode(),headers={'Content-Type':'application/json'})
+    urllib.request.urlopen(request,timeout=10).read()
+"""
+            run([*compose, 'exec', '-T', 'agntcy-directory', 'python', '-c', register_all])
             run([*compose, '--profile', 'directory', 'up', '-d', '--wait', 'agent-fixture', 'directory-bridge'])
-            sync = json.loads(lab('sync', '--wait', '30'))
-            assert sync['ready'] and sync['published'][0]['capability'] == 'interviewer-questions', sync
-            published_cid = sync['published'][0]['cid']
+            sync = json.loads(lab('sync', '--wait', '120'))
+            assert sync['ready'] and {row['capability'] for row in sync['published']} == set(identifiers), sync
+            published_cid = next(row['cid'] for row in sync['published'] if row['capability'] == 'interviewer-questions')
             # Publication is idempotent and visible in the actual upstream catalogue.
-            assert json.loads(lab('sync'))['published'][0]['cid'] == published_cid
+            assert json.loads(lab('sync'))['published'] == sync['published']
             for _ in range(30):
                 with urllib.request.urlopen('http://127.0.0.1:18892/records', timeout=30) as response:
                     discovered = json.load(response)['records']
@@ -115,8 +132,10 @@ urllib.request.urlopen(request,timeout=10).read()
                 raise AssertionError('Bridge did not discover its published A2A record')
             published = next(item['record'] for item in discovered if item['cid'] == published_cid)
             assert published['modules'][0]['data']['card_data']['url'] == 'http://agent-fixture:8888/a2a'
-            with urllib.request.urlopen('http://127.0.0.1:18891/v1/agents', timeout=10) as response:
-                assert 'aoa-course/interviewer-questions' in response.read().decode()
+            with urllib.request.urlopen('http://127.0.0.1:18891/v1/agents?page_size=100', timeout=10) as response:
+                catalogue = response.read().decode()
+                for identifier in identifiers:
+                    assert 'aoa-course/' + identifier in catalogue, identifier
             lab('stop')
             try:
                 urllib.request.urlopen('http://127.0.0.1:18892/records', timeout=40)
