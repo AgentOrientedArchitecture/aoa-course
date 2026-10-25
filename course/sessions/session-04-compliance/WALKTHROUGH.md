@@ -74,25 +74,56 @@ If AU allocation itself is held, resolve that first using its recorded reason.
 A missing Directory publication or an unavailable decision provider is not the
 same outcome as governance rejecting the selected card.
 
-### Add the declaration to the selected card
+### Edit the capability card for the evaluator this run selected
 
-Use the binding recorded for this run, not an assumed evaluator:
+The exercise is to declare that a CV assessment is a draft until a human has
+reviewed it. You make this change in a YAML file in your checked-out repository,
+using your text editor. Studio displays the card; it does not edit the file.
 
-| Accepted evaluator | File under `system/agents/evaluator/capabilities/` |
+First identify which evaluator the planner chose for the CV fit run you just
+submitted:
+
+1. In Studio, open **AU selection**.
+2. Select the task **evaluate cv fit**, then **Accepted binding**.
+3. Read the capability ID on the **right** of the arrow. For example,
+   `evaluate-cv-fit → evaluator-cv-data` means the data specialist was selected.
+
+Here, “binding” just means **the AU assigned to that task**. Accepted selection
+does not mean governance allowed it to execute. At this point, the missing
+declaration should have stopped application work.
+
+Open the file that matches that ID. These paths start at your repository root:
+
+| Selected capability ID | File to open |
 | --- | --- |
-| `evaluator-cv` | `cv/capability-card.yaml` |
-| `evaluator-cv-data` | `cv-data/capability-card.yaml` |
-| `evaluator-cv-frontend` | `cv-frontend/capability-card.yaml` |
+| `evaluator-cv` | `system/agents/evaluator/capabilities/cv/capability-card.yaml` |
+| `evaluator-cv-data` | `system/agents/evaluator/capabilities/cv-data/capability-card.yaml` |
+| `evaluator-cv-frontend` | `system/agents/evaluator/capabilities/cv-frontend/capability-card.yaml` |
 
-In that file, add this item under `constraints`, matching the existing list's
-indentation:
+Find the existing `constraints:` section. Keep its existing entries and add
+the final line shown below, with **two spaces before the dash**. Save the file.
+Use the sentence as written: the course check looks for this explicit
+review-before-use declaration.
 
 ```yaml
-- Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
+constraints:
+  - The output is a single JSON object.
+  - scores is an object whose values are integers from 1 to 5.
+  - verdict is one of "strong", "fit", "weak", "no".
+  - strengths and gaps are arrays of short strings.
+  - rationale is one paragraph summarising the verdict.
+  - Every verdict is a draft and must be approved by a human reviewer before it informs candidate screening, interview, or employment action.
 ```
 
-The card hot-reloads into the local registry. Republish and verify the changed
-binding before submitting another plan:
+This updates the AU's declared contract. It does not itself add a human-review
+mechanism: the planner already implements the hold-and-review control you will
+test in stage 2.
+
+The saved card automatically reloads into the local registry. In Studio, open
+**Capability cards**, select that evaluator and wait until **Declared
+constraints** includes the new sentence. Then run the command below from your repository root to publish the
+updated contract to AGNTCY. New plans require the published record to match the
+local card:
 
 macOS or Linux:
 
@@ -112,6 +143,9 @@ the required declaration was observed. It does not prove that the control works
 or that the system is legally compliant. Recheck the accepted binding on each
 CV run: if allocation chooses a different evaluator, its own card must carry
 the declaration too.
+
+The earlier rejected run remains as evidence. Submit a new CV fit run in the
+next stage; editing a card does not resume a rejected run.
 
 ## 2. Recover and review the actual CV result
 
