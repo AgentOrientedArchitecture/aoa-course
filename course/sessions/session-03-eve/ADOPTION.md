@@ -115,13 +115,13 @@ Repository links below work in GitHub or an editor; Studio only serves the learn
 | Responsibility | File |
 |---|---|
 | Pinned third-party dependencies | [`runtime/package.json`](../../../system/agents-eve/runtime/package.json) and its lockfile |
-| Learner/runtime mounts and endpoints | [`docker-compose.session3-lab.yml`](../../../system/docker-compose.session3-lab.yml) |
+| Learner/runtime mounts and endpoints | [`docker-compose.yml`](../../../system/docker-compose.yml) |
 | Generic adoption entry point | [`generic-boot.mjs`](../../../system/agents-eve/runtime/adapter/generic-boot.mjs) |
 | A2A translation, output parsing and signals | [`serve.mjs`](../../../system/agents-eve/runtime/adapter/serve.mjs) |
 | Real EVE process and client/session calls | [`eve.mjs`](../../../system/agents-eve/runtime/adapter/eve.mjs) |
 | Card stamping and registry publication | [`card.mjs`](../../../system/agents-eve/runtime/adapter/card.mjs), [`registry.mjs`](../../../system/agents-eve/runtime/adapter/registry.mjs) |
 | Interviewer contract | [`interviewer-questions.yaml`](../../../system/agents-eve/runtime/templates/interviewer-questions.yaml) |
-| Pinned Directory container and persistent data | [`Dockerfile`](../../../system/services/directory/Dockerfile), [`docker-compose.directory.yml`](../../../system/docker-compose.directory.yml) |
+| Pinned Directory container and persistent data | [`Dockerfile`](../../../system/services/directory/Dockerfile), [`docker-compose.yml`](../../../system/docker-compose.yml) |
 | Cross-platform Directory commands | [`directory.sh`](../../../scripts/directory.sh), [`directory.bat`](../../../scripts/directory.bat) |
 | Optional native-host Directory installation | [`directory-install.sh`](../../../scripts/directory-install.sh) |
 | OASF export, CLI calls and local comparison | [`directory-lab.py`](../../../scripts/directory-lab.py) |

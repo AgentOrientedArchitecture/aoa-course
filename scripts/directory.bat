@@ -11,7 +11,7 @@ set EXTRA_ARGS=%EXTRA_ARGS% "%~1"
 shift /1
 goto args
 :dispatch
-set "COMPOSE=docker compose -f system/docker-compose.directory.yml --profile directory"
+set "COMPOSE=docker compose -f system/docker-compose.yml --profile directory"
 if /I "%MODE%"=="up" goto up
 if /I "%MODE%"=="start" goto up
 if /I "%MODE%"=="stop" goto stop

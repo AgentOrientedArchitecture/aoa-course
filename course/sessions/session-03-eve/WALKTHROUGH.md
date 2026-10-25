@@ -104,7 +104,7 @@ function baseUrl(): string {
 const provider = createOpenAI({
   baseURL: baseUrl(),
   // Inside the workshop containers Compose supplies OPENAI_API_KEY from your
-  // .env's AOA_OPENAI_API_KEY, so the course key arrives here even though
+  // .env's CEREBRAS_API_KEY (or AOA_OPENAI_API_KEY for other providers), though
   // .env leaves OPENAI_API_KEY itself blank. Local endpoints need no key.
   apiKey: process.env.OPENAI_API_KEY || "not-needed-for-local",
 });
@@ -127,8 +127,9 @@ containers receive `MODEL`, `OPENAI_BASE_URL`, `OLLAMA_HOST`, and (mapped from
 
 | Your `.env` | What the agent uses |
 | --- | --- |
-| `.env.sambanova` / `.env.nvidia` | `OPENAI_BASE_URL` + your `AOA_OPENAI_API_KEY`, model from `MODEL`. |
-| `.env.ollama` (host Ollama) | `OLLAMA_HOST` (`http://host.docker.internal:11434`) + `/v1`, no key. |
+| Cerebras (default) | `OPENAI_BASE_URL` + `CEREBRAS_API_KEY`, mapped into the container as `OPENAI_API_KEY`. |
+| Another OpenAI-compatible provider | `OPENAI_BASE_URL` + your `AOA_OPENAI_API_KEY`, model from `MODEL`. |
+| Local option in `.env` (host Ollama) | `OLLAMA_HOST` (`http://host.docker.internal:11434`) + `/v1`, no key. |
 | Container Ollama (`AOA_LOCAL=1`) | `OLLAMA_HOST` (`http://ollama:11434`) + `/v1`, no key. |
 | MLX or another host-served OpenAI endpoint | Set `OPENAI_BASE_URL=http://host.docker.internal:<port>/v1` — `localhost` would point inside the container. |
 
@@ -365,4 +366,4 @@ contract live under `system/agents-eve/workshop/`.
 
 ## Revised course: discover the adopted AU through AGNTCY
 
-With `.env.revised` selected, adoption also starts AGNTCY and publishes the running AU estate with actual A2A Agent Cards. Follow [the Directory walkthrough](DIRECTORY.md#use-agntcy-for-the-running-estate) before the CV/interview run. In Studio, inspect the `directory-discovery` event and the interviewer's content ID before its accepted binding and invocation. The local registry retains adoption/lifecycle authority; it is no longer the sole AU discovery source. Session 4 continues on this path.
+With the current course setup, adoption also starts AGNTCY and publishes the running AU estate with actual A2A Agent Cards. Follow [the Directory walkthrough](DIRECTORY.md#use-agntcy-for-the-running-estate) before the CV/interview run. In Studio, inspect the `directory-discovery` event and the interviewer's content ID before its accepted binding and invocation. The local registry retains adoption/lifecycle authority; it is no longer the sole AU discovery source. Session 4 continues on this path.

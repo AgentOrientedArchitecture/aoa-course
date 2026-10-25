@@ -7,12 +7,12 @@ Read [Adopting EVE with AGNTCY Directory](ADOPTION.md) first. It explains why th
 Keep the existing [EVE walkthrough](WALKTHROUGH.md), including native `eve init`, the authored instructions, native testing and the AOA boundary. Use these revised launchers so the selected model configuration is retained:
 
 ```bash
-./scripts/revised-eve.sh native
+./scripts/session3-up.sh
 # Complete the original native authoring and acceptance checkpoints, then exit.
-./scripts/revised-eve.sh adopt
+./scripts/session3-adopt.sh
 ```
 
-In Windows Command Prompt, use `scripts\revised-eve.bat native`, then `scripts\revised-eve.bat adopt`. The standard `session3-up` and `session3-adopt` launchers also select this revised path when `.env.revised` is present. See the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop).
+In Windows Command Prompt, use `scripts\session3-up.bat`, then `scripts\session3-adopt.bat`. These are the standard course launchers; they use `.env`. See the [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop).
 
 The pinned `eve init` may try to start its default agent before the provider-neutral configuration is added. If it reports a default-model metadata error, continue to the original walkthrough’s `agent.ts` configuration checkpoint, then run `eve dev` again. The revised launcher runs native authoring as the host user so Linux workshop files remain editable.
 

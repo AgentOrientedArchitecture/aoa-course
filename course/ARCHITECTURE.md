@@ -1,6 +1,6 @@
 # How the course system works
 
-This guide describes the **October implementation on `main`**, with `.env.revised` present. Start with the [setup and launcher table](pre-work/01-revised-model-access.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
+This guide describes the **October implementation on `main`**, using the standard `.env` setup. Start with the [setup and launcher table](pre-work/01-revised-model-access.md#start-and-stop), then use this page alongside Studio. The existing technical reference remains in [`system/ARCHITECTURE.md`](../system/ARCHITECTURE.md).
 
 The course builds one estate across four examples: assess a CV, curate a wiki, adopt an EVE interviewer, then review a persistent business result. A capability is a job the system can ask for; an Agentic Unit is the runtime responsible for fulfilling its contract. A model is one possible implementation component inside that boundary.
 
@@ -81,7 +81,7 @@ Sessions 3 and 4 deliberately fix task planning to keep attention on adoption an
 
 | Question | Source |
 |---|---|
-| What starts in each session? | [`revised-compose.sh`](../scripts/revised-compose.sh) and its [Windows counterpart](../scripts/revised-compose.bat); [`docker-compose.revised.yml`](../system/docker-compose.revised.yml) |
+| What starts in each session? | [`compose.sh`](../scripts/compose.sh) and its [Windows counterpart](../scripts/compose.bat); [`docker-compose.yml`](../system/docker-compose.yml) |
 | Where are the task plans and execution loop? | [`planner.py`](../system/services/planner/planner.py) |
 | Where are eligibility, choice and composition checked? | [`allocation.py`](../system/services/planner/allocation.py) |
 | What actually calls TypeSafe or Ollama? | [`decision.py`](../system/services/decision/decision.py) |

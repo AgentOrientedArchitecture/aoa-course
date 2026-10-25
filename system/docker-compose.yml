@@ -1,68 +1,63 @@
-# Course system. Run directly with Docker Compose from the repo root.
-#
-# Session 1 starts only the CV-fit workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session1.yml --profile session1 up --build -d --remove-orphans
-#
-# Session 2 starts the full knowledge-management workflow:
-#   docker compose --env-file .env -f system/docker-compose.yml --profile session2 up --build -d --remove-orphans
-#
-# Session 3 starts the CV-fit workflow plus the EVE-authored interviewer agent:
-#   docker compose --env-file .env -f system/docker-compose.yml -f system/docker-compose.session3.yml --profile session3 up --build -d --remove-orphans
-
+# Current course: one Compose definition, selected by the session launchers.
+# Keep private configuration in the repository-root .env.
 services:
-
-  # ------------------------------------------------------------------
-  # Services
-  # ------------------------------------------------------------------
   registry:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./services/registry
     image: aoa-course/registry:latest
     container_name: aoa-registry
     ports:
-      - "7100:7100"
+    - 7100:7100
     volumes:
-      - ./services/registry/data:/data
+    - ./services/registry/data:/data
     environment:
       REGISTRY_DATA_DIR: /data
-      REGISTRY_CARD_ALLOWLIST: >-
-        tool-filesystem,tool-document-text,tool-wiki-store,
-        parser-cv,parser-notes,parser-query,
-        evaluator-cv,evaluator-promote,evaluator-wiki-query,
-        reporter-cv-fit,reporter-ingest-summary,reporter-answer
+      REGISTRY_CARD_ALLOWLIST: ${COURSE_REGISTRY_ALLOWLIST:-tool-filesystem,tool-document-text,tool-wiki-store,parser-cv,parser-notes,parser-query,parser-estate,evaluator-cv,evaluator-cv-data,evaluator-cv-frontend,evaluator-promote,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence,reporter-cv-fit,reporter-ingest-summary,reporter-answer,reporter-agent-evidence,reporter-flow-audit,interviewer-questions}
       REGISTRY_PUBLISHER_AGENT_ID: ${REGISTRY_PUBLISHER_AGENT_ID:-urn:aoa:role:platform-team-publisher}
       REGISTRY_APPROVER_AGENT_ID: ${REGISTRY_APPROVER_AGENT_ID:-urn:aoa:role:risk-curator-approver}
       REGISTRY_REVIEWER_AGENT_ID: ${REGISTRY_REVIEWER_AGENT_ID:-urn:aoa:role:registry-reviewer}
       REGISTRY_DEFAULT_LIFECYCLE_STATUS: ${REGISTRY_DEFAULT_LIFECYCLE_STATUS:-approved}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7100/healthz', timeout=2).status == 200 else 1)"]
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7100/healthz', timeout=2).status
+        == 200 else 1)
       interval: 5s
       timeout: 3s
       retries: 20
-
   planner:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./services/planner
     image: aoa-course/planner:latest
     container_name: aoa-planner
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "7200:7200"
+    - 7200:7200
     volumes:
-      - ./services/planner/traces:/data/traces
+    - ./services/planner/traces:/data/traces
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_TRACES_DIR: /data/traces
       PLANNER_INVOKE_TIMEOUT: ${PLANNER_INVOKE_TIMEOUT:-300}
-      PLANNER_STRATEGY: ${PLANNER_STRATEGY:-hybrid}
+      PLANNER_STRATEGY: ${COURSE_PLANNER_STRATEGY:-${PLANNER_STRATEGY:-hybrid}}
       PLANNER_MODEL_TIMEOUT_SECONDS: ${PLANNER_MODEL_TIMEOUT_SECONDS:-60}
       PLANNER_MODEL_MAX_TOKENS: ${PLANNER_MODEL_MAX_TOKENS:-2048}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
@@ -70,45 +65,59 @@ services:
       OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
       OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
       OLLAMA_THINK: ${OLLAMA_THINK:-false}
+      DECISION_URL: http://decision:7250
+      DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
+      DECISION_MIN_PROBABILITY: ${DECISION_MIN_PROBABILITY:-0.65}
+      DECISION_ALLOW_UNSCORED: ${DECISION_ALLOW_UNSCORED:-false}
+      ALLOCATION_MODE: decision
+      DISCOVERY_BACKEND: ${COURSE_DISCOVERY_BACKEND:-local}
+      DIRECTORY_BRIDGE_URL: http://directory-bridge:8892
+      DURABLE_CASES: 'true'
+      CASE_DB_PATH: /data/traces/cases.sqlite3
+      PLAN_GOVERNANCE_CAPABILITY: ${COURSE_PLAN_GOVERNANCE_CAPABILITY:-}
     depends_on:
       registry:
         condition: service_healthy
-
   studio:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./services/studio
     image: aoa-course/studio:latest
     container_name: aoa-studio
     ports:
-      - "8080:8080"
+    - 8080:8080
     volumes:
-      - ./inbox:/data/inbox
+    - ./inbox:/data/inbox
+    - ../course:/data/course:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
       INBOX_DIR: /data/inbox
       PLANNER_REQUEST_TIMEOUT: ${PLANNER_REQUEST_TIMEOUT:-420}
-      STUDIO_WORKFLOWS: ${STUDIO_WORKFLOWS:-cv-fit,knowledge-ingest,wiki-graph,knowledge-query}
+      STUDIO_WORKFLOWS: ${COURSE_STUDIO_WORKFLOWS:-cv-fit,knowledge-ingest,wiki-graph,knowledge-query}
+      AOA_REVISED: 'true'
+      DISCOVERY_BACKEND: ${COURSE_DISCOVERY_BACKEND:-local}
+      STUDIO_ALLOW_WIKI_RESET: ${COURSE_ALLOW_WIKI_RESET:-true}
     depends_on:
       registry:
         condition: service_healthy
       planner:
         condition: service_started
-
-  # ------------------------------------------------------------------
-  # Tools
-  # ------------------------------------------------------------------
   tool-filesystem:
-    profiles: ["session2", "session4"]
+    profiles:
+    - session2
     build:
       context: ./tools/filesystem
     image: aoa-course/tool-filesystem:latest
     container_name: aoa-tool-filesystem
     ports:
-      - "7401:7401"
+    - 7401:7401
     volumes:
-      - ./inbox:/data/inbox:ro
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-filesystem
@@ -117,17 +126,20 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-
   tool-document-text:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./tools/document-text
     image: aoa-course/tool-document-text:latest
     container_name: aoa-tool-document-text
     ports:
-      - "7402:7402"
+    - 7402:7402
     volumes:
-      - ./inbox:/data/inbox:ro
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-document-text
@@ -136,18 +148,19 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-
   tool-wiki-store:
-    profiles: ["session2", "session4"]
+    profiles:
+    - session2
+    - session4
     build:
       context: ./tools/wiki-store
     image: aoa-course/tool-wiki-store:latest
     container_name: aoa-tool-wiki-store
     ports:
-      - "7403:7403"
+    - 7403:7403
     volumes:
-      - ./wiki:/data/wiki
-      - ./inbox:/data/inbox:ro
+    - ./wiki:/data/wiki
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       TOOL_HOST: tool-wiki-store
@@ -157,26 +170,24 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-
-  # ------------------------------------------------------------------
-  # Agents
-  # ------------------------------------------------------------------
   cv-parser:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-cv-parser
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "7301:8888"
+    - 7301:8888
     volumes:
-      # capabilities/ is mounted (not COPYed) so editing instructions.md on the
-      # host triggers the in-container hot reload.
-      - ./agents/parser/capabilities:/app/capabilities:ro
-      - ./inbox:/data/inbox:ro
+    - ./agents/parser/capabilities:/app/capabilities:ro
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -187,7 +198,7 @@ services:
       CAPABILITY_ALLOWLIST: parser-cv
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
@@ -202,23 +213,22 @@ services:
         condition: service_healthy
       tool-document-text:
         condition: service_started
-
   wiki-parser:
-    profiles: ["session2", "session4"]
+    profiles:
+    - session2
+    - session4
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-wiki-parser
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "7304:8888"
+    - 7304:8888
     volumes:
-      # Same parser code and mounted capability tree as cv-parser; the
-      # allowlist plus AGENT_ID make this a separate governed runtime.
-      - ./agents/parser/capabilities:/app/capabilities:ro
-      - ./inbox:/data/inbox:ro
+    - ./agents/parser/capabilities:/app/capabilities:ro
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -229,7 +239,7 @@ services:
       CAPABILITY_ALLOWLIST: parser-notes,parser-query
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
@@ -244,23 +254,20 @@ services:
         condition: service_healthy
       tool-document-text:
         condition: service_started
-
   estate-parser:
-    profiles: ["session4"]
+    profiles:
+    - session4
     build:
       context: ./agents
       dockerfile: parser/Dockerfile
     image: aoa-course/parser:latest
     container_name: aoa-estate-parser
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "7306:8888"
+    - 7306:8888
     volumes:
-      # Same parser code and capability tree as cv-parser / wiki-parser; the
-      # allowlist plus AGENT_ID make this a separate governed runtime that
-      # inventories the estate's own governance artefacts.
-      - ./agents/parser/capabilities:/app/capabilities:ro
+    - ./agents/parser/capabilities:/app/capabilities:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -271,7 +278,7 @@ services:
       CAPABILITY_ALLOWLIST: parser-estate
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
@@ -284,23 +291,26 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-      tool-filesystem:
+      estate-filesystem:
         condition: service_started
-
   evaluator:
-    profiles: ["session1", "session2", "session3", "session4"]
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./agents
       dockerfile: evaluator/Dockerfile
     image: aoa-course/evaluator:latest
     container_name: aoa-evaluator
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+    - host.docker.internal:host-gateway
     ports:
-      - "7302:8888"
+    - 7302:8888
     volumes:
-      - ./agents/evaluator/capabilities:/app/capabilities:ro
-      - ./inbox:/data/inbox:ro
+    - ./agents/evaluator/capabilities:/app/capabilities:ro
+    - ./inbox:/data/inbox:ro
     environment:
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
@@ -308,13 +318,255 @@ services:
       AGENT_NAME: evaluator
       AGENT_HOST: evaluator
       AGENT_PORT: 8888
-      CAPABILITY_ALLOWLIST: ${EVALUATOR_CAPABILITY_ALLOWLIST:-}
+      CAPABILITY_ALLOWLIST: ${COURSE_EVALUATOR_ALLOWLIST:-evaluator-cv,evaluator-promote,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+      DECISION_URL: http://decision:7250
+      DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
+      DECISION_MIN_PROBABILITY: ${DECISION_MIN_PROBABILITY:-0.65}
+      DECISION_ALLOW_UNSCORED: ${DECISION_ALLOW_UNSCORED:-false}
+      WIKI_DECISION_MODE: typed
+    depends_on:
+      registry:
+        condition: service_healthy
+      tool-document-text:
+        condition: service_started
+  reporter:
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
+    build:
+      context: ./agents
+      dockerfile: reporter/Dockerfile
+    image: aoa-course/reporter:latest
+    container_name: aoa-reporter
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    ports:
+    - 7303:8888
+    volumes:
+    - ./agents/reporter/capabilities:/app/capabilities:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:reporter
+      AGENT_NAME: reporter
+      AGENT_HOST: reporter
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: ${COURSE_REPORTER_ALLOWLIST:-${REPORTER_CAPABILITY_ALLOWLIST:-}}
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
+      MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
+      OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
+      OLLAMA_RESPONSE_FORMAT: ${OLLAMA_RESPONSE_FORMAT:-json}
+      OLLAMA_THINK: ${OLLAMA_THINK:-false}
+    depends_on:
+      registry:
+        condition: service_healthy
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aoa-ollama
+    profiles:
+    - local
+    ports:
+    - 11434:11434
+    volumes:
+    - ollama-models:/root/.ollama
+  agntcy-directory:
+    profiles:
+    - directory
+    build:
+      context: ..
+      dockerfile: system/services/directory/Dockerfile
+    image: aoa-course/directory:1.8.0
+    user: ${DIRECTORY_UID:-1000}:${DIRECTORY_GID:-1000}
+    ports:
+    - 127.0.0.1:${COURSE_DIRECTORY_PORT:-8890}:8890
+    - 127.0.0.1:${COURSE_DIRECTORY_UI_PORT:-8891}:8889
+    volumes:
+    - ${COURSE_DIRECTORY_DATA_ROOT:-../.course-data}:/course-data
+    - ./agents-eve/runtime/templates:/course-templates:ro
+    - ./agents-eve/workshop:/workshop:ro
+    environment:
+      DIRECTORY_DAEMON_SERVER_LISTEN_ADDRESS: 0.0.0.0:8890
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_ENABLED: 'true'
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_LISTEN_ADDRESS: 0.0.0.0:8889
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_PUBLIC_URL: http://localhost:${COURSE_DIRECTORY_UI_PORT:-8891}
+      COURSE_DIRECTORY_ADDR: 127.0.0.1:8890
+      COURSE_REGISTRY_URL: http://registry:7100
+    healthcheck:
+      test:
+      - CMD
+      - dirctl
+      - --server-addr
+      - 127.0.0.1:8890
+      - --auth-mode
+      - insecure
+      - search
+      - --name
+      - __aoa_healthcheck__
+      - --output
+      - json
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+  directory-bridge:
+    profiles:
+    - directory
+    build:
+      context: ..
+      dockerfile: system/services/directory/Dockerfile
+    image: aoa-course/directory:1.8.0
+    command:
+    - python
+    - /app/bridge.py
+    environment:
+      COURSE_DIRECTORY_ADDR: agntcy-directory:8890
+      COURSE_REGISTRY_URL: http://registry:7100
+      COURSE_DIRECTORY_EXPECTED_AUS: ${COURSE_DIRECTORY_EXPECTED_AUS:-}
+    depends_on:
+      agntcy-directory:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8892/healthz', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 24
+  eve-workshop-native:
+    profiles:
+    - session3-lab-native
+    build:
+      context: ./agents-eve
+      dockerfile: runtime/Dockerfile
+    image: aoa-course/eve-workshop:0.17.1
+    container_name: aoa-eve-workshop-native
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    working_dir: /workshop
+    command:
+    - /app/workshop-shell.sh
+    ports:
+    - 7310:3000
+    volumes:
+    - ./agents-eve/workshop:/workshop
+    environment:
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+      NPM_CONFIG_OFFLINE: 'true'
+  eve-workshop-wrapped:
+    profiles:
+    - session3-lab-wrapped
+    build:
+      context: ./agents-eve
+      dockerfile: runtime/Dockerfile
+    image: aoa-course/eve-workshop:0.17.1
+    container_name: aoa-eve-workshop-wrapped
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    working_dir: /workshop
+    command:
+    - node
+    - /app/adapter/generic-boot.mjs
+    ports:
+    - 7311:8888
+    volumes:
+    - ./agents-eve/workshop:/workshop
+    environment:
+      EVE_APP_ROOT: /workshop
+      CARD_PATH: /workshop/capability-card.yaml
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:eve-workshop-interviewer
+      AGENT_NAME: eve-workshop-interviewer
+      AGENT_HOST: eve-workshop-wrapped
+      AGENT_PORT: 8888
+      PROVIDER: ${PROVIDER:-ollama}
+      MODEL: ${MODEL:-gpt-oss:120b}
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
+      NPM_CONFIG_OFFLINE: 'true'
+    depends_on:
+      registry:
+        condition: service_healthy
+  decision:
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
+    build: ./services/decision
+    image: aoa-course/decision:latest
+    container_name: aoa-decision
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    ports:
+    - 127.0.0.1:7250:7250
+    environment:
+      DECISION_LOCAL_CONTEXT_TOKENS: ${DECISION_LOCAL_CONTEXT_TOKENS:-8192}
+      DECISION_PROVIDER: ${DECISION_PROVIDER:-typesafe}
+      DECISION_MODEL: ${DECISION_MODEL:-jev-1.13.0}
+      DECISION_BASE_URL: ${DECISION_BASE_URL:-https://api.typesafe.ai}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      DECISION_API_KEY: ${DECISION_API_KEY:-}
+      DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
+  cv-data-evaluator:
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
+    build:
+      context: ./agents
+      dockerfile: evaluator/Dockerfile
+    image: aoa-course/evaluator:latest
+    container_name: aoa-cv-data-evaluator
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    volumes:
+    - ./agents/evaluator/capabilities:/app/capabilities:ro
+    - ./inbox:/data/inbox:ro
+    environment:
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      REGISTRY_URL: http://registry:7100
+      PLANNER_URL: http://planner:7200
+      AGENT_ID: urn:aoa:agent:cv-data-evaluator
+      AGENT_NAME: cv-data-evaluator
+      AGENT_HOST: cv-data-evaluator
+      AGENT_PORT: 8888
+      CAPABILITY_ALLOWLIST: evaluator-cv-data
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL:-gpt-oss-120b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
@@ -326,34 +578,35 @@ services:
         condition: service_healthy
       tool-document-text:
         condition: service_started
-
-  reporter:
-    profiles: ["session1", "session2", "session3", "session4"]
+  cv-frontend-evaluator:
+    profiles:
+    - session1
+    - session2
+    - session3
+    - session4
     build:
       context: ./agents
-      dockerfile: reporter/Dockerfile
-    image: aoa-course/reporter:latest
-    container_name: aoa-reporter
+      dockerfile: evaluator/Dockerfile
+    image: aoa-course/evaluator:latest
+    container_name: aoa-cv-frontend-evaluator
     extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "7303:8888"
+    - host.docker.internal:host-gateway
     volumes:
-      - ./agents/reporter/capabilities:/app/capabilities:ro
+    - ./agents/evaluator/capabilities:/app/capabilities:ro
+    - ./inbox:/data/inbox:ro
     environment:
+      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
-      AGENT_ID: urn:aoa:agent:reporter
-      AGENT_NAME: reporter
-      AGENT_HOST: reporter
+      AGENT_ID: urn:aoa:agent:cv-frontend-evaluator
+      AGENT_NAME: cv-frontend-evaluator
+      AGENT_HOST: cv-frontend-evaluator
       AGENT_PORT: 8888
-      CAPABILITY_ALLOWLIST: ${REPORTER_CAPABILITY_ALLOWLIST:-}
-      PROVIDER: ${PROVIDER:-ollama}
-      MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${AOA_OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
+      CAPABILITY_ALLOWLIST: evaluator-cv-frontend
+      PROVIDER: ${PROVIDER:-openai}
+      MODEL: ${MODEL:-gpt-oss-120b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
@@ -363,20 +616,32 @@ services:
     depends_on:
       registry:
         condition: service_healthy
-
-
-
-  # ------------------------------------------------------------------
-  # Optional: local model server (only started under `local` profile)
-  # ------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: aoa-ollama
-    profiles: ["local"]
+      tool-document-text:
+        condition: service_started
+  estate-filesystem:
+    profiles:
+    - session4
+    build:
+      context: ./tools/filesystem
+    image: aoa-course/tool-filesystem:latest
+    container_name: aoa-estate-filesystem
     ports:
-      - "11434:11434"
+    - 7401:7401
     volumes:
-      - ollama-models:/root/.ollama
-
+    - ./inbox:/data/inbox:ro
+    - ./services/registry/data:/data/estate/registry:ro
+    - ./services/planner/traces:/data/estate/traces:ro
+    environment:
+      REGISTRY_URL: http://registry:7100
+      TOOL_HOST: tool-filesystem
+      TOOL_PORT: 7401
+      FS_ROOT: /data
+    depends_on:
+      registry:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+        - tool-filesystem
 volumes:
-  ollama-models:
+  ollama-models: null

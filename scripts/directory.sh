@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 mode="${1:-help}"
 [[ $# == 0 ]] || shift
 export DIRECTORY_UID="$(id -u)" DIRECTORY_GID="$(id -g)"
-compose=(docker compose -f system/docker-compose.directory.yml --profile directory)
+compose=(docker compose -f system/docker-compose.yml --profile directory)
 case "$mode" in
   up|start)
     mkdir -p "${COURSE_DIRECTORY_DATA_ROOT:-.course-data}"

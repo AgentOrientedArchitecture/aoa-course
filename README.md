@@ -1,10 +1,8 @@
 # aoa-course
 
-**Revised course:** [Cerebras, TypeSafe and the four connected live demos](course/REVISED-COURSE.md). The original material below is retained.
+**Start here:** [Course setup](course/pre-work/01-revised-model-access.md). Use `main`, copy `.env.example` to `.env`, add the two hosted-provider keys or choose the local option in that same file, then use the session scripts. One Compose file defines the current course.
 
-**Understand the system:** [Architecture and component diagrams](course/ARCHITECTURE.md) · [Adopting EVE with AGNTCY Directory](course/sessions/session-03-eve/ADOPTION.md).
-
-**October laptop walkthrough:** use `main` and follow [the revised setup guide](course/pre-work/01-revised-model-access.md) first. It covers macOS/Linux shell scripts and native Windows batch files, including how to update an existing checkout. The `session*-up`, EVE build/adoption and provider-check scripts select the revised course when `.env.revised` exists or `.env` declares `DECISION_PROVIDER`. The direct Docker commands below retain the original configuration; use the scripts for October.
+**Course:** [Four connected live demos](course/REVISED-COURSE.md) · [Architecture and diagrams](course/ARCHITECTURE.md) · [EVE and AGNTCY adoption](course/sessions/session-03-eve/ADOPTION.md).
 
 Materials and a runnable system for the **Agent-Oriented Architecture** live course on O'Reilly.
 The system is a reference implementation for learning the architecture shape,
@@ -76,128 +74,34 @@ not result-review evidence. See
 
 ## Run it
 
-You'll need [Docker](https://docs.docker.com/get-docker/) and either a local
-[Ollama](https://ollama.com) install or an API key for a model provider. Start
-with the setup guide in
-[`course/pre-work/00-setup-and-api-access.md`](course/pre-work/00-setup-and-api-access.md);
-it covers the tested `.env` paths for SambaNova, NVIDIA NIM, and local Ollama
-running on your host.
+Install Git and Docker, then:
 
 ```bash
-git clone https://github.com/AgentOrientedArchitecture/aoa-course.git
+git clone --branch main https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
-cp .env.sambanova .env     # or .env.nvidia / .env.ollama / .env.ollama-cloud
-# edit .env - add your API key if using a hosted provider
+cp .env.example .env
+# Add CEREBRAS_API_KEY and TYPESAFE_API_KEY privately in .env.
+./scripts/test_model_provider.sh
+./scripts/session1-up.sh
 ```
 
-Session 1 only needs the CV-fit workflow:
-
-```bash
-docker compose --env-file .env \
-  -f system/docker-compose.yml \
-  -f system/docker-compose.session1.yml \
-  --profile session1 \
-  up --build -d --remove-orphans
-```
-
-Session 2 starts the full knowledge-management workflow:
-
-```bash
-docker compose --env-file .env \
-  -f system/docker-compose.yml \
-  --profile session2 \
-  up --build -d --remove-orphans
-```
-
-Session 3 starts with a native EVE workshop, then adopts the tested agent into
-the CV-fit workflow:
-
-```bash
-./scripts/session3-up.sh       # run eve init, eve info, and eve dev
-./scripts/session3-adopt.sh    # create the AOA card and start the estate
-```
-
-Session 4 starts Studio with three core stages — Agent card check, CV fit, and
-Flow audit — plus optional Graph and Ask evidence exploration and deterministic
-planner routing, then seeds and verifies the inspectable regulations corpus
-used for governance evidence:
-
-```bash
-./scripts/session4-up.sh
-./scripts/session4-seed.sh
-```
-
-Session 3's agent is created and run entirely inside containers. A pinned EVE
-workshop image exposes the real `eve init`, `eve info`, and `eve dev` CLI against
-a bind-mounted learner workspace. Participants need Docker, not host Node/npm
-or a venue-time package install. They build the agent natively first; the
-adoption script then creates its capability card and runs the same files through
-the generic AOA bridge.
-
-The provided `.env.ollama` example assumes Ollama is already running on your
-host machine. If you want Compose to start the included Ollama container
-instead, add `--profile local` to either command and set
-`OLLAMA_HOST=http://ollama:11434`.
-
-There are also thin helper scripts for the common paths:
-
-With `.env.revised` present, these start the October course. Without it, they
-retain the original course. Set `AOA_REVISED=1` to select October explicitly,
-or `AOA_REVISED=0` to select the original course even when `.env.revised` exists.
-See the [launcher table](course/pre-work/01-revised-model-access.md#start-and-stop)
-for both operating systems and configuration precedence.
+On Windows use Command Prompt, `copy .env.example .env`, and the matching `.bat` commands. The [setup guide](course/pre-work/01-revised-model-access.md) covers hosted models, the local Ollama option, and existing checkouts.
 
 ```bash
 ./scripts/session1-up.sh
 ./scripts/session2-up.sh
-./scripts/session3-build.sh    # pre-work: images only, no agent created
-./scripts/session3-up.sh       # enter the interactive EVE workshop
-./scripts/session3-adopt.sh    # publish the tested agent into AOA
-./scripts/session4-up.sh       # then session4-seed.sh
+./scripts/session3-build.sh    # pre-build images
+./scripts/session3-up.sh       # native EVE authoring and acceptance
+./scripts/session3-adopt.sh    # adopt into AOA and publish to AGNTCY
+./scripts/session4-up.sh
+./scripts/session4-seed.sh
 ./scripts/logs.sh
-./scripts/down.sh
+./scripts/down.sh             # retains authored files and saved data
 ```
 
-On Windows Command Prompt, use the matching batch files:
+Open [Studio](http://localhost:8080) after starting an AOA session. Native EVE authoring is deliberately separate; follow its [walkthrough](course/sessions/session-03-eve/WALKTHROUGH.md). AGNTCY's [catalogue](http://localhost:8891) becomes available with Session 3 adoption and continues in Session 4.
 
-```bat
-scripts\session1-up.bat
-scripts\session2-up.bat
-scripts\session3-build.bat    rem pre-work: images only
-scripts\session3-up.bat       rem interactive native EVE workshop
-scripts\session3-adopt.bat    rem create the AOA card and start the estate
-scripts\session4-up.bat
-scripts\session4-seed.bat
-scripts\logs.bat
-scripts\down.bat
-```
-
-For the included Ollama container with a helper script, prefix it with
-`AOA_LOCAL=1` on macOS/Linux, or run `set AOA_LOCAL=1` first on Windows. The
-host-machine Ollama path does not need `AOA_LOCAL=1`.
-
-`down.sh` and `down.bat` stop all course Compose services, including decisions,
-the specialist CV evaluators and adopted EVE. They retain saved data and Docker
-volumes by default. `logs` covers the same services. The separate AGNTCY
-Directory runs in its own terminal: stop it with Ctrl+C there.
-
-Then open [http://localhost:8080](http://localhost:8080) for the studio.
-Session 1 shows only the CV intent. Session 2 shows CV fit, ingest, graph, and
-ask modes. Session 3 shows CV fit plus a "CV fit + interview" mode that runs the
-EVE-authored interviewer agent. Session 4 presents exactly three core governance
-stages — **Agent card check**, **CV fit**, and **Flow audit** — plus optional
-**Graph** and **Ask** evidence-exploration utilities. Graph visualizes the seeded
-EU AI Act wiki. Ask runs the grounded knowledge-query workflow so learners can
-inspect passage citations and tool retrieval; neither utility is another
-governance stage. Wiki reset is disabled in Session 4 to protect the governance
-corpus, so rerun the Session 4 seed script if evidence is missing. The wiki is
-an explicit governance/evidence knowledge plane: deterministic policy decides,
-while visible wiki queries and citations supply rationale. Missing Annex III
-employment or Article 14 evidence fails employment eligibility closed. Eligible
-CV fit runs only to a held draft until a human reviews the actual output and
-decides its exact `result_digest`.
-
-If something misbehaves, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+`system/docker-compose.yml` is the sole current Compose definition. The scripts choose session profiles and settings; students do not assemble overlays or select a course version. Existing private `.env.revised` files remain readable during migration, but fresh setups use only `.env`. Earlier configurations and the previous setup instructions are [preserved in the archive](archive/configuration-before-consolidation/README.md).
 
 ## Repo layout
 
@@ -213,15 +117,8 @@ system/
   inbox/        # Studio uploads and pasted demo inputs
   wiki/         # Generated wiki raw/promoted/index files
   docker-compose.yml
-  docker-compose.session1.yml   # session overlays; session 2 uses the base file
-  docker-compose.session3.yml
-  docker-compose.session4.yml
-.env.example
-.env.ollama
-.env.ollama-cloud
-.env.sambanova
-.env.nvidia
-scripts/
+.env.example                  # the one current configuration example
+archive/                      # preserved earlier configurations and instructions
 ```
 
 For the architectural story, see [`system/ARCHITECTURE.md`](system/ARCHITECTURE.md). For how the agents work, see [`system/AGENTS.md`](system/AGENTS.md).

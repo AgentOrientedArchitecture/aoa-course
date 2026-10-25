@@ -15,6 +15,11 @@ WORKDIR /app
 COPY runtime/package.json runtime/package-lock.json ./
 RUN npm ci --no-audit --no-fund && chmod -R a+rwX /tmp/aoa-npm-cache
 
+# EVE 0.17.1 stores its workflow build cache beside the installed package.
+# Native authoring runs as the host UID, so only this generated cache must be
+# writable; keep the installed executable and dependencies root-owned.
+RUN mkdir -p /app/node_modules/eve/.eve && chmod 1777 /app/node_modules/eve/.eve
+
 # The reusable AOA bridge is platform plumbing, not part of the participant's
 # EVE project. The generic entry point derives JSON input/output mapping from
 # the capability card, so adoption does not require agent-specific code.

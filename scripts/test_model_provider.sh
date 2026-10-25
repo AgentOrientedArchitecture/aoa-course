@@ -13,17 +13,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-source ./scripts/course-mode.sh
-if [[ "$course_revised" == true ]]; then
-  session=1
-  source ./scripts/revised-compose.sh
-  exec "${compose[@]}" "${files[@]}" --profile session1 \
-    run --rm --no-deps --build evaluator python -u -m _base.provider_test
-fi
-
-exec docker compose \
-  --env-file .env \
-  -f system/docker-compose.yml \
-  --profile session1 \
-  run --rm --no-deps --build \
-  evaluator python -u -m _base.provider_test
+session=1
+source ./scripts/compose.sh
+exec "${compose[@]}" "${files[@]}" --profile session1 \
+  run --rm --no-deps --build evaluator python -u -m _base.provider_test

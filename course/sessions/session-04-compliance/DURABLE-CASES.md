@@ -1,6 +1,6 @@
 # Compliance: a case that survives restart
 
-Start `./scripts/session4-up.sh`, then run `./scripts/session4-seed.sh`, with `.env.revised` configured. On Windows use the matching `.bat` files. The explicit `revised-up.sh/.bat 4` path also works. Follow the [original three-stage walkthrough](WALKTHROUGH.md): card check, CV fit with exact-result review, then flow audit. Its original-profile restart limit is labelled there. In this revised profile, the saved case and its event log are durable. The [case lifecycle diagram](../../ARCHITECTURE.md#session-4-a-result-that-survives-the-process) shows where execution, persistence and review meet.
+Start `./scripts/session4-up.sh`, then run `./scripts/session4-seed.sh`, with `.env` configured. On Windows use the matching `.bat` files. Follow the [original three-stage walkthrough](WALKTHROUGH.md): card check, CV fit with exact-result review, then flow audit. Its original-profile restart limit is labelled there. In this revised profile, the saved case and its event log are durable. The [case lifecycle diagram](../../ARCHITECTURE.md#session-4-a-result-that-survives-the-process) shows where execution, persistence and review meet.
 
 The specialist evaluators also start without the required review-before-use declaration. Inspect which evaluator the planner selected. Add the existing declaration to that evaluator's capability card before expecting the employment policy to proceed. A declaration is still only evidence of the declared constraint.
 

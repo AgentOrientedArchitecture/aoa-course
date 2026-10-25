@@ -31,7 +31,7 @@ Session 4 uses the same discovery path, including its governance/evidence AUs. A
 
 ## Prepare the EVE capability
 
-Keep the [EVE walkthrough](WALKTHROUGH.md): native `eve init`, authored instructions, native acceptance and then AOA adoption. With `.env.revised` configured, use `session3-up.sh/.bat`, complete the native exercise and exit its shell, then run `session3-adopt.sh/.bat`. The [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop) covers both platforms. A healthy adopted `interviewer-questions` card must be in the local registry for the main export/comparison sequence below.
+Keep the [EVE walkthrough](WALKTHROUGH.md): native `eve init`, authored instructions, native acceptance and then AOA adoption. With `.env` configured, use `session3-up.sh/.bat`, complete the native exercise and exit its shell, then run `session3-adopt.sh/.bat`. The [launcher table](../../pre-work/01-revised-model-access.md#start-and-stop) covers both platforms. A healthy adopted `interviewer-questions` card must be in the local registry for the main export/comparison sequence below.
 
 The pinned `eve init` may report a default-model metadata error before the provider-neutral `agent.ts` is added. Complete that configuration checkpoint in the native walkthrough and run `eve dev` again. The agent remains learner-authored; neither the adapter nor Directory rewrites its behaviour.
 

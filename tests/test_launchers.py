@@ -34,7 +34,10 @@ public class Mock {
     string tool = Path.GetFileNameWithoutExtension(Process.GetCurrentProcess().MainModule.FileName);
     var row = new { tool = tool, argv = args, cwd = Directory.GetCurrentDirectory(),
       registry = Environment.GetEnvironmentVariable("COURSE_REGISTRY_ALLOWLIST") ?? "",
-      evaluator = Environment.GetEnvironmentVariable("COURSE_EVALUATOR_ALLOWLIST") ?? "" };
+      evaluator = Environment.GetEnvironmentVariable("COURSE_EVALUATOR_ALLOWLIST") ?? "",
+      discovery = Environment.GetEnvironmentVariable("COURSE_DISCOVERY_BACKEND") ?? "",
+      workflows = Environment.GetEnvironmentVariable("COURSE_STUDIO_WORKFLOWS") ?? "",
+      governance = Environment.GetEnvironmentVariable("COURSE_PLAN_GOVERNANCE_CAPABILITY") ?? "" };
     File.AppendAllText(Environment.GetEnvironmentVariable("MOCK_LOG"), new JavaScriptSerializer().Serialize(row) + "\n");
     string fail = Environment.GetEnvironmentVariable("MOCK_FAIL_COMMAND");
     return tool == "docker" && Array.IndexOf(args, fail) >= 0 ? 17 : 0;
@@ -49,7 +52,7 @@ public class Mock {
         else:
             source = '''#!%s
 import json,os,sys
-row={'tool':os.path.basename(sys.argv[0]),'argv':sys.argv[1:],'cwd':os.getcwd(),'registry':os.getenv('COURSE_REGISTRY_ALLOWLIST',''),'evaluator':os.getenv('COURSE_EVALUATOR_ALLOWLIST','')}
+row={'tool':os.path.basename(sys.argv[0]),'argv':sys.argv[1:],'cwd':os.getcwd(),'registry':os.getenv('COURSE_REGISTRY_ALLOWLIST',''),'evaluator':os.getenv('COURSE_EVALUATOR_ALLOWLIST',''),'discovery':os.getenv('COURSE_DISCOVERY_BACKEND',''),'workflows':os.getenv('COURSE_STUDIO_WORKFLOWS',''),'governance':os.getenv('COURSE_PLAN_GOVERNANCE_CAPABILITY','')}
 with open(os.environ['MOCK_LOG'],'a') as f:f.write(json.dumps(row)+'\\n')
 sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.argv[1:] else 0)
 ''' % sys.executable
@@ -71,7 +74,6 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.env = {k:v for k,v in os.environ.items() if not k.startswith(('AOA_', 'COURSE_', 'MOCK_'))}
         self.env.update(PATH=self.tools_dir.name + os.pathsep + os.environ['PATH'], MOCK_LOG=str(self.log))
         (self.root/'.env').write_text('MODEL=old-model\n')
-        (self.root/'.env.revised').write_text('MODEL=course-model\n')
 
     def invoke(self, name, *args, expect=0):
         script = self.root/'scripts'/(name+EXT)
@@ -87,53 +89,54 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
     def clean_log(self):
         self.log.write_text('')
 
-    def assert_revised(self, row):
+    def assert_current(self, row):
         argv = row['argv']
-        self.assertIn('system/docker-compose.revised.yml', argv)
-        self.assertLess(argv.index('.env'), argv.index('.env.revised'))
+        self.assertEqual([a for a in argv if a.endswith('.yml')], ['system/docker-compose.yml'])
+        self.assertIn('system/docker-compose.yml', argv)
+        self.assertIn('.env', argv)
         self.assertEqual(Path(row['cwd']).resolve(), self.root.resolve())
 
-    def test_session_starts_select_revised_and_forward_arguments(self):
+    def test_session_starts_select_current_and_forward_arguments(self):
         for session in (1, 2, 4):
             with self.subTest(session=session):
                 self.clean_log()
                 rows = self.invoke(f'session{session}-up', '--wait', '--wait-timeout', '90')
                 self.assertEqual(len(rows), 2 if session == 4 else 1)
                 row = rows[0]
-                self.assert_revised(row)
+                self.assert_current(row)
                 self.assertIn(f'session{session}', row['argv'])
                 self.assertEqual(row['argv'][-3:], ['--wait', '--wait-timeout', '90'])
                 self.assertIn('evaluator-cv-data', row['registry'])
+                self.assertEqual(row['discovery'], 'agntcy' if session == 4 else 'local')
+                self.assertEqual(row['governance'], 'evaluator-plan-governance' if session == 4 else '')
+                self.assertEqual(row['workflows'], {1:'cv-fit', 2:'cv-fit,knowledge-ingest,wiki-graph,knowledge-query', 4:'agent-card-check,cv-fit,flow-audit,wiki-graph,knowledge-query'}[session])
                 self.assertEqual('evaluator-plan-governance' in row['evaluator'], session == 4)
                 if session == 4:
                     self.assertIn('directory', row['argv'])
                     self.assertEqual(rows[-1]['argv'][-3:], ['sync', '--wait', '120'])
 
-    def test_original_course_is_preserved_and_can_be_forced(self):
-        self.env['AOA_REVISED'] = '0'
-        row = self.invoke('session1-up')[0]
-        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
-        self.assertNotIn('.env.revised', row['argv'])
-        self.clean_log()
-        self.env.pop('AOA_REVISED')
-        (self.root/'.env.revised').unlink()
-        row = self.invoke('session2-up')[0]
-        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
+    def test_current_course_is_the_default_without_mode_flags(self):
+        for launcher in ('session1-up', 'session2-up', 'session4-up', 'test_model_provider'):
+            self.clean_log()
+            rows = self.invoke(launcher)
+            self.assert_current(rows[-1] if launcher == 'test_model_provider' else rows[0])
 
-    def test_explicit_revised_without_second_env_and_local_ollama(self):
-        (self.root/'.env.revised').unlink()
-        self.env.update(AOA_REVISED='1', AOA_LOCAL='true')
+    def test_existing_overlay_remains_readable_but_is_not_required(self):
+        (self.root/'.env.revised').write_text('MODEL=course-model\n')
         row = self.invoke('session1-up')[0]
-        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assert_current(row)
+        self.assertLess(row['argv'].index('.env'), row['argv'].index('.env.revised'))
+
+    def test_local_ollama_option(self):
+        self.env['AOA_LOCAL'] = 'true'
+        row = self.invoke('session1-up')[0]
+        self.assert_current(row)
         self.assertIn('local', row['argv'])
         self.assertNotIn('.env.revised', row['argv'])
 
-    def test_invalid_selection_stops_before_docker(self):
-        self.env['AOA_REVISED'] = 'mistyped'
-        self.assertEqual(self.invoke('session1-up', expect=2), [])
-        self.env.pop('AOA_REVISED')
-        self.assertEqual(self.invoke('revised-up', '5', expect=2), [])
-        self.assertEqual(self.invoke('revised-up', '3', expect=2), [])
+    def test_invalid_session_stops_before_docker(self):
+        self.assertEqual(self.invoke('session-up', '5', expect=2), [])
+        self.assertEqual(self.invoke('session-up', '3', expect=2), [])
 
     def test_down_and_logs_include_every_service_without_deleting_data(self):
         sentinel = self.root/'system/services/planner/traces/cases.sqlite3'
@@ -143,12 +146,8 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
             with self.subTest(name=name):
                 self.clean_log()
                 row = self.invoke(name)[0]
-                self.assert_revised(row)
-                for profile in ('session1','session2','session3','session4','session3-lab-native','session3-lab-wrapped','local'):
-                    self.assertIn(profile, row['argv'])
-                self.assertIn('system/docker-compose.revised-eve.yml', row['argv'])
-                self.assertIn('system/docker-compose.directory.yml', row['argv'])
-                self.assertIn('directory', row['argv'])
+                self.assert_current(row)
+                self.assertIn('*', row['argv'])
                 self.assertNotIn('-v', row['argv'])
                 self.assertNotIn('--volumes', row['argv'])
                 self.assertEqual(sentinel.read_bytes(), b'preserve this saved case')
@@ -160,8 +159,7 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
 
     def test_eve_prebuild_does_not_create_or_run_agent(self):
         row = self.invoke('session3-build', '--no-cache')[0]
-        self.assert_revised(row)
-        self.assertIn('system/docker-compose.revised-eve.yml', row['argv'])
+        self.assert_current(row)
         self.assertEqual(row['argv'][-2:], ['build','--no-cache'])
         self.assertFalse((self.root/'system/agents-eve/workshop').exists())
 
@@ -173,6 +171,8 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertIn('run', rows[2]['argv'])
         self.assertIn('HOME=/tmp', rows[2]['argv'])
         self.assertEqual(rows[2]['argv'][-1], 'eve-workshop-native')
+        self.assertEqual(rows[2]['discovery'], 'agntcy')
+        self.assertEqual(rows[2]['workflows'], 'cv-fit,cv-fit-interview')
         self.assertFalse((self.root/'system/agents-eve/workshop/capability-card.yaml').exists())
 
     def test_failed_build_never_enters_workshop(self):
@@ -198,56 +198,31 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertEqual(rows[-1]['argv'][-3:], ['sync', '--wait', '120'])
         self.assertEqual(card.read_text(), 'custom learner contract')
         self.assertEqual((workspace/'agent/agent.ts').read_text(), 'learner-authored content')
-        self.clean_log()
-        self.env['AOA_REVISED'] = '0'
-        rows = self.invoke('session3-adopt')
-        self.assertNotIn('system/docker-compose.revised.yml', rows[0]['argv'])
-        self.assertEqual(rows[0]['argv'][-2:], ['build','eve-workshop-native'])
-        self.assertIn('npm', rows[1]['argv'])
-        self.assertEqual(card.read_text(), 'custom learner contract')
 
     def test_provider_check_uses_revised_overlay_with_only_revised_env(self):
         (self.root/'.env').unlink()
+        (self.root/'.env.revised').write_text('MODEL=course-model\n')
         rows = self.invoke('test_model_provider')
         row = rows[-1]
-        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assertIn('system/docker-compose.yml', row['argv'])
         self.assertIn('.env.revised', row['argv'])
         self.assertIn('_base.provider_test', row['argv'])
 
-    def test_october_examples_work_as_the_only_env_file(self):
-        (self.root/'.env.revised').unlink()
-        for example in ('.env.cerebras-typesafe.example', '.env.local-revised.example'):
-            (self.root/'.env').write_bytes((ROOT/example).read_bytes())
-            for launcher in ('test_model_provider', 'session1-up', 'session2-up',
-                             'session3-build', 'session3-up', 'session4-up'):
-                with self.subTest(example=example, launcher=launcher):
-                    self.clean_log()
-                    rows = self.invoke(launcher)
-                    row = rows[-1] if launcher == 'test_model_provider' else rows[0]
-                    self.assertIn('system/docker-compose.revised.yml', row['argv'])
-                    self.assertIn('.env', row['argv'])
-                    self.assertNotIn('.env.revised', row['argv'])
-                    if launcher == 'test_model_provider':
-                        self.assertIn('_base.provider_test', row['argv'])
+    def test_single_example_works_for_provider_and_eve_launchers(self):
+        (self.root/'.env').write_bytes((ROOT/'.env.example').read_bytes())
+        for launcher in ('test_model_provider', 'session3-build', 'session3-up'):
             self.clean_log()
-            self.env['AOA_REVISED'] = '0'
-            row = self.invoke('session1-up')[0]
-            self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
-            self.env.pop('AOA_REVISED')
+            rows = self.invoke(launcher)
+            self.assert_current(rows[-1])
+            self.assertNotIn('.env.revised', rows[-1]['argv'])
 
-    def test_mode_detection_ignores_comments_and_does_not_execute_env(self):
-        (self.root/'.env.revised').unlink()
-        (self.root/'.env').write_text('# DECISION_PROVIDER=typesafe\nMODEL=original\n')
-        row = self.invoke('session1-up')[0]
-        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
-        self.clean_log()
-        # dotenv values are data. Neither shell nor batch may execute this.
+    def test_env_values_are_data_not_shell_commands(self):
         (self.root/'.env').write_text(
             'MODEL=$(touch should-not-exist)\n'
             'AOA_UNUSED=& echo unsafe > should-not-exist\n'
-            ' \tDECISION_PROVIDER = typesafe\n')
+            'DECISION_PROVIDER=typesafe\n')
         row = self.invoke('session1-up')[0]
-        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assert_current(row)
         self.assertFalse((self.root/'should-not-exist').exists())
 
     def test_directory_is_container_only_and_preserves_records(self):
@@ -256,7 +231,7 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         record = data / 'interviewer.oasf.json'
         record.write_text('existing record')
         row = self.invoke('directory', 'up')[0]
-        self.assertIn('system/docker-compose.directory.yml', row['argv'])
+        self.assertIn('system/docker-compose.yml', row['argv'])
         self.assertIn('--wait', row['argv'])
         self.assertEqual(row['argv'][-1], 'agntcy-directory')
         self.assertNotIn('--remove-orphans', row['argv'])

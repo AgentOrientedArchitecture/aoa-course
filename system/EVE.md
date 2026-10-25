@@ -85,7 +85,7 @@ it derives Ollama's OpenAI-compatible `/v1` endpoint from `OLLAMA_HOST`.
 `MODEL_CONTEXT_WINDOW_TOKENS` supplies metadata EVE cannot infer for local or
 unlisted model IDs.
 
-This keeps provider selection in the course environment (`.env`, then `.env.revised` for the revised profile): the authored agent does not
+This keeps provider selection in the course environment (`.env`): the authored agent does not
 import a provider-specific SDK or hard-code a hosted service.
 
 ## Adoption into the CV workflow

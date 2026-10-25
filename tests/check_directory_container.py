@@ -48,7 +48,19 @@ def main():
                               'volumes': [str(agent) + ':/fixture:ro']},
             'agntcy-directory': {'volumes': [str(ROOT / 'system/agents') + ':/fixture-agents:ro']},
             'directory-bridge': {'ports': ['127.0.0.1:18892:8892']}}}))
-        compose = ['docker', 'compose', '-f', str(ROOT / 'system/docker-compose.directory.yml'), '-f', str(fixture)]
+        # Exercise Directory's actual definitions from the one course Compose
+        # file, isolating the fixture registry from all learner ports and data.
+        empty_env = temp / 'empty.env'
+        empty_env.write_text('')
+        definition = json.loads(subprocess.check_output(
+            ['docker', 'compose', '--env-file', str(empty_env), '-f', str(ROOT / 'system/docker-compose.yml'),
+             '--profile', '*', 'config', '--format', 'json'],
+            cwd=ROOT, env=env, text=True))
+        directory_definition = temp / 'directory.json'
+        directory_definition.write_text(json.dumps({'services': {
+            name: definition['services'][name]
+            for name in ('agntcy-directory', 'directory-bridge')}}))
+        compose = ['docker', 'compose', '-f', str(directory_definition), '-f', str(fixture)]
 
         def run(args, timeout=300):
             result = subprocess.run(args, cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)

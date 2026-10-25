@@ -451,7 +451,7 @@ Session 1 starts only the CV-fit path:
 ```bash
 docker compose --env-file .env \
   -f system/docker-compose.yml \
-  -f system/docker-compose.session1.yml \
+  -f system/docker-compose.yml \
   --profile session1 \
   up --build -d --remove-orphans
 ```
@@ -509,7 +509,7 @@ planner all stay still.
 
 ## Revised course profile (October 2026)
 
-The standard session scripts select the revised profile when `.env.revised` exists; `AOA_REVISED=0` explicitly retains the original path. The explicit `revised-up.sh/.bat` and `revised-eve.sh/.bat` entry points remain available. The revised profile adds contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
+The standard session scripts always select the current course from one `.env` and one Compose definition. Earlier configuration files are preserved under `archive/configuration-before-consolidation/`. The revised profile adds contract eligibility followed by bounded semantic allocation, whole-composition validation, typed wiki promotion and persistent cases. The additional CV evaluators have separate Agent IDs and runtimes with compatible contracts.
 
 Sessions 1–2 default to hybrid task planning; Sessions 3–4 use fixed course plans. Revised AU allocation still runs in all four sessions. Planning, allocation, orchestration and result review share the planner service; the course does not register a separate Planner AU. It executes the accepted tasks sequentially. The models operate within a fixed course workflow catalogue, with code checking required responsibilities and evidence dependencies.
 

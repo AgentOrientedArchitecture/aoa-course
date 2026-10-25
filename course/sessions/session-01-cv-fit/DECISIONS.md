@@ -1,6 +1,6 @@
 # CV fit: choosing the AU
 
-Start with `./scripts/session1-up.sh`, or `scripts\session1-up.bat` in Windows Command Prompt, after creating `.env.revised` through the [setup guide](../../pre-work/01-revised-model-access.md). The explicit `revised-up.sh/.bat 1` path also works. Follow the original [CV walkthrough](WALKTHROUGH.md) for synthetic inputs, contract inspection and hot reload, using the differences below. The revised Studio adds **Plan and decisions** and an **Assessment emphasis** field.
+Start with `./scripts/session1-up.sh`, or `scripts\session1-up.bat` in Windows Command Prompt, after creating `.env` through the [setup guide](../../pre-work/01-revised-model-access.md). Follow the original [CV walkthrough](WALKTHROUGH.md) for synthetic inputs, contract inspection and hot reload, using the differences below. The revised Studio adds **Plan and decisions** and an **Assessment emphasis** field.
 
 Read the [component and selection diagrams](../../ARCHITECTURE.md#session-1-proposing-work-and-choosing-an-au). Expect **five AU cards and one tool**: parser, general/data/frontend evaluators, reporter and document-text. The decision service is control-plane infrastructure, not another registered AU card.
 

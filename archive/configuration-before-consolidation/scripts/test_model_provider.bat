@@ -1,0 +1,34 @@
+@echo off
+setlocal EnableExtensions
+
+cd /d "%~dp0.."
+
+if not exist ".env" if not exist ".env.revised" (
+  echo error=.env or .env.revised is required in the repository root 1>&2
+  exit /b 1
+)
+
+docker compose version >nul 2>&1
+if errorlevel 1 (
+  echo error=Docker Compose v2 is required; run "docker compose version" to diagnose 1>&2
+  exit /b 1
+)
+
+call "%~dp0course-mode.bat"
+if errorlevel 1 exit /b %ERRORLEVEL%
+if "%COURSE_REVISED%"=="1" goto revised
+
+docker compose ^
+  --env-file .env ^
+  -f system/docker-compose.yml ^
+  --profile session1 ^
+  run --rm --no-deps --build ^
+  evaluator python -u -m _base.provider_test
+
+exit /b %ERRORLEVEL%
+
+:revised
+call "%~dp0revised-compose.bat" 1
+if errorlevel 1 exit /b %ERRORLEVEL%
+%COMPOSE% --profile session1 run --rm --no-deps --build evaluator python -u -m _base.provider_test
+exit /b %ERRORLEVEL%

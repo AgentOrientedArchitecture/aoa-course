@@ -14,21 +14,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-call "%~dp0course-mode.bat"
-if errorlevel 1 exit /b %ERRORLEVEL%
-if "%COURSE_REVISED%"=="1" goto revised
-
-docker compose ^
-  --env-file .env ^
-  -f system/docker-compose.yml ^
-  --profile session1 ^
-  run --rm --no-deps --build ^
-  evaluator python -u -m _base.provider_test
-
-exit /b %ERRORLEVEL%
-
-:revised
-call "%~dp0revised-compose.bat" 1
+call "%~dp0compose.bat" 1
 if errorlevel 1 exit /b %ERRORLEVEL%
 %COMPOSE% --profile session1 run --rm --no-deps --build evaluator python -u -m _base.provider_test
 exit /b %ERRORLEVEL%
