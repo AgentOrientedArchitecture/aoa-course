@@ -22,12 +22,39 @@ On Windows use `copy .env.example .env` for the last command. Edit the new `.env
 
 The example configures:
 
-- **Generation:** Cerebras, `gpt-oss-120b`. Add `CEREBRAS_API_KEY` privately.
-- **Decisions:** TypeSafe, pinned `jev-1.13.0`. Add `TYPESAFE_API_KEY` privately.
+- **Generation:** Cerebras, `gpt-oss-120b`. Put its key in `LLM_API_KEY` privately.
+- **Decisions:** TypeSafe, pinned `jev-1.13.0`. Put its key in `DECISION_API_KEY` privately.
 
 Run `./scripts/test_model_provider.sh` (Windows: `scripts\test_model_provider.bat`). It makes a small real generation request and should finish with `result=PASS`. This check does not test TypeSafe; the first CV run tests the decision path. Keys on Spark are not transferred by Git.
 
-`PROVIDER=openai` means the OpenAI-compatible adapter; the endpoint selects Cerebras. The course maps `CEREBRAS_API_KEY` to the container's `OPENAI_API_KEY`. Other compatible providers can still use `AOA_OPENAI_API_KEY`, their endpoint and exact model ID; clear `CEREBRAS_API_KEY` when switching away from Cerebras. Keep TypeSafe configured for decisions or choose the local decision route below.
+The key names describe their jobs, not their vendors. `PROVIDER=openai` selects
+the OpenAI-compatible protocol; it does not require an OpenAI account. For
+another compatible generation service, change `LLM_BASE_URL`, `MODEL` and
+`LLM_API_KEY` together. Use that service's API root and exact model ID, then run
+the generation smoke test. All course generation clients, including EVE, use
+the same `LLM_BASE_URL` and `LLM_API_KEY` names.
+
+| Generation service | `LLM_BASE_URL` with `PROVIDER=openai` |
+|---|---|
+| [NVIDIA](https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-120b-infer) | `https://integrate.api.nvidia.com/v1` |
+| [OpenRouter](https://openrouter.ai/developers) | `https://openrouter.ai/api/v1` |
+| [Ollama cloud](https://docs.ollama.com/api/openai-compatibility) | `https://ollama.com/v1` |
+
+For Ollama cloud, use the model name returned by its cloud catalogue; no local
+Ollama installation is required. `PROVIDER=ollama` remains the native local
+Ollama route. The table describes documented endpoints, not completed course
+rehearsals with each provider.
+
+Decisions have separate settings: `DECISION_PROVIDER`, `DECISION_BASE_URL`,
+`DECISION_MODEL` and `DECISION_API_KEY`. A generic key name does not make a
+generation endpoint a decision endpoint: the native decision route requires
+the System One request/response contract. Keep TypeSafe configured for decisions
+or choose the local route below.
+
+When switching providers, replace the key together with its endpoint so a key
+for one service is not sent to another. Compatible API shape is a starting point;
+it does not establish that every provider/model combination passes the course.
+The [validation record](../VALIDATION.md) states which combinations were exercised.
 
 Check provider credit and account limits before class. The example does not promise a free tier or enough quota for a room of learners. Errors remain visible rather than silently replacing a provider.
 
@@ -39,11 +66,15 @@ Use the **same `.env`**. Its commented LOCAL OPTION lists the settings to change
 ollama pull gpt-oss:20b
 ```
 
-Set `PROVIDER=ollama`, `MODEL=gpt-oss:20b`, `DECISION_PROVIDER=ollama`, `DECISION_MODEL=gpt-oss:20b`, and the listed local endpoints. Set `OPENAI_BASE_URL=http://host.docker.internal:11434/v1` as well: EVE uses Ollama's OpenAI-compatible interface. Increase the timeouts as shown in the example. Use `gpt-oss:120b` for generation where hardware permits.
+Set `PROVIDER=ollama`, `MODEL=gpt-oss:20b`, `DECISION_PROVIDER=ollama`, `DECISION_MODEL=gpt-oss:20b`, and the listed local endpoints. Set `LLM_BASE_URL=http://host.docker.internal:11434/v1` as well: EVE uses Ollama's OpenAI-compatible interface. Increase the timeouts as shown in the example. Use `gpt-oss:120b` for generation where hardware permits.
+
+For an unauthenticated local server, set `LLM_API_KEY=local-no-auth` and clear
+`DECISION_API_KEY`. The placeholder keeps the OpenAI-compatible EVE client and
+generation smoke test initialised without forwarding a hosted key.
 
 The local decision baseline uses constrained JSON and reports no calibrated probability. `DECISION_ALLOW_UNSCORED=true` is an explicit classroom policy; it does not make the local model equivalent to Jev. Time the local route before teaching it.
 
-Optional container Ollama is retained: start with `AOA_LOCAL=1` in the shell, set `OLLAMA_HOST` and `DECISION_BASE_URL` to `http://ollama:11434`, set `OPENAI_BASE_URL=http://ollama:11434/v1`, and pull the model into that container. On Windows run `set AOA_LOCAL=1` before the launcher.
+Optional container Ollama is retained: start with `AOA_LOCAL=1` in the shell, set `OLLAMA_HOST` and `DECISION_BASE_URL` to `http://ollama:11434`, set `LLM_BASE_URL=http://ollama:11434/v1`, and pull the model into that container. On Windows run `set AOA_LOCAL=1` before the launcher.
 
 ### Native local decisions with Clef
 
@@ -59,6 +90,7 @@ For [Ollama 0.35.1 or later](https://ollama.com/library/clef-flash), download
 DECISION_PROVIDER=systemone
 DECISION_MODEL=clef-flash
 DECISION_BASE_URL=http://host.docker.internal:11434
+DECISION_API_KEY=
 DECISION_ALLOW_UNSCORED=false
 ```
 
@@ -69,7 +101,8 @@ use a decision checkpoint such as
 [`Jundot/clef-flash-oQ4e`](https://huggingface.co/Jundot/clef-flash-oQ4e),
 including its joint decision head. Set the exact model ID returned by that
 server's `/v1/models`, its port, and `DECISION_API_KEY` only if that server
-requires authentication. The System One route never uses the hosted TypeSafe key.
+requires authentication. Replace any hosted decision key with the local server's
+key, or leave it empty for an unauthenticated server.
 
 Keep `DECISION_ALLOW_UNSCORED=false`. Probabilities are model outputs, not a
 calibrated chance of correctness; re-evaluate the 0.65 teaching gate with your
@@ -84,9 +117,8 @@ local server such as oMLX. For example, if oMLX serves `Qwen3.8-27B-4bit` on por
 
 ```dotenv
 PROVIDER=openai
-CEREBRAS_API_KEY=
-AOA_OPENAI_API_KEY=local-no-auth
-OPENAI_BASE_URL=http://host.docker.internal:8000/v1
+LLM_API_KEY=local-no-auth
+LLM_BASE_URL=http://host.docker.internal:8000/v1
 MODEL=Qwen3.8-27B-4bit
 ```
 
@@ -129,7 +161,23 @@ After adoption, Studio is at [localhost:8080](http://localhost:8080). AGNTCY's c
 
 ## Existing checkouts
 
-Save any source edits, then update `main` with `git pull --ff-only origin main`. Keep your existing `.env`, authored workshop and runtime data. A current Cerebras/TypeSafe configuration already saved as `.env` needs no rename or additional file.
+Save any source edits, then update `main` with `git pull --ff-only origin main`.
+Keep your existing `.env`, authored workshop and runtime data. The course now
+uses one naming scheme for model access; update an older `.env` before starting:
+
+| Old setting | Rename to |
+|---|---|
+| `CEREBRAS_API_KEY` or `AOA_OPENAI_API_KEY` | `LLM_API_KEY` — retain the value for the endpoint you use |
+| `OPENAI_BASE_URL` | `LLM_BASE_URL` |
+| `TYPESAFE_API_KEY` | `DECISION_API_KEY` |
+
+Remove the old entries after renaming; they are no longer read. Keep `PROVIDER`,
+`MODEL`, `DECISION_PROVIDER`, `DECISION_MODEL` and `DECISION_BASE_URL` unchanged
+when retaining the same services. If your authored EVE `agent.ts` uses the old
+environment names, replace those reads with the current
+[provider-neutral wiring](../sessions/session-03-eve/WALKTHROUGH.md#checkpoint-2--add-provider-neutral-model-wiring).
+Rebuild/restart the session after saving the configuration, then rerun the model
+smoke test. This migration does not require another environment file.
 
 If you have used an older setup, check the [migration note](../../archive/course-content-before-review/INDEX.md#updating-an-older-installation) for settings that can override `.env`. Fresh checkouts need only the file above. Exported terminal variables take precedence over `.env`.
 

@@ -16,13 +16,13 @@ def _join_url(base_url: str, path: str) -> str:
 
 def _endpoint(provider: str) -> str:
     if provider == "openai":
-        base_url = os.environ.get("OPENAI_BASE_URL", "").strip()
+        base_url = os.environ.get("LLM_BASE_URL", "").strip()
         return _join_url(base_url or "https://api.openai.com/v1", "chat/completions")
     if provider == "ollama":
         host = os.environ.get("OLLAMA_HOST", "http://ollama:11434").strip()
         return _join_url(host, "api/chat")
     if provider == "anthropic":
-        base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+        base_url = os.environ.get("LLM_BASE_URL", "").strip()
         return _join_url(base_url or "https://api.anthropic.com", "v1/messages")
     return "<unknown provider>"
 
@@ -47,13 +47,9 @@ def _public_url(url: str) -> str:
 def _configuration_error(provider: str, model: str) -> str | None:
     if not model:
         return "MODEL is not set"
-    if provider == "openai":
-        if not os.environ.get("OPENAI_API_KEY", "").strip():
-            return "No API key reached the container for PROVIDER=openai"
-        return None
-    if provider == "anthropic":
-        if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
-            return "ANTHROPIC_API_KEY is not set for PROVIDER=anthropic"
+    if provider in {"openai", "anthropic"}:
+        if not os.environ.get("LLM_API_KEY", "").strip():
+            return f"LLM_API_KEY is not set for PROVIDER={provider}"
         return None
     if provider == "ollama":
         if not os.environ.get("OLLAMA_HOST", "http://ollama:11434").strip():
@@ -64,14 +60,9 @@ def _configuration_error(provider: str, model: str) -> str | None:
 
 def _safe_error(exc: Exception) -> str:
     message = " ".join(str(exc).split()) or "no error details returned"
-    for variable in (
-        "OPENAI_API_KEY",
-        "AOA_OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-    ):
-        secret = os.environ.get(variable, "")
-        if secret:
-            message = message.replace(secret, "[redacted]")
+    secret = os.environ.get("LLM_API_KEY", "").strip()
+    if secret:
+        message = message.replace(secret, "[redacted]")
     return message[:500]
 
 
@@ -90,19 +81,13 @@ def _failure_hint(provider: str) -> str:
             "http://host.docker.internal:11434 for host Ollama)."
         )
     if provider == "openai":
-        if urlsplit(os.environ.get("OPENAI_BASE_URL", "")).hostname == "api.cerebras.ai":
-            return (
-                "Set CEREBRAS_API_KEY in .env and use the "
-                "course launcher. It maps that key to the adapter's "
-                "OPENAI_API_KEY. Check the exact MODEL id and provider access."
-            )
         return (
-            "Check AOA_OPENAI_API_KEY, the provider's exact MODEL id, and that "
-            "OPENAI_BASE_URL is the API root ending in /v1 rather than "
+            "Check LLM_API_KEY, the provider's exact MODEL id, and that "
+            "LLM_BASE_URL is the API root ending in /v1 rather than "
             "/chat/completions."
         )
     if provider == "anthropic":
-        return "Check ANTHROPIC_API_KEY, the exact MODEL id, and provider access."
+        return "Check LLM_API_KEY, LLM_BASE_URL, the exact MODEL id, and provider access."
     return "Check PROVIDER and MODEL in .env."
 
 

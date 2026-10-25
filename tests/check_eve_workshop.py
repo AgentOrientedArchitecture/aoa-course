@@ -42,7 +42,7 @@ def main():
                      '--user',f'{os.getuid()}:{os.getgid()}', '--workdir','/workshop',
                      '--mount',f'type=bind,source={workspace},target=/workshop',
                      '-e','HOME=/tmp','-e','MODEL=gpt-oss-120b',
-                     '-e','OPENAI_BASE_URL=http://127.0.0.1:1/v1','-e','OPENAI_API_KEY=fixture-not-a-real-key',
+                     '-e','LLM_BASE_URL=http://127.0.0.1:1/v1','-e','LLM_API_KEY=fixture-not-a-real-key',
                      image,'sh','-c','npm install --offline --no-audit --no-fund && exec eve dev --no-ui --host 127.0.0.1 --port 3000'])
             for _ in range(180):
                 state=command(['docker','inspect',name,'--format','{{.State.Status}}']).strip()

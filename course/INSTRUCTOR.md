@@ -4,7 +4,7 @@
 
 - Use `main` in `aoa-course`, on Spark or the teaching laptop, and record the commit used for rehearsal. Follow the [checkout instructions](pre-work/SETUP.md#existing-checkouts) when updating an existing installation, then use the [launcher table](pre-work/SETUP.md#start-and-stop) for macOS/Linux and Windows commands.
 - Use the [architecture diagrams](ARCHITECTURE.md) to locate each component before running its example. Read the [EVE/AGNTCY adoption explanation](sessions/session-03-eve/ADOPTION.md) before Session 3; the practical integration is a main course argument, not an optional product overview.
-- Use the [provider setup](pre-work/SETUP.md). Verify actual Cerebras and TypeSafe calls, account quota and access from the teaching environment. Keep the local route ready and label it when used.
+- Use the [provider setup](pre-work/SETUP.md), with `LLM_API_KEY` for generation and `DECISION_API_KEY` for decisions. Verify actual calls, account quota and access for the selected endpoints from the teaching environment. Cerebras and TypeSafe remain the default examples; a different compatible provider needs its own acceptance check. Keep the local route ready and label it when used.
 - Build all images before the session. EVE retains its pinned native workspace and framework version; do not replace learner files to make a demo pass.
 - Run `.venv-course/bin/python -m pytest -q tests` after installing `tests/requirements.txt` into that isolated environment. These are adapter/policy/storage checks, not model-quality certification.
 - After Session 3 adoption, check automatic AU publication, AGNTCY catalogue cards and the Directory content IDs in the executed plan. Session 4 continues through AGNTCY.

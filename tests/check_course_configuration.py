@@ -24,7 +24,7 @@ def config(files, profiles, env, env_file):
     return json.loads(subprocess.check_output(args+['config', '--format', 'json'], cwd=ROOT, env=env, text=True))
 
 
-def normalise(services):
+def normalise(services, historical=False):
     services = copy.deepcopy(services)
     if 'estate-filesystem' in services:
         service = services.pop('estate-filesystem')
@@ -36,6 +36,14 @@ def normalise(services):
     for service in services.values():
         service.pop('profiles', None)
         env = service.get('environment', {})
+        # The archive keeps its original vocabulary. Translate the expected
+        # fixture here only; the current runtime has no compatibility aliases.
+        if historical:
+            for old, current in (('OPENAI_API_KEY', 'LLM_API_KEY'), ('OPENAI_BASE_URL', 'LLM_BASE_URL')):
+                if old in env: env[current] = env.pop(old)
+            env.pop('ANTHROPIC_API_KEY', None)
+            if 'TYPESAFE_API_KEY' in env:
+                env['DECISION_API_KEY'] = env.pop('TYPESAFE_API_KEY')
         # These explicit current defaults equal the existing application defaults.
         if env.get('PLAN_GOVERNANCE_CAPABILITY') == '': env.pop('PLAN_GOVERNANCE_CAPABILITY')
         if env.get('STUDIO_ALLOW_WIKI_RESET') == 'true': env.pop('STUDIO_ALLOW_WIKI_RESET')
@@ -77,16 +85,22 @@ def main():
                 profiles = [f'session{session}']
                 if session == 3: profiles += ['session3-lab-wrapped']
                 if session in (3,4): profiles += ['directory']
-                expected = normalise(config(files,profiles,env,env_file)['services'])
-                actual = normalise(config([ROOT/'system/docker-compose.yml'],profiles,env,env_file)['services'])
+                expected = normalise(config(files,profiles,env,env_file)['services'], historical=True)
+                current_env = {k:v for k,v in env.items() if k not in {
+                    'CEREBRAS_API_KEY', 'TYPESAFE_API_KEY', 'AOA_OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ANTHROPIC_API_KEY'}}
+                current_env.update(LLM_API_KEY='fixture-generation-key',
+                                   LLM_BASE_URL=values['OPENAI_BASE_URL'],
+                                   DECISION_API_KEY='fixture-decision-key')
+                actual = normalise(config([ROOT/'system/docker-compose.yml'],profiles,current_env,env_file)['services'])
                 assert actual.keys() == expected.keys(), (route,session,actual.keys() ^ expected.keys())
                 for name in expected:
                     assert actual[name] == expected[name], (route,session,name,
                         {k:(expected[name].get(k),actual[name].get(k)) for k in expected[name].keys() | actual[name].keys() if expected[name].get(k)!=actual[name].get(k)})
-                assert actual['evaluator']['environment']['OPENAI_API_KEY'] == 'fixture-generation-key'
+                assert actual['evaluator']['environment']['LLM_API_KEY'] == 'fixture-generation-key'
+                assert actual['decision']['environment']['DECISION_API_KEY'] == 'fixture-decision-key'
                 print(f'PASS: {route}, session {session}: services, mounts, endpoints and runtime settings match')
         # Native authoring must mount the same real learner folder.
-        native = config([ROOT/'system/docker-compose.yml'],['session3-lab-native'],env,env_file)['services']['eve-workshop-native']
+        native = config([ROOT/'system/docker-compose.yml'],['session3-lab-native'],current_env,env_file)['services']['eve-workshop-native']
         mount = next(v for v in native['volumes'] if v['target']=='/workshop')
         assert mount['source'] == str(ROOT/'system/agents-eve/workshop') and not mount.get('read_only',False)
         print('PASS: native EVE uses the writable learner workshop')

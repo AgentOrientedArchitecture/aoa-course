@@ -31,7 +31,7 @@ For each demonstration: **predict → reveal → inspect → change → compare*
 
 ## Model access
 
-[The setup](pre-work/SETUP.md) uses Cerebras `gpt-oss-120b` for generation and TypeSafe `jev-1.13.0` for bounded choices. Ollama remains available. The local constrained-choice baseline is labelled as such; it is not represented as Jev or given invented probabilities.
+[The setup](pre-work/SETUP.md) uses Cerebras `gpt-oss-120b` for generation and TypeSafe `jev-1.13.0` for bounded choices as its defaults. `LLM_API_KEY` and `DECISION_API_KEY` name these two roles independently of the chosen vendors; endpoint and model settings choose each service. Ollama remains available. The local constrained-choice baseline is labelled as such; it is not represented as Jev or given invented probabilities.
 
 The CV assessment itself still needs language generation. The wiki promotion AU demonstrates a different product design: a bounded decision is the main model output, while code assembles an evidence-preserving result. This is a separate application of decision models from planner allocation.
 

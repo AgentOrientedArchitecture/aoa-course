@@ -51,7 +51,7 @@ def test_local_does_not_invent_probability():
 
 
 def test_typesafe_wire_contract(monkeypatch):
-    monkeypatch.setenv('DECISION_PROVIDER', 'typesafe'); monkeypatch.setenv('TYPESAFE_API_KEY', 'unit-test-placeholder')
+    monkeypatch.setenv('DECISION_PROVIDER', 'typesafe'); monkeypatch.setenv('DECISION_API_KEY', 'unit-test-placeholder')
     monkeypatch.setenv('DECISION_MODEL', 'jev-1.13.0')
     def handler(request):
         body = json.loads(request.content)

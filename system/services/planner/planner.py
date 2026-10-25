@@ -715,10 +715,10 @@ async def _planner_ollama(prompt: str, model: str) -> tuple[str, dict[str, Any]]
 
 
 async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]:
-    base_url = (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    base_url = (os.environ.get("LLM_BASE_URL", "").strip() or "https://api.openai.com/v1").rstrip("/")
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
+        raise RuntimeError("LLM_API_KEY is not set for PROVIDER=openai")
     payload: dict[str, Any] = {
         "model": model,
         "messages": [
@@ -745,9 +745,10 @@ async def _planner_openai(prompt: str, model: str) -> tuple[str, dict[str, Any]]
 
 
 async def _planner_anthropic(prompt: str, model: str) -> tuple[str, dict[str, Any]]:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    base_url = (os.environ.get("LLM_BASE_URL", "").strip() or "https://api.anthropic.com").rstrip("/")
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+        raise RuntimeError("LLM_API_KEY is not set for PROVIDER=anthropic")
     payload: dict[str, Any] = {
         "model": model,
         "max_tokens": PLANNER_MODEL_MAX_TOKENS,
@@ -762,7 +763,7 @@ async def _planner_anthropic(prompt: str, model: str) -> tuple[str, dict[str, An
     }
     async with httpx.AsyncClient(timeout=PLANNER_MODEL_TIMEOUT) as client:
         r = await client.post(
-            "https://api.anthropic.com/v1/messages", json=payload, headers=headers
+            f"{base_url}/v1/messages", json=payload, headers=headers
         )
         r.raise_for_status()
         raw = r.json()

@@ -506,7 +506,9 @@ Models operate within a fixed workflow catalogue, with code checking required
 responsibilities and evidence dependencies.
 
 Cerebras generation and TypeSafe decisions have distinct adapters and
-configuration. `DECISION_PROVIDER=systemone` calls a local native
+configuration. Generation uses `LLM_BASE_URL` and `LLM_API_KEY`; decisions use
+`DECISION_BASE_URL` and `DECISION_API_KEY`. The same names apply throughout the
+course, including EVE. `DECISION_PROVIDER=systemone` calls a local native
 `/v1/systemone` endpoint and validates the returned candidate probabilities,
 using only optional `DECISION_API_KEY` authentication. Clef can run through
 Ollama, compatible llama.cpp builds or oMLX. `DECISION_PROVIDER=ollama` retains

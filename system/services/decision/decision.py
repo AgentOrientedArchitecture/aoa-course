@@ -80,10 +80,9 @@ async def decide(body: dict, client: httpx.AsyncClient) -> dict:
             "systemone": "http://host.docker.internal:11434",
         }[provider]
         base = os.getenv("DECISION_BASE_URL", default_base).rstrip("/")
-        # Local System One servers must never inherit the hosted TypeSafe key.
-        key = os.getenv("TYPESAFE_API_KEY", "") if provider == "typesafe" else os.getenv("DECISION_API_KEY", "")
+        key = os.getenv("DECISION_API_KEY", "").strip()
         if provider == "typesafe" and not key:
-            raise ValueError("TYPESAFE_API_KEY is not configured; select the local option or configure a key")
+            raise ValueError("DECISION_API_KEY is not configured; configure a key or select a local decision provider")
         response = await client.post(base + "/v1/systemone", headers={"Authorization": "Bearer " + key} if key else {}, json={"model": model, "state": body["state"], "questions": {"decision": question}})
         response.raise_for_status()
         raw = response.json()
@@ -120,7 +119,7 @@ async def decide(body: dict, client: httpx.AsyncClient) -> dict:
 @app.get("/healthz")
 async def healthz() -> dict:
     config = configuration()
-    return {"ok": True, **config, "configured": config["provider"] != "typesafe" or bool(os.getenv("TYPESAFE_API_KEY")), "provider_called": False}
+    return {"ok": True, **config, "configured": config["provider"] != "typesafe" or bool(os.getenv("DECISION_API_KEY", "").strip()), "provider_called": False}
 
 
 @app.post("/choice")

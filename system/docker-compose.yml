@@ -57,9 +57,8 @@ services:
       PLANNER_MODEL_MAX_TOKENS: ${PLANNER_MODEL_MAX_TOKENS:-2048}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-low}
       OPENAI_RESPONSE_FORMAT: ${OPENAI_RESPONSE_FORMAT:-json_object}
@@ -198,9 +197,8 @@ services:
       CAPABILITY_ALLOWLIST: parser-cv
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -239,9 +237,8 @@ services:
       CAPABILITY_ALLOWLIST: parser-notes,parser-query
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -278,9 +275,8 @@ services:
       CAPABILITY_ALLOWLIST: parser-estate
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -321,9 +317,8 @@ services:
       CAPABILITY_ALLOWLIST: ${COURSE_EVALUATOR_ALLOWLIST:-evaluator-cv,evaluator-promote,evaluator-wiki-query,evaluator-plan-governance,evaluator-agent-evidence,evaluator-flow-evidence}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -368,9 +363,8 @@ services:
       CAPABILITY_ALLOWLIST: ${COURSE_REPORTER_ALLOWLIST:-${REPORTER_CAPABILITY_ALLOWLIST:-}}
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -475,8 +469,8 @@ services:
     environment:
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
       NPM_CONFIG_OFFLINE: 'true'
@@ -509,8 +503,8 @@ services:
       AGENT_PORT: 8888
       PROVIDER: ${PROVIDER:-ollama}
       MODEL: ${MODEL:-gpt-oss:120b}
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       MODEL_CONTEXT_WINDOW_TOKENS: ${MODEL_CONTEXT_WINDOW_TOKENS:-128000}
       NPM_CONFIG_OFFLINE: 'true'
@@ -535,7 +529,6 @@ services:
       DECISION_PROVIDER: ${DECISION_PROVIDER:-typesafe}
       DECISION_MODEL: ${DECISION_MODEL:-jev-1.13.0}
       DECISION_BASE_URL: ${DECISION_BASE_URL:-https://api.typesafe.ai}
-      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
       DECISION_API_KEY: ${DECISION_API_KEY:-}
       DECISION_TIMEOUT_SECONDS: ${DECISION_TIMEOUT_SECONDS:-120}
   cv-data-evaluator:
@@ -555,7 +548,7 @@ services:
     - ./agents/evaluator/capabilities:/app/capabilities:ro
     - ./inbox:/data/inbox:ro
     environment:
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
       AGENT_ID: urn:aoa:agent:cv-data-evaluator
@@ -565,7 +558,7 @@ services:
       CAPABILITY_ALLOWLIST: evaluator-cv-data
       PROVIDER: ${PROVIDER:-openai}
       MODEL: ${MODEL:-gpt-oss-120b}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}
@@ -595,7 +588,7 @@ services:
     - ./agents/evaluator/capabilities:/app/capabilities:ro
     - ./inbox:/data/inbox:ro
     environment:
-      OPENAI_API_KEY: ${CEREBRAS_API_KEY:-${AOA_OPENAI_API_KEY:-}}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       REGISTRY_URL: http://registry:7100
       PLANNER_URL: http://planner:7200
       AGENT_ID: urn:aoa:agent:cv-frontend-evaluator
@@ -605,7 +598,7 @@ services:
       CAPABILITY_ALLOWLIST: evaluator-cv-frontend
       PROVIDER: ${PROVIDER:-openai}
       MODEL: ${MODEL:-gpt-oss-120b}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.cerebras.ai/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
       MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-240}
       MODEL_MAX_TOKENS: ${MODEL_MAX_TOKENS:-8192}

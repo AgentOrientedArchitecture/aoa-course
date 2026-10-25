@@ -91,14 +91,14 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { defineAgent } from "eve";
 
 // Endpoint resolution, in order:
-//   1. OPENAI_BASE_URL   — any OpenAI-compatible endpoint (SambaNova, NVIDIA
+//   1. LLM_BASE_URL      — any OpenAI-compatible endpoint (SambaNova, NVIDIA
 //                          NIM, an MLX server on the host, ...).
 //   2. OLLAMA_HOST + /v1 — Ollama's OpenAI-compatible shim.
 //   3. localhost Ollama  — only reachable when EVE runs outside Docker;
 //                          inside the workshop container Compose always sets
 //                          OLLAMA_HOST, so this is a host-dev fallback.
 function baseUrl(): string {
-  const explicit = process.env.OPENAI_BASE_URL?.trim();
+  const explicit = process.env.LLM_BASE_URL?.trim();
   if (explicit) return explicit;
   const ollama = process.env.OLLAMA_HOST?.trim();
   if (ollama) return `${ollama.replace(/\/$/, "")}/v1`;
@@ -107,10 +107,9 @@ function baseUrl(): string {
 
 const provider = createOpenAI({
   baseURL: baseUrl(),
-  // Inside the workshop containers Compose supplies OPENAI_API_KEY from your
-  // .env's CEREBRAS_API_KEY (or AOA_OPENAI_API_KEY for other providers), though
-  // .env leaves OPENAI_API_KEY itself blank. Local endpoints need no key.
-  apiKey: process.env.OPENAI_API_KEY || "not-needed-for-local",
+  // The course uses LLM_API_KEY for generation, independent of the vendor.
+  // An unauthenticated local endpoint uses a placeholder, not a hosted key.
+  apiKey: process.env.LLM_API_KEY || "not-needed-for-local",
 });
 
 export default defineAgent({
@@ -125,17 +124,21 @@ export default defineAgent({
 });
 ```
 
-The same file works unchanged with every tested course `.env` — the workshop
-containers receive `MODEL`, `OPENAI_BASE_URL`, `OLLAMA_HOST`, and (mapped from
-`AOA_OPENAI_API_KEY`) `OPENAI_API_KEY` from Compose:
+The workshop containers receive `MODEL`, `LLM_BASE_URL`, `OLLAMA_HOST`, and
+`LLM_API_KEY` from Compose. These are the same generation settings used by the
+other course AUs:
 
 | Your `.env` | What the agent uses |
 | --- | --- |
-| Cerebras (default) | `OPENAI_BASE_URL` + `CEREBRAS_API_KEY`, mapped into the container as `OPENAI_API_KEY`. |
-| Another OpenAI-compatible provider | `OPENAI_BASE_URL` + your `AOA_OPENAI_API_KEY`, model from `MODEL`. |
-| Local option in `.env` (host Ollama) | `OLLAMA_HOST` (`http://host.docker.internal:11434`) + `/v1`, no key. |
-| Container Ollama (`AOA_LOCAL=1`) | `OLLAMA_HOST` (`http://ollama:11434`) + `/v1`, no key. |
-| MLX or another host-served OpenAI endpoint | Set `OPENAI_BASE_URL=http://host.docker.internal:<port>/v1` — `localhost` would point inside the container. |
+| Cerebras (default) | `LLM_BASE_URL` + its key in `LLM_API_KEY`, model from `MODEL`. |
+| Another OpenAI-compatible provider | Its API root in `LLM_BASE_URL`, key in `LLM_API_KEY`, and exact ID in `MODEL`; verify native acceptance with that combination. |
+| Local option in `.env` (host Ollama) | `OLLAMA_HOST` (`http://host.docker.internal:11434`) + `/v1`; use `LLM_API_KEY=local-no-auth` for an unauthenticated server. |
+| Container Ollama (`AOA_LOCAL=1`) | `OLLAMA_HOST` (`http://ollama:11434`) + `/v1`; use the local placeholder. |
+| MLX or another host-served OpenAI endpoint | Set `LLM_BASE_URL=http://host.docker.internal:<port>/v1` and the local server's key or placeholder in `LLM_API_KEY` — `localhost` would point inside the container. |
+
+Generation and decision credentials are separate. `DECISION_API_KEY` belongs
+to the decision service and is not used by this EVE agent. These configuration
+options do not claim that every compatible provider/model has passed the lab.
 
 Two limits worth knowing: this lab speaks the OpenAI-compatible interface
 only, so `PROVIDER=anthropic` does not apply here (the `PROVIDER` variable is

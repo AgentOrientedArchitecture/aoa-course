@@ -84,13 +84,21 @@ there is still no AOA Agent ID or registry entry.
 ## Provider-neutral model access
 
 The workshop's `agent.ts` uses `createOpenAI` with environment-driven
-`OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL`. If no explicit base URL is set,
+`LLM_BASE_URL`, `LLM_API_KEY`, and `MODEL`. If no explicit base URL is set,
 it derives Ollama's OpenAI-compatible `/v1` endpoint from `OLLAMA_HOST`.
 `MODEL_CONTEXT_WINDOW_TOKENS` supplies metadata EVE cannot infer for local or
 unlisted model IDs.
 
-This keeps provider selection in the course environment (`.env`): the authored agent does not
-import a provider-specific SDK or hard-code a hosted service.
+In the course `.env`, use `LLM_BASE_URL` and `LLM_API_KEY` for generation.
+Compose passes those same names into EVE. Replace the key when changing endpoints.
+For an unauthenticated local server use a placeholder such as `local-no-auth`.
+`DECISION_API_KEY` configures the separate decision service and is not passed
+to EVE as its generation credential.
+
+This keeps provider selection in the course environment (`.env`): the authored
+agent uses the OpenAI-compatible SDK without hard-coding a hosted service.
+Configuration compatibility is not a claim of acceptance testing for every
+provider and model. Run the native tests against the selected combination.
 
 ## Adoption into the CV workflow
 

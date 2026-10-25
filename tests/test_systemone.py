@@ -24,7 +24,7 @@ ANSWER = {"choice": "data", "probabilities": {"data": 0.9, "no_suitable_capabili
 
 @pytest.fixture(autouse=True)
 def isolated_configuration(monkeypatch):
-    for key in ("DECISION_PROVIDER", "DECISION_MODEL", "DECISION_BASE_URL", "DECISION_API_KEY", "TYPESAFE_API_KEY", "OLLAMA_HOST"):
+    for key in ("DECISION_PROVIDER", "DECISION_MODEL", "DECISION_BASE_URL", "DECISION_API_KEY", "LLM_API_KEY", "OLLAMA_HOST"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -37,7 +37,7 @@ def call(handler):
 
 def test_local_systemone_native_contract_and_provenance(monkeypatch):
     monkeypatch.setenv("DECISION_PROVIDER", "systemone")
-    monkeypatch.setenv("TYPESAFE_API_KEY", "hosted-test-key-must-stay-private")
+    monkeypatch.setenv("LLM_API_KEY", "generation-test-key-must-stay-private")
     def handler(request):
         assert request.method == "POST"
         assert str(request.url) == "http://host.docker.internal:11434/v1/systemone"
@@ -65,7 +65,7 @@ def test_local_systemone_custom_endpoint_model_and_optional_auth(monkeypatch):
     monkeypatch.setenv("DECISION_MODEL", "clef-flash-oQ4e")
     monkeypatch.setenv("DECISION_BASE_URL", "http://127.0.0.1:8000/")
     monkeypatch.setenv("DECISION_API_KEY", "local-test-key")
-    monkeypatch.setenv("TYPESAFE_API_KEY", "different-hosted-test-key")
+    monkeypatch.setenv("LLM_API_KEY", "different-generation-test-key")
     def handler(request):
         assert str(request.url) == "http://127.0.0.1:8000/v1/systemone"
         assert request.headers["authorization"] == "Bearer local-test-key"
@@ -89,7 +89,6 @@ def test_local_systemone_rejects_invalid_choices_and_distributions(monkeypatch, 
 
 def test_unavailable_local_systemone_never_falls_back(monkeypatch):
     monkeypatch.setenv("DECISION_PROVIDER", "systemone")
-    monkeypatch.setenv("TYPESAFE_API_KEY", "hosted-test-key")
     calls = []
     def handler(request):
         calls.append(str(request.url))
@@ -103,10 +102,9 @@ def test_unavailable_local_systemone_never_falls_back(monkeypatch):
     ("typesafe", "https://api.typesafe.ai", "jev-1.13.0", "hosted-test-key"),
     ("kev", "http://host.docker.internal:8090", "gpt-oss:20b", "local-test-key"),
 ])
-def test_existing_native_provider_defaults_and_auth_stay_unchanged(monkeypatch, provider, base, model, key):
+def test_native_provider_defaults_protocol_and_cost_stay_unchanged(monkeypatch, provider, base, model, key):
     monkeypatch.setenv("DECISION_PROVIDER", provider)
-    monkeypatch.setenv("TYPESAFE_API_KEY", "hosted-test-key")
-    monkeypatch.setenv("DECISION_API_KEY", "local-test-key")
+    monkeypatch.setenv("DECISION_API_KEY", key)
     def handler(request):
         assert str(request.url) == base + "/v1/systemone"
         assert request.headers["authorization"] == "Bearer " + key
@@ -119,6 +117,45 @@ def test_existing_native_provider_defaults_and_auth_stay_unchanged(monkeypatch, 
         assert result["estimated_cost_usd"] == 100 * 0.042 / 1_000_000
     else:
         assert result["estimated_cost_usd"] is None
+
+
+def test_typesafe_uses_decision_key_and_health_does_not_expose_it(monkeypatch):
+    monkeypatch.setenv("DECISION_PROVIDER", "typesafe")
+    monkeypatch.setenv("DECISION_API_KEY", "generic-decision-test-key")
+    monkeypatch.setenv("LLM_API_KEY", "different-generation-test-key")
+    def handler(request):
+        assert request.headers["authorization"] == "Bearer generic-decision-test-key"
+        assert str(request.url) == "https://api.typesafe.ai/v1/systemone"
+        return httpx.Response(200, json={"answers": {"decision": ANSWER}})
+    assert call(handler)["provider"] == "typesafe"
+    health = asyncio.run(decision.healthz())
+    assert health["configured"] is True
+    assert health["provider_called"] is False
+    assert "generic-decision-test-key" not in json.dumps(health)
+
+
+@pytest.mark.parametrize("provider", ["systemone", "kev"])
+def test_local_native_provider_does_not_inherit_generation_key(monkeypatch, provider):
+    monkeypatch.setenv("DECISION_PROVIDER", provider)
+    monkeypatch.setenv("DECISION_API_KEY", "")
+    monkeypatch.setenv("LLM_API_KEY", "generation-test-key-must-stay-private")
+    def handler(request):
+        assert "authorization" not in request.headers
+        return httpx.Response(200, json={"answers": {"decision": ANSWER}})
+    assert call(handler)["provider"] == provider
+    assert asyncio.run(decision.healthz())["configured"] is True
+
+
+@pytest.mark.parametrize("key", ["", "   "])
+def test_typesafe_without_a_decision_key_makes_no_request(monkeypatch, key):
+    monkeypatch.setenv("DECISION_PROVIDER", "typesafe")
+    monkeypatch.setenv("DECISION_API_KEY", key)
+    monkeypatch.setenv("LLM_API_KEY", "generation-test-key-must-stay-private")
+    def handler(request):
+        pytest.fail("An unconfigured provider must not receive a request")
+    with pytest.raises(ValueError, match="DECISION_API_KEY is not configured"):
+        call(handler)
+    assert asyncio.run(decision.healthz())["configured"] is False
 
 
 def test_ollama_chat_baseline_remains_unscored(monkeypatch):

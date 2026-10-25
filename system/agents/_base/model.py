@@ -3,7 +3,7 @@
 Agents call ``model.complete(prompt, **opts)`` and don't know which provider
 is behind it. The provider is chosen by the ``PROVIDER`` env var; the model
 name comes from ``MODEL``. Hosted OpenAI-compatible endpoints can be selected
-with ``OPENAI_BASE_URL``. Switching model or hosting location is a ``.env``
+with ``LLM_BASE_URL`` and ``LLM_API_KEY``. Switching model or hosting location is a ``.env``
 change.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ class Model:
         self.model = model or os.environ.get("MODEL", "")
         if not self.model:
             raise RuntimeError(
-                "MODEL env var is not set. See system/.env.example for guidance."
+                "MODEL env var is not set. See .env.example for guidance."
             )
         self.timeout_seconds = (
             float(os.environ.get("MODEL_TIMEOUT_SECONDS", "180"))
@@ -98,8 +98,11 @@ class Model:
         from openai import OpenAI  # type: ignore[import-untyped]
 
         if self._client is None:
-            base_url = os.environ.get("OPENAI_BASE_URL") or None
-            self._client = OpenAI(timeout=self.timeout_seconds, base_url=base_url)
+            api_key = os.environ.get("LLM_API_KEY", "").strip()
+            if not api_key:
+                raise RuntimeError("LLM_API_KEY is not set for PROVIDER=openai")
+            base_url = os.environ.get("LLM_BASE_URL", "").strip() or "https://api.openai.com/v1"
+            self._client = OpenAI(api_key=api_key, timeout=self.timeout_seconds, base_url=base_url)
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -163,7 +166,11 @@ class Model:
         from anthropic import Anthropic  # type: ignore[import-untyped]
 
         if self._client is None:
-            self._client = Anthropic(timeout=self.timeout_seconds)
+            api_key = os.environ.get("LLM_API_KEY", "").strip()
+            if not api_key:
+                raise RuntimeError("LLM_API_KEY is not set for PROVIDER=anthropic")
+            base_url = os.environ.get("LLM_BASE_URL", "").strip() or "https://api.anthropic.com"
+            self._client = Anthropic(api_key=api_key, auth_token="", timeout=self.timeout_seconds, base_url=base_url)
         kwargs: dict[str, Any] = {
             "model": self.model,
             "max_tokens": max_tokens,

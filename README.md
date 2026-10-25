@@ -83,7 +83,7 @@ Install Git and Docker, then:
 git clone --branch main https://github.com/AgentOrientedArchitecture/aoa-course.git
 cd aoa-course
 cp .env.example .env
-# Add CEREBRAS_API_KEY and TYPESAFE_API_KEY privately in .env.
+# Add LLM_API_KEY and DECISION_API_KEY privately in .env.
 ./scripts/test_model_provider.sh
 ./scripts/session1-up.sh
 ```
