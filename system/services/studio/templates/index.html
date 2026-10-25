@@ -26,7 +26,7 @@
   </section>
   <main>
     <section id="registry-pane" class="pane">
-      <h2>Registry</h2>
+      <h2>{% if studio_config.discovery_backend == 'agntcy' %}Locally adopted capabilities{% else %}Registry{% endif %}</h2>
       <ul id="registry-list" class="list"></ul>
       <section class="governance-log">
         <h3>Governance</h3>
@@ -57,10 +57,9 @@
         </div>
 
         <div class="workflow-fields{% if studio_config.workflows[0] != "cv-fit" %} hidden{% endif %}" data-mode-panel="cv-fit">
-          <p class="mode-note" id="cv-fit-note" data-naive-note="Drop or paste a CV and a job description, then submit. The planner discovers the parser, evaluator, and reporter from the registry and runs them as one workflow." data-governed-note="The baseline card is ineligible, so this plan is blocked before any application AU runs. After you fix the card, execution produces a held draft; review the actual evaluation and approve or reject its exact result digest below.">
-            Drop or paste a CV and a job description, then submit. The planner
-            discovers the parser, evaluator, and reporter from the registry and
-            runs them as one workflow.
+          {% set discovery_note = 'Drop or paste a CV and a job description, then submit. The planner discovers AUs through AGNTCY Directory, checks local adoption and composes the work.' if studio_config.discovery_backend == 'agntcy' else 'Drop or paste a CV and a job description, then submit. The planner discovers the parser, evaluator, and reporter from the registry and runs them as one workflow.' %}
+          <p class="mode-note" id="cv-fit-note" data-naive-note="{{ discovery_note }}" data-governed-note="The baseline card is ineligible, so this plan is blocked before any application AU runs. After you fix the card, execution produces a held draft; review the actual evaluation and approve or reject its exact result digest below.">
+            {{ discovery_note }}
           </p>
           <label class="drop-field">
             <span class="drop-label">

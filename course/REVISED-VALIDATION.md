@@ -83,3 +83,17 @@ Directory now runs through Docker on all course platforms, including Windows Com
 - CI runs those launchers on Linux, macOS and native Windows, and the real container round trip on Linux amd64.
 
 The container test uses synthetic registry metadata, temporary data and a separate Docker project. It does not call a generation/decision provider or alter learner data. Native Windows Docker Desktop rehearsal remains a separate delivery check; the Windows CI job checks actual batch command handling with a Docker stand-in.
+
+## 25 October: AGNTCY becomes the AU discovery source
+
+Revised Sessions 3–4 now publish all running AUs and require current AGNTCY records before planning/allocation. The local registry retains adoption, lifecycle and tool lookup. Earlier-session and original-profile paths remain available.
+
+- Real Docker integration on macOS arm64 validates publication and catalogue visibility for **all 18 course AU contracts**, including non-parser evaluators/reporters and the EVE contract. It checks idempotent publication, search/pull, local contract match/mismatch, Directory outage failure, output preservation and restart recovery. CI repeats this on Linux amd64.
+- Native shell/batch launcher checks pass on macOS, Linux and Windows. Full Windows Docker Desktop rehearsal remains a separate delivery check.
+- A live Spark run used an isolated EVE workshop built from the documented instructions, separate registry/traces/Directory state and the checked-in synthetic CV/JD fixtures. Trace **`0c7404c3e5ca`** discovered six active Session 3 AUs through AGNTCY. TypeSafe `jev-1.13.0` selected `evaluator-cv-data`; parser, evaluator and real EVE interviewer used Cerebras `gpt-oss-120b`.
+- The EVE result contained exactly five questions and met the documented area/question/why word limits. This is one successful execution and shape check, not a quality benchmark.
+- Stopping only the rehearsal Directory caused a new intent to return 503. Trace **`093d75d6788c`** contained `start` and `directory-unavailable`, with **zero AU invocations**. Directory was restarted afterwards.
+- Studio's AU selection and Run review were inspected in the browser. They expose AGNTCY provenance, content IDs and local adoption checks alongside the accepted EVE binding and output.
+- The live test found and corrected two practical issues: OASF rejects empty skill lists, and the publication adapter may start after the adopted EVE health check completes. Every course AU now has an explicit v1.0.0 taxonomy mapping; the sync command waits for the adapter and for indexing.
+
+[Structured live evidence](validation/2026-10-25-agntcy/live-evidence.json) records the exact content IDs, bindings, provider/model names, output and outage trace. [EVE binding screenshot](validation/2026-10-25-agntcy/eve-binding.png) shows the inspected UI. Learner-owned workshop files and existing course state were not used as disposable test data.

@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-25",
+  "implementation_commit": "3756a8d",
+  "environment": "Spark Linux arm64; isolated temporary EVE workshop and separate state",
+  "fixtures": [
+    "course/sessions/session-01-cv-fit/cv-examples/jordan-okafor.txt",
+    "course/sessions/session-01-cv-fit/jd-examples/senior-data-engineer-fintech.txt"
+  ],
+  "trace_id": "0c7404c3e5ca",
+  "status": "done",
+  "generation_provider_host": "api.cerebras.ai",
+  "discovery": {
+    "trace_id": "0c7404c3e5ca",
+    "step": "directory-discovery",
+    "source": "agntcy-directory",
+    "records_retrieved": 8,
+    "accepted": [
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareicfxqcnrvpl7ybxxquk46mqzvj7gi6o7elbzmhhojkn2vavxj5e2m",
+        "record_name": "aoa-course/interviewer-questions",
+        "binding_sha256": "6bb8ffccea6c7985c692c4606ba634b559934d531609323c662aadb1df48f10f",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "interviewer-questions"
+      },
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareigsw5ou45ojgfjrqzkbmvquj6gancpqpqytc2fxx7ye7shpwvikkm",
+        "record_name": "aoa-course/parser-cv",
+        "binding_sha256": "5626303e70ef89f34d00553b63199eea0929037e9bbe3d60fb6578fce6295258",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "parser-cv"
+      },
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareidomzqktdbcfmriysbuuuolb2jagnpypkcjnqj4r36o7ngwxulape",
+        "record_name": "aoa-course/evaluator-cv-frontend",
+        "binding_sha256": "8cdb11b871c7fe06dbf694f3546508ab88281ae99fe1c21ca362aff2c5bf2fd1",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "evaluator-cv-frontend"
+      },
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareiflifga47zssmr43qs2urp6b43mb5e36bs4og7dcumupj6hbany4u",
+        "record_name": "aoa-course/evaluator-cv-data",
+        "binding_sha256": "399294c5ab9bf51987b29ef474271dd2f3f3dd22f5e0afed22940415b333d18f",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "evaluator-cv-data"
+      },
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareigyp5yt5mgzz35b5tbvdgqxofb2c2jglvymwffyt2urietrw2j7ea",
+        "record_name": "aoa-course/evaluator-cv",
+        "binding_sha256": "bbcb4ed61c46fcb4490c7b8b432f12eabc0216cb3784732e349ffa0b8cb058dd",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "evaluator-cv"
+      },
+      {
+        "source": "agntcy-directory",
+        "cid": "baeareidijwhapkrjdcqgqgdvh653b4z5xtbk7wykh4ys6tygkibup26tqi",
+        "record_name": "aoa-course/reporter-cv-fit",
+        "binding_sha256": "5308635fad1baef56e34d8a5c04fdf9e19dbc4d521bcc01c5bd6c266a5e804ba",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false,
+        "capability": "reporter-cv-fit"
+      }
+    ],
+    "excluded": [],
+    "missing_current_publication": [],
+    "ts": "2026-10-25T15:28:32.445+00:00",
+    "event_sequence": 2
+  },
+  "bindings": [
+    {
+      "capability": "parser-cv",
+      "discovery": {
+        "source": "agntcy-directory",
+        "cid": "baeareigsw5ou45ojgfjrqzkbmvquj6gancpqpqytc2fxx7ye7shpwvikkm",
+        "record_name": "aoa-course/parser-cv",
+        "binding_sha256": "5626303e70ef89f34d00553b63199eea0929037e9bbe3d60fb6578fce6295258",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false
+      },
+      "model": "gpt-oss-120b"
+    },
+    {
+      "capability": "evaluator-cv-data",
+      "discovery": {
+        "source": "agntcy-directory",
+        "cid": "baeareiflifga47zssmr43qs2urp6b43mb5e36bs4og7dcumupj6hbany4u",
+        "record_name": "aoa-course/evaluator-cv-data",
+        "binding_sha256": "399294c5ab9bf51987b29ef474271dd2f3f3dd22f5e0afed22940415b333d18f",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false
+      },
+      "model": "gpt-oss-120b"
+    },
+    {
+      "capability": "interviewer-questions",
+      "discovery": {
+        "source": "agntcy-directory",
+        "cid": "baeareicfxqcnrvpl7ybxxquk46mqzvj7gi6o7elbzmhhojkn2vavxj5e2m",
+        "record_name": "aoa-course/interviewer-questions",
+        "binding_sha256": "6bb8ffccea6c7985c692c4606ba634b559934d531609323c662aadb1df48f10f",
+        "local_adoption_checked": true,
+        "publisher_identity_verified": false
+      },
+      "model": "gpt-oss-120b"
+    }
+  ],
+  "decisions": [
+    {
+      "choice": "evaluator-cv-data",
+      "provider": "typesafe",
+      "model": "jev-1.13.0"
+    }
+  ],
+  "invoked_aus": [
+    "parser-cv",
+    "evaluator-cv-data",
+    "interviewer-questions"
+  ],
+  "output_checks": {
+    "question_count": 5,
+    "word_limits_pass": true,
+    "semantic_quality_certified": false
+  },
+  "outputs": {
+    "questions": [
+      {
+        "area": "Healthcare domain experience",
+        "question": "Can you describe a project where you worked with healthcare or NHS payment data, detailing your role and outcomes?",
+        "why": "Tests claimed lack of healthcare data experience."
+      },
+      {
+        "area": "GDPR compliance work",
+        "question": "Tell me about a time you performed GDPR/DPA compliance tasks such as DPIAs or data retention scheduling.",
+        "why": "Validates missing GDPR compliance claim."
+      },
+      {
+        "area": "Regulated data handling",
+        "question": "How have you ensured data handling meets regulatory requirements in previous roles, and what controls did you implement?",
+        "why": "Checks ability to handle regulated environment."
+      },
+      {
+        "area": "Data contracts impact",
+        "question": "Describe how you designed and implemented data contracts in Snowflake/dbt, and the measurable impact on schema-change incidents.",
+        "why": "Seeks evidence of claimed reduction to zero."
+      },
+      {
+        "area": "Adapting to healthcare role",
+        "question": "How would you apply your fintech data pipeline and contract experience to building compliant payment data pipelines for the NHS?",
+        "why": "Assesses adaptation to new domain."
+      }
+    ],
+    "report_markdown": "- **Healthcare domain experience:** Can you describe a project where you worked with healthcare or NHS payment data, detailing your role and outcomes?\n- **GDPR compliance work:** Tell me about a time you performed GDPR/DPA compliance tasks such as DPIAs or data retention scheduling.\n- **Regulated data handling:** How have you ensured data handling meets regulatory requirements in previous roles, and what controls did you implement?\n- **Data contracts impact:** Describe how you designed and implemented data contracts in Snowflake/dbt, and the measurable impact on schema-change incidents.\n- **Adapting to healthcare role:** How would you apply your fintech data pipeline and contract experience to building compliant payment data pipelines for the NHS?"
+  },
+  "directory_outage": {
+    "trace_id": "093d75d6788c",
+    "steps": [
+      "start",
+      "directory-unavailable"
+    ],
+    "au_invocations": 0
+  }
+}

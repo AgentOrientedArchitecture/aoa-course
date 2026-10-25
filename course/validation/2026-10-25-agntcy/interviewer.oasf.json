@@ -1,0 +1,155 @@
+{
+  "annotations": {
+    "aoa/acceptance": "Directory discovery is not local execution approval.",
+    "aoa/binding-sha256": "6bb8ffccea6c7985c692c4606ba634b559934d531609323c662aadb1df48f10f",
+    "aoa/capability-id": "interviewer-questions",
+    "aoa/contract-sha256": "4a65573901fe4dca535a0897c7d5a66dc248085e78e4f1a9ad927182878c19c7",
+    "aoa/publication-sha256": "cad5cdd612200079152aa060e023c9fa0cc83d8d6880816e90278f41ae058773",
+    "aoa/taxonomy-mapping": "course-reviewed-declaration-not-performance-evidence"
+  },
+  "authors": [
+    "AOA course workshop"
+  ],
+  "created_at": "2026-10-25T15:27:46.542305+00:00",
+  "description": "Turn a CV-fit evaluation into targeted questions that help a human\ninterviewer test the stated strengths and gaps.",
+  "domains": [],
+  "modules": [
+    {
+      "data": {
+        "card_data": {
+          "capabilities": {
+            "extensions": [
+              {
+                "description": "AOA capability-card contracts exposed by this A2A agent.",
+                "params": {
+                  "agent_identity": {
+                    "agent_id": "urn:aoa:agent:eve-workshop-interviewer",
+                    "agent_name": "eve-workshop-interviewer",
+                    "principal": "urn:aoa:agent:eve-workshop-interviewer",
+                    "runtime": "docker-compose-eve"
+                  },
+                  "capabilities": [
+                    {
+                      "a2a_endpoint": "http://eve-workshop-wrapped:8888/a2a",
+                      "agent_card_url": "http://eve-workshop-wrapped:8888/.well-known/agent-card.json",
+                      "agent_id": "urn:aoa:agent:eve-workshop-interviewer",
+                      "constraints": [
+                        "The output is a single JSON object.",
+                        "questions contains exactly 5 items; each item has area, question, and why.",
+                        "area is at most 6 words, question is at most 35 words, and why is at most 15 words.",
+                        "The capability supports a human interviewer and does not make a hiring decision."
+                      ],
+                      "endpoint": "http://eve-workshop-wrapped:8888/invoke",
+                      "evaluation_signals": [
+                        "valid_output_shape",
+                        "has_questions",
+                        "latency_p95_under(12s)"
+                      ],
+                      "id": "interviewer-questions",
+                      "identity": {
+                        "agent_id": "urn:aoa:agent:eve-workshop-interviewer",
+                        "agent_name": "eve-workshop-interviewer",
+                        "principal": "urn:aoa:agent:eve-workshop-interviewer",
+                        "runtime": "docker-compose-eve"
+                      },
+                      "inputs": [
+                        {
+                          "name": "evaluation",
+                          "required": true,
+                          "type": "object"
+                        },
+                        {
+                          "name": "cv",
+                          "required": false,
+                          "type": "structured-cv"
+                        }
+                      ],
+                      "kind": "au",
+                      "outputs": [
+                        {
+                          "name": "questions",
+                          "type": "array"
+                        },
+                        {
+                          "name": "report_markdown",
+                          "type": "string"
+                        }
+                      ],
+                      "provenance": {
+                        "model": "gpt-oss-120b",
+                        "skills_hash": "ea6ca0ad75cf663db546ea35d677474fe4ed0eb322d4e6fe75f9d1a47b39807f"
+                      },
+                      "purpose": "Turn a CV-fit evaluation into targeted questions that help a human\ninterviewer test the stated strengths and gaps.\n",
+                      "version": "0.1.0"
+                    }
+                  ]
+                },
+                "required": false,
+                "uri": "urn:aoa:extensions:capability-card:v1"
+              },
+              {
+                "description": "Stable AOA Agent ID used by registry, policy, trace, and audit.",
+                "params": {
+                  "agent_id": "urn:aoa:agent:eve-workshop-interviewer",
+                  "agent_name": "eve-workshop-interviewer",
+                  "principal": "urn:aoa:agent:eve-workshop-interviewer",
+                  "runtime": "docker-compose-eve"
+                },
+                "required": false,
+                "uri": "urn:aoa:extensions:agent-identity:v1"
+              }
+            ],
+            "pushNotifications": false,
+            "stateTransitionHistory": false,
+            "streaming": false
+          },
+          "defaultInputModes": [
+            "application/json",
+            "text/plain"
+          ],
+          "defaultOutputModes": [
+            "application/json",
+            "text/markdown",
+            "text/plain"
+          ],
+          "description": "Turn a CV-fit evaluation into targeted questions that help a human interviewer test the stated strengths and gaps.",
+          "name": "eve-workshop-interviewer",
+          "preferredTransport": "JSONRPC",
+          "protocolVersion": "0.3.0",
+          "skills": [
+            {
+              "description": "Turn a CV-fit evaluation into targeted questions that help a human interviewer test the stated strengths and gaps.",
+              "id": "interviewer-questions",
+              "inputModes": [
+                "application/json"
+              ],
+              "name": "interviewer-questions",
+              "outputModes": [
+                "application/json",
+                "text/markdown"
+              ],
+              "tags": [
+                "aoa",
+                "agentic-unit",
+                "eve"
+              ]
+            }
+          ],
+          "url": "http://eve-workshop-wrapped:8888/a2a",
+          "version": "0.1.0"
+        },
+        "card_schema_version": "0.3.0"
+      },
+      "name": "integration/a2a"
+    }
+  ],
+  "name": "aoa-course/interviewer-questions",
+  "schema_version": "1.0.0",
+  "skills": [
+    {
+      "id": 10205,
+      "name": "natural_language_processing/natural_language_generation/question_generation"
+    }
+  ],
+  "version": "0.1.0"
+}

@@ -38,6 +38,7 @@ services:
       - ../course:/data/course:ro
     environment:
       AOA_REVISED: "true"
+      DISCOVERY_BACKEND: ${COURSE_DISCOVERY_BACKEND:-local}
   cv-parser:
     environment: *generation
   wiki-parser:

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -108,14 +109,23 @@ def main():
         command.add_argument('--out', help='Write output as UTF-8; paths are inside .course-data when using Docker')
     args = parser.parse_args()
     if args.command == 'sync':
-        url = os.getenv('COURSE_DIRECTORY_BRIDGE_URL', 'http://directory-bridge:8892') + '/sync?wait=' + str(args.wait)
-        request = urllib.request.Request(url, data=b'', method='POST')
-        try:
-            with urllib.request.urlopen(request, timeout=max(30, args.wait + 10)) as response:
-                print(json.dumps(json.load(response), indent=2))
-        except urllib.error.HTTPError as exc:
-            print('Directory publication is not ready: ' + exc.read().decode(), file=sys.stderr)
-            raise SystemExit(1) from exc
+        deadline = time.monotonic() + min(max(args.wait, 0), 120)
+        while True:
+            remaining = max(0, int(deadline - time.monotonic()))
+            url = os.getenv('COURSE_DIRECTORY_BRIDGE_URL', 'http://directory-bridge:8892') + '/sync?wait=' + str(remaining)
+            request = urllib.request.Request(url, data=b'', method='POST')
+            try:
+                with urllib.request.urlopen(request, timeout=max(30, remaining + 10)) as response:
+                    print(json.dumps(json.load(response), indent=2))
+                break
+            except urllib.error.HTTPError as exc:
+                print('Directory publication is not ready: ' + exc.read().decode(), file=sys.stderr)
+                raise SystemExit(1) from exc
+            except urllib.error.URLError as exc:
+                if time.monotonic() >= deadline:
+                    print('Directory publication adapter is unavailable. Check directory-bridge logs.', file=sys.stderr)
+                    raise SystemExit(1) from exc
+                time.sleep(1)
         return
     if args.command == 'pull':
         if bool(args.cid) == bool(args.cid_file):

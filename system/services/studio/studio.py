@@ -195,6 +195,7 @@ async def index(request: Request) -> HTMLResponse:
             "studio_config": {
                 "workflows": ENABLED_WORKFLOWS,
                 "revised": os.getenv("AOA_REVISED", "false").lower() == "true",
+                "discovery_backend": os.getenv("DISCOVERY_BACKEND", "local"),
                 "allow_wiki_reset": ALLOW_WIKI_RESET,
             },
         },

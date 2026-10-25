@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import io
+import urllib.error
 
 import httpx
 import pytest
@@ -31,6 +33,20 @@ def estate():
 def record(card):
     a2a = {'url': card['a2a_endpoint'], 'protocolVersion': '0.3.0', 'skills': [{'id': card['id']}]}
     return {'cid': 'cid-' + card['id'], 'record': lab.export_record(card, a2a)}
+
+
+def test_sync_waits_for_adapter_startup(monkeypatch, capsys):
+    calls = []
+    def opening(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1:
+            raise urllib.error.URLError('connection refused')
+        return io.BytesIO(b'{"ready": true}')
+    monkeypatch.setattr(sys, 'argv', ['directory-lab.py', 'sync', '--wait', '5'])
+    monkeypatch.setattr(lab.urllib.request, 'urlopen', opening)
+    monkeypatch.setattr(lab.time, 'sleep', lambda _: None)
+    lab.main()
+    assert len(calls) == 2 and json.loads(capsys.readouterr().out)['ready']
 
 
 def test_every_course_au_exports_real_a2a_module():
