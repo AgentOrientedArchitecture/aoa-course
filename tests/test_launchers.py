@@ -214,6 +214,42 @@ sys.exit(17 if row['tool']=='docker' and os.getenv('MOCK_FAIL_COMMAND') in sys.a
         self.assertIn('.env.revised', row['argv'])
         self.assertIn('_base.provider_test', row['argv'])
 
+    def test_october_examples_work_as_the_only_env_file(self):
+        (self.root/'.env.revised').unlink()
+        for example in ('.env.cerebras-typesafe.example', '.env.local-revised.example'):
+            (self.root/'.env').write_bytes((ROOT/example).read_bytes())
+            for launcher in ('test_model_provider', 'session1-up', 'session2-up',
+                             'session3-build', 'session3-up', 'session4-up'):
+                with self.subTest(example=example, launcher=launcher):
+                    self.clean_log()
+                    rows = self.invoke(launcher)
+                    row = rows[-1] if launcher == 'test_model_provider' else rows[0]
+                    self.assertIn('system/docker-compose.revised.yml', row['argv'])
+                    self.assertIn('.env', row['argv'])
+                    self.assertNotIn('.env.revised', row['argv'])
+                    if launcher == 'test_model_provider':
+                        self.assertIn('_base.provider_test', row['argv'])
+            self.clean_log()
+            self.env['AOA_REVISED'] = '0'
+            row = self.invoke('session1-up')[0]
+            self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
+            self.env.pop('AOA_REVISED')
+
+    def test_mode_detection_ignores_comments_and_does_not_execute_env(self):
+        (self.root/'.env.revised').unlink()
+        (self.root/'.env').write_text('# DECISION_PROVIDER=typesafe\nMODEL=original\n')
+        row = self.invoke('session1-up')[0]
+        self.assertNotIn('system/docker-compose.revised.yml', row['argv'])
+        self.clean_log()
+        # dotenv values are data. Neither shell nor batch may execute this.
+        (self.root/'.env').write_text(
+            'MODEL=$(touch should-not-exist)\n'
+            'AOA_UNUSED=& echo unsafe > should-not-exist\n'
+            ' \tDECISION_PROVIDER = typesafe\n')
+        row = self.invoke('session1-up')[0]
+        self.assertIn('system/docker-compose.revised.yml', row['argv'])
+        self.assertFalse((self.root/'should-not-exist').exists())
+
     def test_directory_is_container_only_and_preserves_records(self):
         data = self.root / '.course-data'
         data.mkdir()

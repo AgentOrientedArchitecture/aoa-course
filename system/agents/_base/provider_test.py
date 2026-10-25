@@ -49,7 +49,7 @@ def _configuration_error(provider: str, model: str) -> str | None:
         return "MODEL is not set"
     if provider == "openai":
         if not os.environ.get("OPENAI_API_KEY", "").strip():
-            return "AOA_OPENAI_API_KEY is not set for PROVIDER=openai"
+            return "No API key reached the container for PROVIDER=openai"
         return None
     if provider == "anthropic":
         if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
@@ -90,6 +90,13 @@ def _failure_hint(provider: str) -> str:
             "http://host.docker.internal:11434 for host Ollama)."
         )
     if provider == "openai":
+        if urlsplit(os.environ.get("OPENAI_BASE_URL", "")).hostname == "api.cerebras.ai":
+            return (
+                "Set CEREBRAS_API_KEY in .env or .env.revised and use the revised "
+                "course launcher (the Cerebras/TypeSafe example selects it through "
+                "DECISION_PROVIDER). It maps that key to the adapter's "
+                "OPENAI_API_KEY. Check the exact MODEL id and provider access."
+            )
         return (
             "Check AOA_OPENAI_API_KEY, the provider's exact MODEL id, and that "
             "OPENAI_BASE_URL is the API root ending in /v1 rather than "

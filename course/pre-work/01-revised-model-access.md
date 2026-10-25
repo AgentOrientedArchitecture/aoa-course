@@ -17,7 +17,7 @@ git status --short --branch
 docker compose version
 ```
 
-Confirm that the branch is `main` and Docker Compose is available before continuing. Configure one model route below, then use the matching session launcher. The presence of `.env.revised` selects the revised course automatically.
+Confirm that the branch is `main` and Docker Compose is available before continuing. Configure one model route below, then use the matching session launcher. The launchers select the revised course when `.env.revised` exists or `.env` declares `DECISION_PROVIDER`. Both October examples therefore also work when copied to the usual `.env` file.
 
 ### Update an existing checkout
 
@@ -88,7 +88,7 @@ Session 3's native authoring step stops the running AOA services so learners can
 
 `down` includes every original and revised Compose service, including the decision service, specialist CV evaluators, EVE, AGNTCY Directory and container Ollama. It retains volumes, saved cases, Directory records, wiki state and authored workshop files by default. `logs` covers the same service set; add a service name to narrow it. A Directory started through the optional native-host route still needs Ctrl+C in its terminal. Host-installed Ollama is also independent of Compose.
 
-The explicit revised entry points remain available on both platforms: `revised-up.sh/.bat 1`, `2` or `4`, and `revised-eve.sh/.bat build`, `native` or `adopt`. They always choose the revised configuration. The ordinary session launchers instead honour `AOA_REVISED`: `1`/`true` forces revised, `0`/`false` forces original, and unset/`auto` selects by the presence of `.env.revised`. On macOS/Linux, for example, `AOA_REVISED=0 ./scripts/session1-up.sh` runs the original course. In Windows Command Prompt, run `set AOA_REVISED=0` first; `set AOA_REVISED=` restores automatic selection.
+The explicit revised entry points remain available on both platforms: `revised-up.sh/.bat 1`, `2` or `4`, and `revised-eve.sh/.bat build`, `native` or `adopt`. They always choose the revised configuration. The ordinary session launchers instead honour `AOA_REVISED`: `1`/`true` forces revised, `0`/`false` forces original, and unset/`auto` selects when `.env.revised` exists or `.env` declares `DECISION_PROVIDER`. On macOS/Linux, for example, `AOA_REVISED=0 ./scripts/session1-up.sh` runs the original course. In Windows Command Prompt, run `set AOA_REVISED=0` first; `set AOA_REVISED=` restores automatic selection.
 
 Open `http://localhost:8080`. Check `http://localhost:7250/healthz` from the host: it names the decision provider/model and says whether configuration is present. It does **not** claim a successful provider call. Run the first CV example to verify actual access.
 
