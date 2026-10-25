@@ -9,11 +9,12 @@ Use `scripts/directory.sh` or `scripts\directory.bat` from the repository root. 
 - `up` builds, starts in the background and waits for a real CLI search health check.
 - `export`, `push`, `search`, `pull` and `check` execute the helper inside the running container. `cli` exposes the real upstream CLI.
 - `stop` retains the container's bind-mounted database and exported records. Global course stop/log commands also include this service.
-- The daemon listens on container port 8890; only host loopback is published. The client runs inside the container, while the helper reaches `http://registry:7100` on the course network.
+- The daemon listens on container port 8890. Its upstream HTTP gateway/catalogue listens on container port 8889, mapped to [localhost:8891](http://localhost:8891). Both host ports are loopback only. The client runs inside the container, while the helper reaches `http://registry:7100` on the course network.
+- The v1.8.0 catalogue projects A2A, MCP and Agent Skills modules. Plain course OASF records (`modules: []`) remain CLI-searchable but do not appear as catalogue cards. Read exported/pulled `.course-data/*.json` files for the full OASF record; the browser shows a catalogue projection.
 - `.course-data` is mounted writable at `/course-data`; contract templates and the learner workshop are read-only. Provider environment files are neither mounted nor sent in the image build context.
 - Shell launchers use the host UID/GID for writable files on Linux. Docker Desktop uses the image's default UID through the batch route.
 
-Optional environment overrides are `COURSE_DIRECTORY_PORT` (host port, default 8890), `COURSE_DIRECTORY_DATA_ROOT` (host data folder), and `DIRECTORY_UID`/`DIRECTORY_GID` for direct Compose use. The integration check uses a separate project, data folder and registry. Stop an existing native daemon before sharing its data with the container.
+Optional environment overrides are `COURSE_DIRECTORY_PORT` (CLI host port, default 8890), `COURSE_DIRECTORY_UI_PORT` (browser host port, default 8891), `COURSE_DIRECTORY_DATA_ROOT` (host data folder), and `DIRECTORY_UID`/`DIRECTORY_GID` for direct Compose use. The integration check uses a separate project, data folder and registry. Stop an existing native daemon before sharing its data with the container.
 
 To repeat the real-container check on macOS/Linux with Docker running:
 
@@ -21,4 +22,4 @@ To repeat the real-container check on macOS/Linux with Docker running:
 python3 tests/check_directory_container.py
 ```
 
-This check uses synthetic registry metadata and no model calls. It tests publication, retrieval, indexing, contract match/mismatch, failed-output preservation and persistence across stop/start. CI runs it on Linux amd64; native Windows command handling is covered by the cross-platform launcher tests.
+This check uses synthetic registry metadata and no model calls. It tests browser gateway availability, publication, retrieval, indexing, contract match/mismatch, failed-output preservation and persistence across stop/start. CI runs it on Linux amd64; native Windows command handling is covered by the cross-platform launcher tests.

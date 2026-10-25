@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,7 +20,7 @@ def main():
         data = temp / 'data'
         data.mkdir()
         env = {**os.environ, 'COMPOSE_PROJECT_NAME': f'aoa-directory-check-{os.getpid()}',
-               'COURSE_DIRECTORY_DATA_ROOT': str(data), 'COURSE_DIRECTORY_PORT': '18890',
+               'COURSE_DIRECTORY_DATA_ROOT': str(data), 'COURSE_DIRECTORY_PORT': '18890', 'COURSE_DIRECTORY_UI_PORT': '18891',
                'DIRECTORY_UID': str(os.getuid()), 'DIRECTORY_GID': str(os.getgid())}
         # This separate registry has no published host port or learner volume.
         fixture = temp / 'registry.yml'
@@ -45,6 +46,9 @@ def main():
             run([*compose, 'up', '--build', '-d', '--wait', 'registry'])
             lab('up')
             print('Real Directory daemon and isolated course registry are healthy.', flush=True)
+            with urllib.request.urlopen('http://127.0.0.1:18891/', timeout=10) as response:
+                page = response.read().decode()
+                assert response.status == 200 and '<html' in page.lower(), page[:500]
             # Register a synthetic contract using the real registry endpoint.
             register = """
 import json,urllib.request,yaml

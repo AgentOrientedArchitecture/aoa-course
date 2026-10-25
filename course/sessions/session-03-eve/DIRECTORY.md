@@ -21,7 +21,7 @@ From the repository root:
 | Follow Directory logs | `./scripts/directory.sh logs` | `scripts\directory.bat logs` |
 | Stop Directory, keeping records | `./scripts/directory.sh stop` | `scripts\directory.bat stop` |
 
-The container uses the official `dir-ctl` image's binary, pinned by version and multi-platform digest, with the course helper and PyYAML alongside it. It runs in the background and publishes host loopback port 8890. Its helper reaches the local AOA registry through `registry:7100` on the course Docker network. Start Directory and AOA from the same checkout and Compose project.
+The container uses the official `dir-ctl` image's binary, pinned by version and multi-platform digest, with the course helper and PyYAML alongside it. It runs in the background and publishes host loopback ports 8890 (CLI) and 8891 (upstream browser catalogue). Its helper reaches the local AOA registry through `registry:7100` on the course Docker network. Start Directory and AOA from the same checkout and Compose project.
 
 Directory's database and record store persist in **`.course-data/directory`**. Exports and retrieved JSON files are also written under `.course-data`, where you can open them in your editor. Neither `directory stop` nor the normal course `down.sh/.bat` removes that data. The course `logs` and `down` commands include Directory.
 
@@ -65,6 +65,16 @@ The final command reports:
 
 Read the fields: `check` is informational and can exit successfully while reporting a mismatch. It is not an automated admission controller. The [adoption guide](ADOPTION.md#three-descriptions-of-the-same-capability) lists the exact hash scope and distinguishes the OASF record, AOA card and A2A Agent Card.
 
+## View the OASF descriptions
+
+Open **`.course-data/interviewer.oasf.json`** in Zed or another text editor to read the exported description. Open **`.course-data/discovered.json`** to inspect the record actually retrieved from Directory. These files show the name, version, description, declared skills and domains, modules, and the course's contract annotations. This is the full OASF record; Studio's capability-card view shows the separate local AOA contract.
+
+The upstream **AI Catalog** is also available at [http://localhost:8891](http://localhost:8891) after `directory.sh up` or `directory.bat up`. Select a listed card for its summary, tags and **Catalog Entry JSON**. This is AGNTCY's built-in interface, not a course viewer.
+
+**The v1.8.0 catalogue does not list every OASF record.** It projects records containing an A2A, MCP or Agent Skills module. The course's current export has `modules: []`, so it remains searchable and retrievable through the CLI but does not appear as a card in this browser catalogue. An apparently empty course search in the browser does not mean publication failed. The daemon's self-description may be the only visible card. Catalogue JSON is a projection, not the original OASF JSON. This behaviour is explicit in the [pinned upstream catalogue implementation](https://github.com/agntcy/dir/blob/v1.8.0/api/catalog/v1/catalog.go).
+
+Use the editor files for this lab. A future catalogue-visible export needs a reviewed, accurate integration module; do not invent an endpoint or claim A2A compatibility simply to make a card appear. The browser's generic wording about verified records also does not establish that our local records are signed, trusted or approved for execution.
+
 ## Discover before adoption
 
 The container also mounts the checked-in contract template read-only. You can publish its description before an interviewer has been adopted:
@@ -94,6 +104,8 @@ Finish in Studio's **CV fit + interview** workflow. Inspect the accepted EVE cap
 | Docker cannot start | Start Docker Desktop/Engine; on Windows select Linux containers |
 | `agntcy-directory` is not running | Run `directory.sh up` or `directory.bat up`; inspect `logs` if readiness fails |
 | Host port 8890 is already in use | Stop the old host Directory daemon or identify the existing container; do not run two daemons on the same data |
+| Browser port 8891 is already in use | Set `COURSE_DIRECTORY_UI_PORT` to a free host port before `directory.sh up` or `directory.bat up`, then browse that port |
+| CLI finds the record but the catalogue does not | Plain OASF records without a recognised integration module are not projected into the v1.8.0 catalogue; inspect the pulled JSON |
 | Search is initially empty | Allow indexing to finish; retrieve using the returned content ID |
 | Registry connection fails | Run the adopted AOA session or the registry-only command above, in the same checkout/project |
 | A file cannot be found | Helper paths are relative to `.course-data`; use the filename, not a Windows host path |

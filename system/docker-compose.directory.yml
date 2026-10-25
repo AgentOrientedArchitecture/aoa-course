@@ -9,12 +9,16 @@ services:
     user: "${DIRECTORY_UID:-1000}:${DIRECTORY_GID:-1000}"
     ports:
       - "127.0.0.1:${COURSE_DIRECTORY_PORT:-8890}:8890"
+      - "127.0.0.1:${COURSE_DIRECTORY_UI_PORT:-8891}:8889"
     volumes:
       - ${COURSE_DIRECTORY_DATA_ROOT:-../.course-data}:/course-data
       - ./agents-eve/runtime/templates:/course-templates:ro
       - ./agents-eve/workshop:/workshop:ro
     environment:
       DIRECTORY_DAEMON_SERVER_LISTEN_ADDRESS: "0.0.0.0:8890"
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_ENABLED: "true"
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_LISTEN_ADDRESS: "0.0.0.0:8889"
+      DIRECTORY_DAEMON_SERVER_HTTP_GATEWAY_PUBLIC_URL: "http://localhost:${COURSE_DIRECTORY_UI_PORT:-8891}"
       COURSE_DIRECTORY_ADDR: "127.0.0.1:8890"
       COURSE_REGISTRY_URL: "http://registry:7100"
     healthcheck:
