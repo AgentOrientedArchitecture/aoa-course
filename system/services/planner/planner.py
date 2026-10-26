@@ -25,7 +25,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from allocation import allocate, validate_composition
+from allocation import allocate, allocation_hold_detail, validate_composition
 from case_store import CaseStore, CaseConflict
 from directory_contract import bind_records
 
@@ -1523,8 +1523,9 @@ async def _run_workflow(
                     raise HTTPException(503, "Decision service unavailable; no AU was invoked. Check provider configuration and retry.") from exc
                 await _record({"trace_id": trace_id, "step": "allocation", **evidence})
                 if selected_card is None:
-                    await _record({"trace_id": trace_id, "step": "allocation-held", "task": task.id, "reason": evidence["outcome"]})
-                    raise HTTPException(409, "Allocation needs review or clarification; no AU was invoked")
+                    detail = allocation_hold_detail(trace_id, evidence)
+                    await _record({"trace_id": trace_id, "step": "allocation-held", "task": task.id, "reason": evidence["outcome"], "hold_reason": detail["reason"], "message": detail["message"]})
+                    raise HTTPException(409, detail)
                 candidates = [{"card": selected_card, "score": None, "reasons": [evidence["outcome"]]}]
                 query = {"strategy": "contract-eligibility-then-bounded-decision", "task": _task_trace(task)}
             elif task.selected_capability:

@@ -419,6 +419,14 @@ function applyLifecycleEvent(record) {
     if (!record.valid) { life.error = record.error || "Composition rejected"; life.status = "error"; }
     return;
   }
+  if (record.step === "allocation-held") {
+    life.status = "allocation-held";
+    life.error = record.message || `Allocation held: ${record.reason || "inspect AU selection"}. No AU was invoked.`;
+    const task = ensureTask(record.task);
+    task.status = "held";
+    task.error = life.error;
+    return;
+  }
   if (record.step === "discover") {
     const task = ensureTask(record.task);
     task.candidates = record.candidates || [];
@@ -872,6 +880,7 @@ function renderLifecycleRail(life) {
     if (key === "draft" && life.status === "draft-held") {
       li.className = "held";
     }
+    if (key === "proposal" && life.status === "allocation-held") li.className = "held";
     if (key === "work" && life.tasks.some((task) => task.status === "running")) {
       li.className = "active";
     }
@@ -954,6 +963,7 @@ function isResponsibilityRecord(record) {
     "capability-context",
     "plan-proposal",
     "composition-validation",
+    "allocation-held",
     "governance-invoke",
     "plan-governance",
     "governance-release",
@@ -989,6 +999,9 @@ function traceEventView(record) {
   const latency = record.latency_seconds != null ? `${record.latency_seconds.toFixed(2)}s` : "";
   if (step === "start") {
     return traceView(layer, status, "Intent received", record.workflow || (record.intent && record.intent.kind) || "workflow", latency);
+  }
+  if (step === "allocation-held") {
+    return traceView("planner", "held", "AU selection held", record.message || record.reason || "Inspect AU selection", task);
   }
   if (step === "capability-context") {
     return traceView(layer, status, "Registry context loaded", `${(record.capabilities || []).length} AU cards considered`, latency);
@@ -1448,7 +1461,9 @@ function renderResult(life) {
         ? "The human-rejected draft is quarantined; no final result was released."
         : life.status === "rejected"
           ? "The plan was ineligible, so no result was produced."
-          : "No released result yet.";
+          : life.status === "allocation-held"
+            ? life.error
+            : "No released result yet.";
     return;
   }
   const markdown = life.result.report_markdown || life.result.answer_markdown || life.result.ingest_markdown || life.result.findings_markdown || "";
@@ -1816,7 +1831,8 @@ async function submitIntent() {
     });
     const body = await resp.json();
     if (!resp.ok) {
-      status.textContent = `error: ${body.error || resp.statusText}`;
+      const trace = body.detail?.trace_id;
+      status.textContent = `${body.error || resp.statusText}${trace ? ` · trace ${trace}` : ""}`;
     } else if (body.status === "draft-held") {
       status.textContent = `draft ready for human review · trace ${body.trace_id}`;
     } else if (body.status === "rejected") {

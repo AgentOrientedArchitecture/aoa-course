@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cardSections, escapeText, taskIds, allocationEvidence, probabilityLabel,
-  runOutputs, recordedInputs, runEvidenceStatus } from '../system/services/studio/static/inspection-model.mjs';
+  allocationHoldMessage, runOutputs, recordedInputs, runEvidenceStatus } from '../system/services/studio/static/inspection-model.mjs';
 
 test('readable projection keeps unknown metadata and complete original JSON', () => {
   const card={id:'an-au',purpose:'Decide',inputs:[{name:'case',type:'object',required:true}],outputs:[],constraints:[],evaluation_signals:[],identity:{agent_id:'urn:agent'},extension:{nested:[false,0,null]}};
@@ -42,6 +42,19 @@ test('abstention and composition rejection preserve absent execution',()=>{
 test('probabilities distinguish zero from absent and unscored decisions',()=>{
   assert.equal(probabilityLabel(0),'0.0%');assert.equal(probabilityLabel(1),'100.0%');
   for(const value of [null,undefined,NaN,'0.9'])assert.equal(probabilityLabel(value),'Not reported');
+});
+test('historical Clef hold explains the recorded threshold without changing evidence',()=>{
+  const allocation={choice:'evaluator-cv',outcome:'selection-held',minimum_probability:.65,decision:{winner_probability:.6448}};
+  const before=structuredClone(allocation);
+  assert.match(allocationHoldMessage(allocation,{reason:'selection-held'}),/64\.48%, below the configured 65\.00%/);
+  assert.equal(allocationHoldMessage(allocation,null),'');
+  assert.deepEqual(allocation,before);
+  assert.match(allocationHoldMessage({...allocation,decision:{winner_probability:.64996}}, {reason:'selection-held'}),/reported probability 0\.64996 < 0\.65/);
+});
+test('specific hold message is preserved and abstention is distinct from a low score',()=>{
+  assert.equal(allocationHoldMessage({}, {message:'Recorded reason'}),'Recorded reason');
+  assert.match(allocationHoldMessage({choice:'no_suitable_capability',minimum_probability:.65,decision:{winner_probability:.4}}, {reason:'selection-held'}),/no suitable capability/);
+  assert.match(allocationHoldMessage({outcome:'no-eligible-capability'}, {reason:'no-eligible-capability'}),/contract eligibility/);
 });
 test('allocations are task scoped and keep excluded candidates',()=>{
   const view=allocationEvidence([{step:'allocation',task:'parse',choice:'parser'},{step:'allocation',task:'decide',choice:'a',candidates:[{id:'a',eligible:true},{id:'tool',eligible:false,reasons:['not an AU']}]}],'decide');

@@ -557,8 +557,19 @@ async def _post_planner_intent(planner_body: dict[str, Any]) -> dict[str, Any] |
             r.raise_for_status()
             return r.json()
         except httpx.HTTPStatusError as e:
+            try:
+                payload = e.response.json()
+            except ValueError:
+                payload = {}
+            detail = payload.get("detail") if isinstance(payload, dict) else None
+            if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+                return JSONResponse(
+                    {"error": detail["message"], "detail": detail},
+                    status_code=e.response.status_code,
+                )
             return JSONResponse(
-                {"error": e.response.text}, status_code=e.response.status_code
+                {"error": detail if isinstance(detail, str) else e.response.text},
+                status_code=e.response.status_code,
             )
         except httpx.HTTPError as e:
             return JSONResponse({"error": repr(e)}, status_code=502)

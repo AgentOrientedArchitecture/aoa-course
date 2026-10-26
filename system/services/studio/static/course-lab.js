@@ -74,7 +74,7 @@
       content+=`<details class="course-decision" open><summary>Wiki promotion · ${esc(promotion.decision_outcome)}</summary><p>The decision model supplies the judgement. The retained quotes come from the parsed source.</p><p>${esc(promotion.rejection_reason||'Source passages accepted for promotion.')}</p><pre>${esc(JSON.stringify(promotion.decision_evidence,null,2))}</pre></details>`;
     }
     const held=records.find(r=>r.step==='allocation-held');
-    if(held)content+=`<p role="status">Selection held: ${esc(held.reason)}. No application AU has run.</p>`;
+    if(held)content+=`<p role="status">${esc(held.message || `Selection held: ${held.reason}. No application AU has run.`)}</p>`;
     document.getElementById("course-decisions").innerHTML=content;
   }
 

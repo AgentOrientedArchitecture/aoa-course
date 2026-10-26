@@ -1,5 +1,6 @@
 """CV allocation sees the same job context for pasted and uploaded documents."""
 import importlib.util
+import asyncio
 import json
 from pathlib import Path
 
@@ -112,3 +113,25 @@ def test_missing_job_description_stops_before_document_read_or_planner(submissio
     response = client.post("/api/intent", json={"inputs": {"cv_text": "Synthetic CV", "jd_text": " "}})
     assert response.status_code == 400
     assert requests == [] and submitted == []
+
+
+@pytest.mark.parametrize("detail", [
+    {"message": "evaluator-cv received 64.48%, below the configured 65% minimum.",
+     "trace_id": "held-example", "task": "evaluate-cv-fit",
+     "reason": "below-probability-threshold", "winner_probability": 0.6448,
+     "minimum_probability": 0.65},
+    "Allocation needs review or clarification; no AU was invoked",
+])
+def test_planner_hold_message_is_readable_and_keeps_structured_evidence(monkeypatch, detail):
+    def handle(request):
+        return httpx.Response(409, json={"detail": detail})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(studio.httpx, "AsyncClient",
+                        lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    response = asyncio.run(studio._post_planner_intent({"kind": "cv-fit"}))
+    assert response.status_code == 409
+    body = json.loads(response.body)
+    assert body["error"] == (detail["message"] if isinstance(detail, dict) else detail)
+    if isinstance(detail, dict):
+        assert body["detail"] == detail

@@ -110,6 +110,15 @@ If selection is held, inspect its recorded reason in **AU selection**. No
 application AU should have run. Resolve provider errors through the setup
 guide; inspect a low probability or no-fit result as a decision to review.
 
+For example, a returned probability of `0.6448` is below the default `0.65`
+minimum, so the planner holds the choice even though it ranked first. The gate
+uses `winner_probability`, not the provider's separate `provider_confidence`
+field. A blank emphasis still supplies the job description; an explicit brief
+may change the selected specialisation but does not guarantee acceptance.
+The same numerical threshold is not calibrated across Jev and Clef. Preserve
+the held result when comparing providers; changing the threshold is a separate
+policy experiment (step 6), not a connection repair.
+
 ## 4. Change the assessment
 
 Run the matching frontend pair:

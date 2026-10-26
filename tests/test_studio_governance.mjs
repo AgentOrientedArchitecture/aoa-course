@@ -17,7 +17,7 @@ function renderer(workflows = ['agent-card-check', 'cv-fit', 'flow-audit']) {
   });
   const source = readFileSync(new URL('../system/services/studio/static/app.js', import.meta.url), 'utf8')
     .replace(/^import .*studio-inspector\.js.*;\n/, '');
-  vm.runInContext(source + '\nglobalThis.renderTest = { state, renderResult, renderMarkdown };', context);
+  vm.runInContext(source + '\nglobalThis.renderTest = { state, renderResult, renderMarkdown, applyLifecycleEvent, isResponsibilityRecord, traceEventView };', context);
   return { ...context.renderTest, body: elements.get('result-body') };
 }
 const finding = severity => ({
@@ -77,4 +77,18 @@ test('unrelated workflows and incomplete evidence retain the normal complete rep
     assert.equal(view.body.children.length, 1);
     assert.deepEqual(view.body.children[0], view.renderMarkdown(life.result.findings_markdown));
   }
+});
+
+test('an allocation hold stops the displayed run and exposes its reason in the result and trace', () => {
+  const view = renderer(['cv-fit']);
+  view.applyLifecycleEvent({step:'start',workflow:'cv-fit',intent:{kind:'cv-fit'}});
+  const event={step:'allocation-held',task:'evaluate-cv-fit',reason:'selection-held',message:'evaluator-cv received 64.48%, below the configured 65% minimum. No AU was invoked.'};
+  view.applyLifecycleEvent(event);
+  assert.equal(view.state.lifecycle.status,'allocation-held');
+  assert.equal(view.state.lifecycle.taskById.get('evaluate-cv-fit').status,'held');
+  assert.equal(view.state.lifecycle.result,null);
+  view.renderResult(view.state.lifecycle);
+  assert.equal(view.body.textContent,event.message);
+  assert.equal(view.isResponsibilityRecord(event),true);
+  assert.equal(view.traceEventView(event).detail,event.message);
 });

@@ -15,7 +15,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT/'system/services/planner'), str(ROOT/'system/services/decision'), str(ROOT/'system/agents')]
 from decision import decide, normalise_answer, validate_request
-from allocation import allocate, eligibility, validate_composition
+from allocation import allocate, allocation_hold_detail, eligibility, validate_composition
 from case_store import CaseStore, CaseConflict, result_digest
 from _base.decisions import promote
 
@@ -95,6 +95,113 @@ def test_single_eligible_does_not_call_model():
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: pytest.fail('unexpected model call'))) as client:
             return await allocate(NS(id='task'), card(), [card()], {}, client)
     selected, evidence = run(exercise()); assert selected and not evidence['model_called']
+
+
+@pytest.mark.parametrize('choice,probability,unscored_allowed,accepted,reason', [
+    ('evaluator-cv', .6448, 'false', False, 'below-probability-threshold'),
+    ('evaluator-cv', .6499999, 'false', False, 'below-probability-threshold'),
+    ('evaluator-cv', .65, 'false', True, None),
+    ('no_suitable_capability', .99, 'false', False, 'no-suitable-capability'),
+    ('evaluator-cv', None, 'false', False, 'unscored-decision-not-allowed'),
+    ('evaluator-cv', None, 'true', True, None),
+])
+def test_allocation_hold_explains_policy_without_changing_acceptance(
+    monkeypatch, choice, probability, unscored_allowed, accepted, reason
+):
+    monkeypatch.setenv('DECISION_MIN_PROBABILITY', '0.65')
+    monkeypatch.setenv('DECISION_ALLOW_UNSCORED', unscored_allowed)
+    ref, alt = card(), card('specialist')
+    async def exercise():
+        response = {'choice': choice, 'winner_probability': probability}
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=response))) as client:
+            return await allocate(NS(id='evaluate-cv-fit', purpose='Assess the CV'), ref, [ref, alt], {}, client)
+    selected, evidence = run(exercise())
+    assert bool(selected) is accepted
+    assert evidence['outcome'] == ('proposed' if accepted else 'selection-held')
+    assert evidence.get('reason') == reason
+    if not accepted:
+        detail = allocation_hold_detail('test-trace', evidence)
+        assert evidence['message'] == detail['message']
+        assert detail['reason'] == reason
+        assert detail['choice'] == choice
+        assert detail['winner_probability'] == probability
+        assert detail['minimum_probability'] == .65
+        assert 'No AU was invoked.' in detail['message']
+        if probability == .6448:
+            assert '64.48%, below the configured 65% minimum' in detail['message']
+            assert '(reported probability' not in detail['message']
+        if probability == .6499999:
+            assert '65%, below the configured 65% minimum (reported probability 0.6499999 < 0.65)' in detail['message']
+
+
+def test_no_eligible_capability_has_specific_diagnostic_without_model_call():
+    ref = card()
+    unapproved = copy.deepcopy(ref)
+    unapproved['lifecycle']['status'] = 'pending'
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: pytest.fail('unexpected model call'))) as client:
+            return await allocate(NS(id='evaluate-cv-fit'), ref, [unapproved], {}, client)
+    selected, evidence = run(exercise())
+    assert selected is None
+    assert evidence['outcome'] == 'no-eligible-capability'
+    assert evidence['model_called'] is False
+    detail = allocation_hold_detail('test-trace', evidence)
+    assert detail['reason'] == 'no-eligible-capability'
+    assert 'No approved AU matches' in detail['message']
+    assert detail['choice'] is detail['winner_probability'] is detail['minimum_probability'] is None
+
+
+def test_planner_returns_safe_allocation_diagnostic_and_preserves_hold(monkeypatch):
+    import planner
+    workflow = planner.WORKFLOWS['cv-fit']
+    cards = []
+    for path in (ROOT/'system/agents').glob('*/capabilities/*/capability-card.yaml'):
+        item = yaml.safe_load(path.read_text())
+        item['lifecycle'] = {'status': 'approved'}
+        cards.append(item)
+    events = []
+    async def listing(client): return cards
+    async def build(*args): return planner.PlanBuildResult(tasks=copy.deepcopy(workflow.tasks), source='test-proposal')
+    async def record(event): events.append(event)
+    async def execution(run): pytest.fail('held allocation reached execution')
+    async def selection(task, reference, *args):
+        if task.id != 'evaluate-cv-fit':
+            return reference, {'task': task.id, 'outcome': 'single-eligible-capability'}
+        return None, {
+            'task': task.id, 'outcome': 'selection-held',
+            'reason': 'below-probability-threshold', 'choice': 'evaluator-cv',
+            'minimum_probability': .65,
+            'decision': {'winner_probability': .6448, 'raw': 'private-provider-data'},
+            'candidates': [{'private': 'private-card-data'}],
+        }
+    monkeypatch.setattr(planner, 'ALLOCATION_MODE', 'decision')
+    monkeypatch.setattr(planner, 'DISCOVERY_BACKEND', 'local')
+    monkeypatch.setattr(planner, '_registry_list', listing)
+    monkeypatch.setattr(planner, '_build_plan', build)
+    monkeypatch.setattr(planner, '_record', record)
+    monkeypatch.setattr(planner, '_execute_prepared_run', execution)
+    monkeypatch.setattr(planner, 'allocate', selection)
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=planner.app), base_url='http://test') as client:
+            return await client.post('/intent', json={
+                'kind': 'cv-fit', 'selection_context': 'private-job-description',
+                'inputs': {'cv_path': '/private-cv.txt', 'jd_path': '/private-jd.txt'},
+            })
+    response = run(exercise())
+    assert response.status_code == 409
+    detail = response.json()['detail']
+    assert set(detail) == {'message', 'trace_id', 'task', 'reason', 'choice', 'winner_probability', 'minimum_probability'}
+    assert detail['trace_id'] == events[0]['trace_id']
+    assert detail['task'] == 'evaluate-cv-fit'
+    assert detail['reason'] == 'below-probability-threshold'
+    assert detail['winner_probability'] == .6448
+    assert '64.48%, below the configured 65% minimum' in detail['message']
+    assert 'private-' not in response.text
+    assert events[-1]['step'] == 'allocation-held'
+    assert events[-1]['reason'] == 'selection-held'
+    assert events[-1]['hold_reason'] == detail['reason']
+    assert events[-1]['message'] == detail['message']
+    assert not any(event['step'] in {'allocation-accepted', 'invoke'} for event in events)
 
 
 def test_final_composition_rejects_wrong_business_edge_and_missing_task(monkeypatch):

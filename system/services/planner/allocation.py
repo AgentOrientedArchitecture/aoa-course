@@ -99,7 +99,9 @@ async def allocate(task, reference, cards, intent, client: httpx.AsyncClient):
     digest = hashlib.sha256(json.dumps([row["card"] for row in candidates], sort_keys=True).encode()).hexdigest()
     evidence = {"task": task.id, "candidates": candidates, "candidate_set_sha256": digest, "accepted_choice": None}
     if not eligible:
-        return None, {**evidence, "outcome": "no-eligible-capability", "model_called": False}
+        evidence.update({"outcome": "no-eligible-capability", "reason": "no-eligible-capability", "model_called": False})
+        evidence["message"] = _allocation_hold_message(evidence)
+        return None, evidence
     if len(eligible) == 1:
         return eligible[0]["card"], {**evidence, "outcome": "single-eligible-capability", "choice": eligible[0]["id"], "model_called": False}
     criteria = {row["id"]: row["purpose"] for row in eligible}
@@ -114,5 +116,51 @@ async def allocate(task, reference, cards, intent, client: httpx.AsyncClient):
     chosen = next((row for row in eligible if row["id"] == answer.get("choice")), None)
     probability = answer.get("winner_probability")
     unscored_allowed = os.getenv("DECISION_ALLOW_UNSCORED", "false").lower() == "true"
-    accepted = bool(chosen) and (probability is not None and probability >= float(os.getenv("DECISION_MIN_PROBABILITY", "0.65")) or probability is None and unscored_allowed)
-    return chosen["card"] if accepted else None, {**evidence, "model_called": True, "decision": answer, "choice": answer.get("choice"), "minimum_probability": float(os.getenv("DECISION_MIN_PROBABILITY", "0.65")), "unscored_allowed": unscored_allowed, "outcome": "proposed" if accepted else "selection-held"}
+    minimum_probability = float(os.getenv("DECISION_MIN_PROBABILITY", "0.65"))
+    accepted = bool(chosen) and (probability is not None and probability >= minimum_probability or probability is None and unscored_allowed)
+    evidence.update({"model_called": True, "decision": answer, "choice": answer.get("choice"), "minimum_probability": minimum_probability, "unscored_allowed": unscored_allowed, "outcome": "proposed" if accepted else "selection-held"})
+    if not accepted:
+        if answer.get("choice") == "no_suitable_capability":
+            evidence["reason"] = "no-suitable-capability"
+        elif chosen is None:
+            evidence["reason"] = "unrecognised-choice"
+        elif probability is None:
+            evidence["reason"] = "unscored-decision-not-allowed"
+        else:
+            evidence["reason"] = "below-probability-threshold"
+        evidence["message"] = _allocation_hold_message(evidence)
+    return chosen["card"] if accepted else None, evidence
+
+
+def _allocation_hold_message(evidence):
+    reason = evidence.get("reason", evidence.get("outcome"))
+    task = evidence.get("task")
+    choice = evidence.get("choice")
+    probability = (evidence.get("decision") or {}).get("winner_probability")
+    minimum = evidence.get("minimum_probability")
+    if reason == "no-eligible-capability":
+        explanation = "No approved AU matches the required input/output contract."
+    elif reason == "no-suitable-capability":
+        explanation = "The decision model found no suitable capability among the eligible AUs."
+    elif reason == "below-probability-threshold":
+        reported_percent, minimum_percent = f"{probability * 100:g}", f"{minimum * 100:g}"
+        precision = f" (reported probability {probability} < {minimum})" if reported_percent == minimum_percent else ""
+        explanation = f"{choice} received {reported_percent}%, below the configured {minimum_percent}% minimum{precision}."
+    elif reason == "unscored-decision-not-allowed":
+        explanation = "The decision has no reported probability and unscored decisions are not permitted."
+    else:
+        explanation = "The returned choice could not be accepted; inspect the recorded allocation evidence."
+    return f"Allocation held for {task}: {explanation} No AU was invoked."
+
+
+def allocation_hold_detail(trace_id, evidence):
+    """Expose the recorded policy result without including task input or card data."""
+    return {
+        "message": _allocation_hold_message(evidence),
+        "trace_id": trace_id,
+        "task": evidence.get("task"),
+        "reason": evidence.get("reason", evidence.get("outcome")),
+        "choice": evidence.get("choice"),
+        "winner_probability": (evidence.get("decision") or {}).get("winner_probability"),
+        "minimum_probability": evidence.get("minimum_probability"),
+    }

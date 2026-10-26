@@ -1,5 +1,5 @@
 import { escapeText as esc, cardSections, taskIds, allocationEvidence,
-  probabilityLabel, runOutputs, recordedInputs, runEvidenceStatus } from "./inspection-model.mjs";
+  probabilityLabel, allocationHoldMessage, runOutputs, recordedInputs, runEvidenceStatus } from "./inspection-model.mjs";
 
 const jsonBlock = value => `<pre class="inspection-json">${esc(JSON.stringify(value, null, 2))}</pre>`;
 const valueText = value => typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
@@ -70,6 +70,7 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
 
   function stageBody(view) {
     const a = view.allocation, d = a?.decision;
+    const holdMessage = allocationHoldMessage(a, view.held);
     const chosen = view.candidates.find(c => c.id === candidateId);
     const raw = value => value ? detail("Recorded event",value) : "";
     if (stage === "task") return `<h3>Proposed task</h3><p>${esc(view.task?.purpose || "Task proposal not recorded in this trace.")}</p>${raw(view.task)}`;
@@ -78,16 +79,18 @@ export function createStudioInspector({ renderMarkdown, selectCapability }) {
     if (stage === "choice") {
       if (!a) return '<h3>Choice evidence</h3><p>No bounded-allocation event is recorded for this task. Inspect the original selection events in Studio.</p>';
       return `<h3>${a.model_called ? "Model choice" : "Contract selection"}</h3>
+        ${holdMessage ? `<p class="inspection-warning" role="status">${esc(holdMessage)}</p>` : ""}
         <p>Returned choice: <strong>${esc(a.choice || "none")}</strong></p>
         <p>${a.model_called ? `${esc(d?.provider || "provider not recorded")} / ${esc(d?.model || "model not recorded")}` : "No decision-model call was made for this allocation."}</p>
         ${chosen ? `<h4>Inspecting ${esc(chosen.id)}</h4><p>${esc(chosen.purpose)}</p>` : ""}
         ${a.model_called ? `<div class="inspection-facts"><div><strong>${probabilityLabel(d?.probabilities?.[candidateId])}</strong><span>Model-reported probability for this candidate</span></div><div><strong>${Number.isFinite(d?.latency_seconds) ? d.latency_seconds.toFixed(3)+' s' : 'Not recorded'}</strong><span>Allocator call</span></div></div><p class="inspection-muted">Model probability is not measured accuracy. Inspecting another candidate does not change the recorded choice.</p><p>No suitable capability: ${probabilityLabel(d?.probabilities?.no_suitable_capability)}</p>` : ""}
+        ${Number.isFinite(a.minimum_probability) ? `<p>Recorded minimum probability: <strong>${probabilityLabel(a.minimum_probability)}</strong>. This is a course policy, not a calibrated accuracy guarantee.</p>` : ""}
         <p>Recorded outcome: ${esc(a.outcome || "not reported")}</p>${d ? detail("Decision evidence and usage",d) : ""}${raw(a)}`;
     }
     if (stage === "validation") return `<h3>Whole-plan composition check</h3><p>${view.validation ? view.validation.valid ? 'Composition validation passed.' : 'Composition validation failed.' : 'No composition-validation event recorded.'}</p><p>${esc(view.validation?.scope || view.validation?.error || "")}</p>${raw(view.validation)}<p class="inspection-muted">A valid composition does not establish the factual quality of its outputs. Pre-execution governance is a separate control.</p>`;
     return `<h3>Accepted binding</h3><p>${view.accepted ? `<code>${esc(taskId)} → ${esc(view.accepted.accepted_choice)}</code>` : "No accepted-binding event recorded for this task."}</p>
       ${view.accepted ? `<p>${view.validatedBeforeAcceptance ? 'Whole-plan validation is recorded before this acceptance.' : 'A passing composition check before acceptance is not established by these records.'}</p>` : ""}
-      ${view.held ? `<p class="inspection-warning">Selection held: ${esc(view.held.reason || "inspect the recorded event")}</p>` : ""}
+      ${holdMessage ? `<p class="inspection-warning">${esc(holdMessage)}</p>` : ""}
       <p>${view.execution ? 'Application invocation is recorded for this task.' : 'No application invocation is recorded for this task.'}</p>${raw(view.accepted)}${raw(view.held)}`;
   }
 
