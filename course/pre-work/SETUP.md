@@ -25,7 +25,9 @@ The example configures:
 - **Generation:** Cerebras, `gpt-oss-120b`. Put its key in `LLM_API_KEY` privately.
 - **Decisions:** TypeSafe, pinned `jev-1.13.0`. Put its key in `DECISION_API_KEY` privately.
 
-Run `./scripts/test_model_provider.sh` (Windows: `scripts\test_model_provider.bat`). It makes a small real generation request and should finish with `result=PASS`. This check does not test TypeSafe; the first CV run tests the decision path. Keys on Spark are not transferred by Git.
+For both models hosted by Ollama, start from [`.env.ollama.example`](../../.env.ollama.example) instead: `cp .env.ollama.example .env` (Windows: `copy .env.ollama.example .env`). It configures GPT-OSS 120B and Clef 27B; put the same Ollama key in `LLM_API_KEY` and `DECISION_API_KEY`. No local Ollama installation is needed. Hosted Clef requires a paid plan or usage credits. As checked on 26 October 2026, Clef Flash is listed for local use; the hosted example uses Clef. See [Ollama's decision API](https://docs.ollama.com/capabilities/decision). This is a configuration example, not a completed course rehearsal with this hosted pair.
+
+Run `./scripts/test_model_provider.sh` (Windows: `scripts\test_model_provider.bat`). It makes a small real generation request and should finish with `result=PASS`. This check does not test the decision model; the first Session 1 CV run tests that path. Keys on Spark are not transferred by Git.
 
 The key names describe their jobs, not their vendors. `PROVIDER=openai` selects
 the OpenAI-compatible protocol; it does not require an OpenAI account. For
@@ -48,8 +50,8 @@ rehearsals with each provider.
 Decisions have separate settings: `DECISION_PROVIDER`, `DECISION_BASE_URL`,
 `DECISION_MODEL` and `DECISION_API_KEY`. A generic key name does not make a
 generation endpoint a decision endpoint: the native decision route requires
-the System One request/response contract. Keep TypeSafe configured for decisions
-or choose the local route below.
+the System One request/response contract. Use TypeSafe, the hosted Ollama example
+above, or the local route below.
 
 When switching providers, replace the key together with its endpoint so a key
 for one service is not sent to another. Compatible API shape is a starting point;
