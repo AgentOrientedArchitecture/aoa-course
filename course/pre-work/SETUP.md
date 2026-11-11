@@ -62,6 +62,32 @@ Check provider credit and account limits before class. The example does not prom
 
 ## Local models
 
+### oMLX: Qwen3.8 Next and LiquidAI d1
+
+For local inference on an Apple Silicon Mac, use
+[`.env.local.example`](../../.env.local.example). It selects Qwen3.8 Next for
+generation, including EVE, and `d1-2B-MLX-8bit` for native decision calls.
+[oMLX 0.7.3](https://github.com/jundot/omlx/releases/tag/v0.7.3) supports this
+d1 model through `/v1/systemone`, which the course already uses.
+
+Preserve your existing `.env` before copying the example to `.env`. Download both
+models in oMLX and use their exact `/v1/models` IDs. If oMLX requires a key, put
+that server's key in both `LLM_API_KEY` and `DECISION_API_KEY`. Leave real keys
+out of the example file. For unauthenticated inference, use
+`LLM_API_KEY=local-no-auth` and an empty `DECISION_API_KEY`.
+
+The example uses `http://host.docker.internal:8000/v1` for generation and
+`http://host.docker.internal:8000` for decisions. Docker must be able to reach
+oMLX on that port. Run `./scripts/test_model_provider.sh`, then exercise CV
+selection and wiki promotion to check the decision path. EVE native acceptance
+and the full course still need their own walkthrough: API compatibility alone
+does not establish reliable outputs. Keep `DECISION_ALLOW_UNSCORED=false`;
+the 0.65 gate remains an explicit teaching policy, not calibrated accuracy.
+The [5 November checks](../validation/2026-11-05-omlx-d1/README.md) record working
+Docker connectivity and the decision cases that still need attention.
+
+### Ollama
+
 Use the **same `.env`**. Its commented LOCAL OPTION lists the settings to change; uncommenting duplicate keys is unnecessary—edit the existing values. Install Ollama on the laptop and pull the named model first:
 
 ```bash

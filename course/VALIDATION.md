@@ -15,6 +15,7 @@ The [content review](DOCUMENTATION-REVIEW.md) describes the current documentatio
 | Exact-result review | A held case survived planner restart with the same result digest. Approval released the identical payload; an identical retry added no second release |
 | Local model route | Ollama `gpt-oss:20b` completed generation and constrained choice on Spark, without invented probabilities. Observed requests took roughly 111–168 seconds; this route needs a hardware-specific timing check before class |
 | Mac generation access | The consolidated provider smoke test completed a real Cerebras request on 25 October. It does not test TypeSafe |
+| oMLX Qwen Next / d1 | [5 November checks](validation/2026-11-05-omlx-d1/README.md) verified generation and six native decision calls from Docker. Four decision cases met expectations; data allocation held below 0.65 and frontend selection chose the general AU. Full course and EVE with this pair remain unrehearsed |
 
 [Structured AGNTCY rehearsal evidence](validation/2026-10-25-agntcy/live-evidence.json)
 records exact models, bindings, content IDs and outage behaviour. The

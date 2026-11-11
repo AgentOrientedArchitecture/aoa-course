@@ -146,7 +146,11 @@ async def run(args):
         cards.append(card)
     reference = deepcopy(cards[0])
     promotion_instructions = (ROOT / "system/agents/evaluator/capabilities/promote/instructions.md").read_text()
-    commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip() or "unavailable"
+    try:
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip() or "unavailable"
+    except FileNotFoundError:
+        # The course containers omit Git; source hashes still identify the code.
+        commit = "unavailable"
     report = {
         "schema_version": 1, "label": args.label,
         "started_at": datetime.now(timezone.utc).isoformat(), "commit": commit,
